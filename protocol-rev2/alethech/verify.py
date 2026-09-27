@@ -32,6 +32,8 @@ class VerifyReport:
     commits_invalid: int = 0
     commits_missing_parent: int = 0
     commits_identity_mismatch: int = 0
+    commits_revoked_key_after_cutoff: int = 0
+    commits_valid_historical: int = 0
     evidence_total: int = 0
     evidence_invalid: int = 0
     artifacts_total: int = 0
@@ -51,6 +53,7 @@ class VerifyReport:
             and self.commits_invalid == 0
             and self.commits_missing_parent == 0
             and self.commits_identity_mismatch == 0
+            and self.commits_revoked_key_after_cutoff == 0
             and self.evidence_invalid == 0
             and self.artifacts_missing == 0
             and self.artifacts_hash_mismatch == 0
@@ -61,7 +64,7 @@ class VerifyReport:
     def summary(self) -> str:
         lines = [
             f"identities: {self.identities_total - self.identities_invalid} verified, {self.identities_invalid} invalid",
-            f"commits: {self.commits_total - self.commits_invalid} verified, {self.commits_invalid} invalid, {self.commits_missing_parent} missing_parent, {self.commits_identity_mismatch} identity_mismatch",
+            f"commits: {self.commits_total - self.commits_invalid} verified, {self.commits_invalid} invalid, {self.commits_missing_parent} missing_parent, {self.commits_identity_mismatch} identity_mismatch, {self.commits_revoked_key_after_cutoff} revoked_after_cutoff, {self.commits_valid_historical} valid_historical",
             f"evidence: {self.evidence_total - self.evidence_invalid} verified, {self.evidence_invalid} invalid",
             f"artifacts: {self.artifacts_total - self.artifacts_missing - self.artifacts_hash_mismatch} verified, {self.artifacts_missing} missing, {self.artifacts_hash_mismatch} hash_mismatch",
         ]
@@ -124,11 +127,16 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
         identities_v2 = {}
 
     # 3. Verify each commit's signature and identity link
+    #    For v0.2 identities, also enforce reachability guarantee:
+    #    a commit signed with a revoked key MUST be in ancestry(cutoff_head).
+    #    This is the guarantee tonydzi flagged as untested — wiring it here
+    #    makes verify_store actually reject 'dark' commits.
     for cid, commit in commits.items():
         # Try legacy identity first
         ident = identities.get(commit.agent_id)
         if ident is not None:
             public_jwk = ident.public_key
+            key_state = "VALID_LEGACY"
         else:
             # Try v0.2 identity — find the key by key_id
             v2_ident = None
@@ -142,10 +150,18 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
                 continue
             # Find the key_id in active or revoked keys
             key_obj = None
-            for k in v2_ident.active_keys + v2_ident.revoked_keys:
+            key_state = "UNKNOWN_KEY"
+            for k in v2_ident.active_keys:
                 if k.get("key_id") == commit.key_id:
                     key_obj = k
+                    key_state = "VALID"
                     break
+            if key_obj is None:
+                for k in v2_ident.revoked_keys:
+                    if k.get("key_id") == commit.key_id:
+                        key_obj = k
+                        key_state = "REVOKED"
+                        break
             if key_obj is None:
                 report.commits_invalid += 1
                 report.errors.append(f"unknown_key: commit {cid} uses key_id {commit.key_id} not in identity {commit.agent_id}")
@@ -156,6 +172,31 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
             report.commits_invalid += 1
             report.errors.append(f"signature_invalid: commit {cid} does not verify against identity {commit.agent_id}")
             continue
+
+        # Reachability guarantee (rev 3): a commit signed with a revoked key
+        # must be in ancestry(cutoff_head). If it's not, the revoked key was
+        # used AFTER rotation — a 'dark' commit. This is the one guarantee
+        # the design adds over plain signature verification, and the one the
+        # test suite MUST watch fail (see test_revoked_key_reachability).
+        if key_state == "REVOKED":
+            cutoff_head = key_obj.get("cutoff_head", "")
+            if not cutoff_head:
+                report.commits_revoked_key_after_cutoff += 1
+                report.errors.append(
+                    f"revoked_key_after_cutoff: commit {cid} signed with revoked key "
+                    f"{commit.key_id} but cutoff_head is empty (cannot prove pre-rotation)"
+                )
+                continue
+            if not ancestry_check(cid, cutoff_head, commits):
+                report.commits_revoked_key_after_cutoff += 1
+                report.errors.append(
+                    f"revoked_key_after_cutoff: commit {cid} signed with revoked key "
+                    f"{commit.key_id} is NOT in ancestry of cutoff_head {cutoff_head} "
+                    f"(post-rotation use of revoked key)"
+                )
+                continue
+            # Signature OK and commit IS in ancestry(cutoff_head) → historical use, fine.
+            report.commits_valid_historical += 1
 
     # 4. DAG integrity
     commit_ids = set(commits.keys())
