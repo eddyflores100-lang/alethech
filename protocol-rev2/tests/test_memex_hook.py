@@ -133,14 +133,16 @@ def test_add_writes_to_both_stores(v02_alethech):
     assert mc.provenance["source_id"] == result["id"]
 
 
-def test_add_returns_same_dict_as_memex(v02_alethech):
-    """hook.add() should return exactly what memex.add() would return."""
+def test_add_returns_result_with_memex_id(v02_alethech):
+    """hook.add() should return a result with the memex_id."""
     alethech_path, memex = v02_alethech
     hook = MemexAlethechHook(memex_store=memex, alethech_store_path=alethech_path)
 
     result = hook.add("test text", user_id="agent")
-    expected = {"id": result["id"], "text": "test text"}
-    assert result == expected
+    assert result["id"] is not None
+    assert result["text"] == "test text"
+    assert result["success"] is True
+    assert result["compensation_status"] == "not_needed"
 
 
 def test_multiple_writes_create_chain(v02_alethech):
