@@ -2,6 +2,16 @@
 
 Write-hook that signs every memex memory with alethech.
 
+## status
+
+**Implementation works and is tested. The cryptographic semantics of
+post-rotation in DAGs with branches is NOT closed.**
+
+See `INTEGRATION.md` in the repo root for the full status disclosure.
+The hook itself is correct: it signs every write. The open question is
+in the identity layer, not the integration layer.
+
+
 ## usage
 
 ```python

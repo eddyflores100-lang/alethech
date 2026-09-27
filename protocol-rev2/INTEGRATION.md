@@ -2,6 +2,41 @@
 
 > Make every memex memory cryptographically verifiable — without changing memex.
 
+## STATUS — read this first
+
+**The implementation works. The cryptographic protocol is NOT closed.**
+
+What is implemented and tested (67 tests passing):
+- Identity creation (Ed25519, SHA-256, agent_id derivation)
+- MemoryCommit signing and verification
+- Key rotation (atomic, with cutoff_head)
+- Migration from v0.1 to v0.2 (bilateral signatures)
+- The memex hook (writes to ChromaDB + creates signed commits)
+
+What is NOT yet cryptographically closed:
+- The semantics of "post-rotation" in a DAG with branches. Specifically:
+  The claim `C ∉ ancestry(cutoff_head) ⇒ C is post-rotation` does NOT
+  follow from the cryptographic properties. A commit can be outside the
+  ancestry of cutoff_head without having been created after the rotation
+  (e.g., a parallel branch created before the rotation but not merged).
+- Until this is formally resolved, `rev 3` of the identity spec remains
+  `AUDIT_PENDING`. An adversarial audit is pending and the audit material
+  is available on request.
+
+What this means for users:
+- If you use the hook today, your commits ARE signed and verifiable.
+- If you never rotate keys, none of the open issue affects you.
+- If you DO rotate keys, the protocol correctly identifies commits
+  signed with revoked keys, but the distinction between
+  `VALID_HISTORICAL` and `REVOKED_KEY_AFTER_CUTOFF` in DAGs with
+  branches may not be as precise as the names suggest. We are working
+  on a formal definition.
+
+For the full audit material (33 questions + 7 design tests + 5 new
+adversarial questions), see the project documentation or request it
+from the maintainer.
+
+
 ## quickstart
 
 ```bash
