@@ -134,7 +134,14 @@ class Store:
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 commit = MemoryCommit.from_dict(data)
+                if commit.commit_id in commits:
+                    raise StoreError(
+                        f"duplicate commit_id {commit.commit_id} in {path.name} "
+                        f"(also in another file) — data corruption detected"
+                    )
                 commits[commit.commit_id] = commit
+            except StoreError:
+                raise
             except Exception as e:
                 raise StoreError(f"corrupted commit {path.name}: {e}") from e
         return commits

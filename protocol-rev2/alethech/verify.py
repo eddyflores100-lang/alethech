@@ -222,6 +222,12 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
             report.head_invalid = "points to nonexistent commit"
             report.errors.append(f"head_invalid: HEAD points to nonexistent commit {head}")
 
+    # 8b. Verify identity layer (rev 3: ControlEvents, MigrationRecords, RootAuthority)
+    try:
+        report = verify_identity_layer(store, report)
+    except Exception as e:
+        report.errors.append(f"identity_layer_verification_failed: {e}")
+
     # 9. Continuity against external checkpoint (corrección 2)
     if checkpoint is not None:
         cp_ident = identities.get(checkpoint.agent_id)
@@ -286,10 +292,11 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
     - Each revoked key has a cutoff_head
     - Migration records (if any) have bilateral signatures
     """
+    # Root authority is optional (v0.1 stores don't have it)
     try:
         root = store.load_root_authority()
-    except Exception as e:
-        report.errors.append(f"root_authority_load_failed: {e}")
+    except Exception:
+        # No root authority — this is a v0.1 store, skip identity layer verification
         return report
 
     if not root.verify_self():

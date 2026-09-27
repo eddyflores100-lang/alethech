@@ -129,15 +129,10 @@ class TestMissingParent:
 
 class TestDuplicateDifferentContent:
     def test_two_files_same_id_different_content(self, populated):
-        """BUG FOUND: Two files with same commit_id but different content —
-        verify silently ignores one (dict key collision).
+        """FIXED: load_commits() now detects duplicate commit_ids and raises StoreError.
         
-        This is a real finding: load_commits() uses commit_id as dict key,
-        so the last file loaded wins. If the original is loaded after the
-        tampered copy, the tampered copy is silently dropped.
-        
-        Expected behavior: verify should detect the collision and report it.
-        Current behavior: silently ignores one of the two.
+        Two files with same commit_id but different content now cause
+        verify to fail with 'duplicate commit_id' error.
         """
         commit_files = list((populated / "commits").glob("*.json"))
         target = commit_files[-1]
@@ -147,26 +142,18 @@ class TestDuplicateDifferentContent:
         dup.write_text(json.dumps(data, indent=2))
 
         code, output = _verify(populated)
-        # Document the bug: verify may pass or fail depending on file load order
-        # This is non-deterministic — the test documents the issue
-        print(f"\n[BUG] Duplicate commit files with different content: {output[:100]}")
-        # Don't assert — document the finding
-        # When this bug is fixed, this test should assert FAIL
+        assert "FAIL" in output or code != 0, \
+            f"should detect duplicate commit_id: {output}"
 
 
 # ============ 5. Corrupt ControlEvent ============
 
 class TestCorruptControlEvent:
     def test_modified_control_event_field(self, populated):
-        """BUG FOUND: verify_store does NOT check ControlEvent chain.
+        """FIXED: verify_store now calls verify_identity_layer.
         
-        verify_identity_layer() exists but is NOT called by verify_store().
-        A modified ControlEvent (with changed field but same signature)
-        passes verify without detection.
-        
-        Expected behavior: verify should call verify_identity_layer and detect
-        that the ControlEvent signature no longer matches its content.
-        Current behavior: ControlEvents are not checked by `alethech verify`.
+        A modified ControlEvent (changed field, same signature) is now
+        detected because verify checks the ControlEvent chain.
         """
         ce_dir = populated / "control_events"
         if not ce_dir.is_dir() or not list(ce_dir.glob("*.json")):
@@ -177,10 +164,8 @@ class TestCorruptControlEvent:
         ce_file.write_text(json.dumps(data, indent=2))
 
         code, output = _verify(populated)
-        print(f"\n[BUG] Modified ControlEvent not detected by verify: {output[:100]}")
-        # Document the bug: verify passes when it shouldn't
-        # This test will be updated when verify_identity_layer is integrated
-        assert True  # document, don't fail
+        assert "FAIL" in output or "control_chain" in output or "signature_invalid" in output, \
+            f"should detect corrupt ControlEvent: {output}"
 
 
 # ============ 6. Corrupt checkpoint ============
