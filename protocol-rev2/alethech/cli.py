@@ -365,11 +365,43 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
     (out / "evidence").mkdir(exist_ok=True)
     (out / "artifacts").mkdir(exist_ok=True)
 
-    # Copy identities
+    # Copy identities (legacy)
     identities = store.load_identities()
     for ident in identities.values():
         (out / "identities" / f"{ident.agent_id}.json").write_text(
             json.dumps(ident.to_dict(), indent=2), encoding="utf-8"
+        )
+
+    # Copy IdentityRecordV2 (v0.2 identity layer)
+    v2_identities = store.load_identity_records_v2()
+    for ident in v2_identities.values():
+        (out / "identities" / f"{ident.agent_id}.json").write_text(
+            json.dumps(ident.to_signed_dict(), indent=2), encoding="utf-8"
+        )
+
+    # Copy RootAuthority
+    try:
+        root_auth = store.load_root_authority()
+        (out / "root_authority.json").write_text(
+            json.dumps(root_auth.to_signed_dict(), indent=2), encoding="utf-8"
+        )
+    except Exception:
+        pass  # no root authority (v0.1 store)
+
+    # Copy ControlEvents
+    control_events = store.load_control_events()
+    (out / "control_events").mkdir(exist_ok=True)
+    for ev in control_events.values():
+        (out / "control_events" / f"{ev.commit_id}.json").write_text(
+            json.dumps(ev.to_signed_dict(), indent=2), encoding="utf-8"
+        )
+
+    # Copy MigrationRecords
+    migrations = store.load_migration_records()
+    (out / "migrations").mkdir(exist_ok=True)
+    for mig in migrations.values():
+        (out / "migrations" / f"{mig.commit_id}.json").write_text(
+            json.dumps(mig.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
     # Copy commits
@@ -510,13 +542,22 @@ def import_(input_path: str, target_path: str | None,
     if not crypto.KeyPair.verify(pub, sig_bytes, msg):
         raise click.ClickException("manifest signature invalid")
 
-    # 4: Load all identities in package
+    # 4: Load all identities in package (both legacy Identity and IdentityRecordV2)
     pkg_identities: dict[str, Identity] = {}
+    pkg_identities_v2: dict[str, IdentityRecordV2] = {}
     for path in (src / "identities").glob("*.json"):
-        ident = Identity.from_dict(json.loads(path.read_text(encoding="utf-8")))
-        if not ident.verify_self():
-            raise click.ClickException(f"identity_mismatch in package: {ident.agent_id}")
-        pkg_identities[ident.agent_id] = ident
+        data = json.loads(path.read_text(encoding="utf-8"))
+        id_type = data.get("type", "")
+        if id_type == "IdentityRecordV2":
+            ident = IdentityRecordV2.from_dict(data)
+            if not ident.verify_self():
+                raise click.ClickException(f"identity_mismatch in package: {ident.agent_id}")
+            pkg_identities_v2[ident.agent_id] = ident
+        elif id_type == "Identity":
+            ident = Identity.from_dict(data)
+            if not ident.verify_self():
+                raise click.ClickException(f"identity_mismatch in package: {ident.agent_id}")
+            pkg_identities[ident.agent_id] = ident
 
     # 5: Load commits and evidence from package
     pkg_commits: dict[str, MemoryCommit] = {}
@@ -529,19 +570,45 @@ def import_(input_path: str, target_path: str | None,
         ev = EvidenceCommit.from_dict(json.loads(path.read_text(encoding="utf-8")))
         pkg_evidence[ev.commit_id] = ev
 
-    # 5b: Verify each commit's signature
+    # 5b: Verify each commit's signature (check legacy Identity and IdentityRecordV2)
     for cid, commit in pkg_commits.items():
         ident = pkg_identities.get(commit.agent_id)
-        if ident is None:
-            raise click.ClickException(f"unknown_identity in package: commit {cid} claims {commit.agent_id}")
-        if not commit.verify(ident.public_key):
+        if ident is not None:
+            public_jwk = ident.public_key
+        else:
+            v2_ident = pkg_identities_v2.get(commit.agent_id)
+            if v2_ident is not None:
+                key_obj = None
+                for k in v2_ident.active_keys + v2_ident.revoked_keys:
+                    if k.get("key_id") == commit.key_id:
+                        key_obj = k
+                        break
+                if key_obj is None:
+                    raise click.ClickException(f"unknown_key in package: commit {cid} uses key_id {commit.key_id}")
+                public_jwk = key_obj["public_key"]
+            else:
+                raise click.ClickException(f"unknown_identity in package: commit {cid} claims {commit.agent_id}")
+        if not commit.verify(public_jwk):
             raise click.ClickException(f"signature_invalid in package: commit {cid}")
 
     for eid, ev in pkg_evidence.items():
         ident = pkg_identities.get(ev.agent_id)
-        if ident is None:
-            raise click.ClickException(f"unknown_identity in package: evidence {eid} claims {ev.agent_id}")
-        if not ev.verify(ident.public_key):
+        if ident is not None:
+            public_jwk = ident.public_key
+        else:
+            v2_ident = pkg_identities_v2.get(ev.agent_id)
+            if v2_ident is not None:
+                key_obj = None
+                for k in v2_ident.active_keys + v2_ident.revoked_keys:
+                    if k.get("key_id") == ev.key_id:
+                        key_obj = k
+                        break
+                if key_obj is None:
+                    raise click.ClickException(f"unknown_key in package: evidence {eid}")
+                public_jwk = key_obj["public_key"]
+            else:
+                raise click.ClickException(f"unknown_identity in package: evidence {eid} claims {ev.agent_id}")
+        if not ev.verify(public_jwk):
             raise click.ClickException(f"signature_invalid in package: evidence {eid}")
 
     # 6: Open or init target store
@@ -565,6 +632,36 @@ def import_(input_path: str, target_path: str | None,
             )
         # Trust it — write it
         store.write_identity(ident)
+
+    # 7a: Write v0.2 identity records to target
+    for agent_id, ident in pkg_identities_v2.items():
+        store.write_identity_record_v2(ident)
+
+    # 7b: Copy identity layer objects (v0.2)
+    # Copy RootAuthority
+    root_path = src / "root_authority.json"
+    if root_path.is_file():
+        store.write_root_authority(
+            __import__("alethech.objects", fromlist=["RootAuthority"]).RootAuthority.from_dict(
+                json.loads(root_path.read_text(encoding="utf-8"))
+            )
+        )
+
+    # Copy ControlEvents
+    ce_dir = src / "control_events"
+    if ce_dir.is_dir():
+        for ce_path in ce_dir.glob("*.json"):
+            ce_data = json.loads(ce_path.read_text(encoding="utf-8"))
+            ce = __import__("alethech.objects", fromlist=["ControlEvent"]).ControlEvent.from_dict(ce_data)
+            store.write_control_event(ce)
+
+    # Copy MigrationRecords
+    mig_dir = src / "migrations"
+    if mig_dir.is_dir():
+        for mig_path in mig_dir.glob("*.json"):
+            mig_data = json.loads(mig_path.read_text(encoding="utf-8"))
+            mig = __import__("alethech.objects", fromlist=["MigrationRecord"]).MigrationRecord.from_dict(mig_data)
+            store.write_migration_record(mig)
 
     # 8: Copy commits (don't overwrite)
     target_commits = store.load_commits()
