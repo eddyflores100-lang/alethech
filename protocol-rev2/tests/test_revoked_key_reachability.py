@@ -580,3 +580,129 @@ class TestRecallSeamDefeats:
         assert report.ok is False, \
             "verify_store must reject when IdentityRecord is inconsistent " \
             "with ControlEvent chain"
+
+
+# ============================================================================
+# 6. Cutoff-head mutation — second recall-seam defeat
+# ============================================================================
+
+class TestCutoffHeadMutation:
+    """Second recall-seam defeat: instead of moving K1 from revoked_keys
+    to active_keys (covered by TestRecallSeamDefeats), the attacker keeps
+    K1 in revoked_keys but MUTATES the cutoff_head to point at the dark
+    commit itself (or any commit that has the dark commit in its ancestry).
+
+    Attack scenario:
+      1. K1 rotated to K2, cutoff_head = C1
+      2. Attacker constructs dark commit D, signed with K1, parents = [C1]
+      3. D is a child of C1, NOT in ancestry(C1) — so normally rejected
+      4. Attacker mutates IdentityRecord: changes K1's cutoff_head from
+         C1 to D
+      5. Re-signs IdentityRecord with root
+      6. Now ancestry_check(D, D) = True → D passes as VALID_HISTORICAL
+
+    The ControlEvent still says cutoff_head = C1. The IdentityRecord now
+    says cutoff_head = D. They don't match.
+
+    verify MUST detect this mismatch — the cutoff_head in the
+    IdentityRecord must match the cutoff_head declared in the
+    ControlEvent that revoked the key. If it doesn't, the reachability
+    frontier has been tampered with, and the ancestry check is
+    validating against the WRONG frontier.
+    """
+
+    def test_cutoff_head_mutated_to_dark_commit(
+        self, store_with_pre_rotation_commit, runner
+    ):
+        """Mutate cutoff_head to point at the dark commit itself.
+
+        Before fix: ancestry_check(D, D) = True → D passes as
+        VALID_HISTORICAL. verify returns OK.
+
+        After fix: verify detects that IdentityRecord's cutoff_head
+        does not match the ControlEvent's cutoff_head →
+        identity_control_event_mismatch.
+        """
+        s, k1_keypair, c1_id = store_with_pre_rotation_commit
+
+        # Rotate K1 → K2 (cutoff_head = C1)
+        r = runner.invoke(cli, ["--store", str(s), "key", "rotate"])
+        assert r.exit_code == 0
+
+        store = Store.open(s)
+        identities = store.load_identity_records_v2()
+        ident = next(iter(identities.values()))
+
+        # Verify K1 is in revoked_keys with cutoff_head = C1
+        k1_entry = next(k for k in ident.revoked_keys if k["key_id"] == "key-001")
+        original_cutoff = k1_entry["cutoff_head"]
+        assert original_cutoff == c1_id, \
+            f"cutoff_head should be C1 ({c1_id}), got {original_cutoff}"
+
+        # Construct dark commit D, signed with K1, parents = [C1]
+        dark = MemoryCommit(
+            agent_id=ident.agent_id,
+            key_id="key-001",
+            parents=[c1_id],
+            content={"dark": "cutoff_head mutation test"},
+        )
+        dark.sign(k1_keypair)
+        store.write_commit(dark)
+        dark_id = dark.commit_id
+
+        # MUTATION: change K1's cutoff_head from C1 to D (the dark commit)
+        for k in ident.revoked_keys:
+            if k["key_id"] == "key-001":
+                k["cutoff_head"] = dark_id
+
+        # Re-sign IdentityRecord with root
+        root_keypair = store.load_root_key()
+        ident.sign(root_keypair)
+        store.write_identity_record_v2(ident)
+
+        # verify MUST fail — cutoff_head in IdentityRecord does not match
+        # the ControlEvent's cutoff_head
+        r = runner.invoke(cli, ["--store", str(s), "verify"])
+        assert r.exit_code != 0, \
+            f"verify must detect cutoff_head mutation: {r.output}"
+        assert "FAIL" in r.output
+        assert "identity_control_event_mismatch" in r.output or \
+               "cutoff_head_mismatch" in r.output, \
+            f"must report cutoff_head mismatch: {r.output}"
+
+    def test_cutoff_head_mutated_to_dark_commit_api(
+        self, store_with_pre_rotation_commit, runner
+    ):
+        """Same via verify_store API."""
+        s, k1_keypair, c1_id = store_with_pre_rotation_commit
+
+        runner.invoke(cli, ["--store", str(s), "key", "rotate"])
+
+        store = Store.open(s)
+        ident = next(iter(store.load_identity_records_v2().values()))
+
+        dark = MemoryCommit(
+            agent_id=ident.agent_id,
+            key_id="key-001",
+            parents=[c1_id],
+            content={"dark": "API cutoff_head mutation test"},
+        )
+        dark.sign(k1_keypair)
+        store.write_commit(dark)
+        dark_id = dark.commit_id
+
+        # Mutate cutoff_head
+        for k in ident.revoked_keys:
+            if k["key_id"] == "key-001":
+                k["cutoff_head"] = dark_id
+        root_keypair = store.load_root_key()
+        ident.sign(root_keypair)
+        store.write_identity_record_v2(ident)
+
+        report = verify_store(store)
+        assert report.ok is False, \
+            "verify_store must reject when cutoff_head is mutated"
+        assert any(
+            "identity_control_event_mismatch" in e or "cutoff_head" in e
+            for e in report.errors
+        ), f"must report cutoff_head mismatch in errors: {report.errors}"

@@ -419,16 +419,29 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
                         f"nonexistent cutoff_head {ev.cutoff_head}"
                     )
 
-        # RECALL-SEAM DEFENSE (0.5.4): Verify consistency between the
-        # ControlEvent chain and the IdentityRecord. A key_rotation or
+        # RECALL-SEAM DEFENSE (0.5.4 + 0.5.5): Verify consistency between
+        # the ControlEvent chain and the IdentityRecord. A key_rotation or
         # key_revoke ControlEvent declares that a key was revoked at a
         # specific cutoff_head. The IdentityRecord MUST reflect this —
         # the revoked key MUST appear in revoked_keys with the matching
-        # cutoff_head. If the IdentityRecord says the key is in
-        # active_keys instead, the reachability check in verify_store
-        # is silently bypassed — this is the "recall seam" defeat
-        # tonydzi described: the guarantee is defeated without editing
-        # the line that implements the check.
+        # cutoff_head.
+        #
+        # Two defeat modes covered:
+        #
+        # (a) 0.5.4 — key moved from revoked_keys to active_keys.
+        #     The reachability check (if key_state == "REVOKED":) is
+        #     never invoked. Dark commit passes as VALID.
+        #
+        # (b) 0.5.5 — key stays in revoked_keys but cutoff_head is
+        #     mutated to point at the dark commit itself (or any commit
+        #     that has the dark commit in its ancestry). The reachability
+        #     check IS invoked, but against the WRONG frontier —
+        #     ancestry_check(D, D) returns True, so D passes as
+        #     VALID_HISTORICAL.
+        #
+        # Both are "recall seam" defeats in tonydzi's sense: the
+        # guarantee is defeated without editing the line that implements
+        # the check. Text moves; properties don't.
         for ident in identities_v2.values():
             for ev in events.values():
                 if ev.event_type not in ("key_rotation", "key_revoke"):
@@ -437,24 +450,55 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
                 revoked_key_id = ev.old_key_id if ev.event_type == "key_rotation" else ev.key_id
                 if not revoked_key_id:
                     continue
-                # Only check if this key_id is associated with this identity.
-                # The IdentityRecord may have multiple keys; we need to find
-                # the one matching the ControlEvent.
-                in_revoked = any(
+
+                # Check if the key is in revoked_keys with the MATCHING
+                # cutoff_head (the legitimate state after rotation).
+                in_revoked_matching = any(
                     k.get("key_id") == revoked_key_id
                     and k.get("cutoff_head") == ev.cutoff_head
                     for k in ident.revoked_keys
                 )
+                # Check if the key is in revoked_keys but with a
+                # MISMATCHED cutoff_head (defeat mode b).
+                in_revoked_mismatched = any(
+                    k.get("key_id") == revoked_key_id
+                    and k.get("cutoff_head") != ev.cutoff_head
+                    for k in ident.revoked_keys
+                )
+                # Check if the key is in active_keys (defeat mode a).
                 in_active = any(
                     k.get("key_id") == revoked_key_id
                     for k in ident.active_keys
                 )
-                if in_active and not in_revoked:
+
+                # Defeat (a): key in active_keys, not in revoked_keys
+                # with matching cutoff.
+                if in_active and not in_revoked_matching:
                     report.errors.append(
                         f"identity_control_event_mismatch: ControlEvent {ev.commit_id} "
                         f"declares {revoked_key_id} revoked (event_type={ev.event_type}, "
                         f"cutoff_head={ev.cutoff_head}) but IdentityRecord "
                         f"{ident.agent_id} lists it as active — recall-seam defeat"
+                    )
+
+                # Defeat (b): key in revoked_keys but with a different
+                # cutoff_head than the ControlEvent declares. The
+                # reachability check will run against the wrong frontier.
+                if in_revoked_mismatched and not in_revoked_matching:
+                    # Find the mismatched entry to report which cutoff_head
+                    # was used
+                    mismatched_entry = next(
+                        (k for k in ident.revoked_keys
+                         if k.get("key_id") == revoked_key_id
+                         and k.get("cutoff_head") != ev.cutoff_head),
+                        None
+                    )
+                    actual_cutoff = mismatched_entry.get("cutoff_head", "") if mismatched_entry else ""
+                    report.errors.append(
+                        f"identity_control_event_mismatch: ControlEvent {ev.commit_id} "
+                        f"declares cutoff_head={ev.cutoff_head} for {revoked_key_id} "
+                        f"but IdentityRecord {ident.agent_id} has cutoff_head="
+                        f"{actual_cutoff} — reachability frontier tampered"
                     )
 
     # Verify migration records
