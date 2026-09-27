@@ -420,3 +420,163 @@ class TestReachabilityWiredIntoVerify:
         assert "not_in_proven_pre_rotation_history" in r.output, \
             f"must report not_in_proven_pre_rotation_history when cutoff_head " \
             f"is empty: {r.output}"
+
+
+# ============================================================================
+# 5. Recall-seam defeats — tonydzi's "second mutation" for alethech
+# ============================================================================
+
+class TestRecallSeamDefeats:
+    """Property-level tests that defeat the guarantee at the RECALL SEAM
+    (data mutations), not at the line that implements the check (code
+    mutations).
+
+    Context: tonydzi's review of cognicore-dev/cognicore-env#136 found that
+    a textual tripwire (`test_reachability_check_defeat_makes_suite_red`)
+    only caught mutations that edited the specific line `if dark:`. When
+    he defeated reachability at the recall seam
+    (`dark = imported_ids - reachable_ids` -> `dark = set()`), the tripwire
+    stayed green. The semantic test (`test_dark_claim_fails_import`)
+    caught both.
+
+    His general form:
+        "a test that proves a guarantee must defeat the guarantee,
+         not defeat the line that implements it. Text moves; properties don't."
+
+    For alethech, the equivalent recall seam is the IdentityRecord. If
+    someone mutates the IdentityRecord to move K1 from revoked_keys back
+    to active_keys (and re-signs with the root key), the
+    `if key_state == "REVOKED":` block never executes — the reachability
+    check is defeated WITHOUT editing any line of verify.py.
+
+    These tests construct that mutation and assert verify STILL rejects
+    the dark commit. If verify accepts it, we have a recall-seam gap and
+    must fix verify_identity_layer to detect the inconsistency between
+    the IdentityRecord and the ControlEvent chain.
+
+    The key insight: a key_rotation ControlEvent says "K1 was rotated to
+    K2 at cutoff_head C1". The IdentityRecord should reflect this —
+    K1 should be in revoked_keys with cutoff_head = C1. If the
+    IdentityRecord says K1 is in active_keys, it is INCONSISTENT with
+    the ControlEvent chain, regardless of whether the IdentityRecord's
+    own signature is valid.
+    """
+
+    def test_identity_record_undeclares_revocation(
+        self, store_with_pre_rotation_commit, runner
+    ):
+        """Recall-seam defeat: move K1 from revoked_keys back to
+        active_keys in the IdentityRecord, re-sign with root.
+
+        The IdentityRecord signature is valid (we re-signed with root).
+        The ControlEvent chain still has the key_rotation event.
+        But the IdentityRecord no longer reflects the rotation.
+
+        verify MUST detect this inconsistency. If it doesn't, the
+        reachability guarantee is defeated at the recall seam — the
+        dark commit would pass verify because key_state == "VALID"
+        (K1 is in active_keys), so the reachability check is never
+        invoked.
+        """
+        s, k1_keypair, c1_id = store_with_pre_rotation_commit
+
+        # Rotate K1 -> K2 (cutoff_head = C1)
+        r = runner.invoke(cli, ["--store", str(s), "key", "rotate"])
+        assert r.exit_code == 0
+
+        store = Store.open(s)
+        identities = store.load_identity_records_v2()
+        ident = next(iter(identities.values()))
+
+        # Sanity: K1 should be in revoked_keys after rotation
+        assert any(k["key_id"] == "key-001" for k in ident.revoked_keys), \
+            "K1 must be in revoked_keys after rotation"
+        assert any(k["key_id"] == "key-002" for k in ident.active_keys), \
+            "K2 must be in active_keys after rotation"
+
+        # RECALL-SEAM MUTATION: move K1 back to active_keys
+        k1_entry = None
+        for k in ident.revoked_keys:
+            if k["key_id"] == "key-001":
+                k1_entry = k
+                break
+        assert k1_entry is not None
+        ident.revoked_keys = [k for k in ident.revoked_keys if k["key_id"] != "key-001"]
+        # Add K1 to active_keys (alongside K2 — this is the inconsistency)
+        ident.active_keys.append({
+            "key_id": "key-001",
+            "public_key": k1_entry["public_key"],
+            "authorized_at": k1_entry.get("revoked_at", ""),
+            "authorized_by": k1_entry.get("revoked_by", ""),
+            "expires_at": None,
+        })
+
+        # Re-sign the IdentityRecord with root (otherwise the signature
+        # check fails, which is a DIFFERENT error and obscures the test)
+        root_keypair = store.load_root_key()
+        ident.sign(root_keypair)
+        store.write_identity_record_v2(ident)
+
+        # Construct a dark commit signed with K1, parents = [c1_id]
+        constructed = MemoryCommit(
+            agent_id=ident.agent_id,
+            key_id="key-001",
+            parents=[c1_id],
+            content={"constructed": "recall-seam defeat test"},
+        )
+        constructed.sign(k1_keypair)
+        store.write_commit(constructed)
+
+        # verify MUST fail — the IdentityRecord is inconsistent with the
+        # ControlEvent chain (key_rotation event exists, but IdentityRecord
+        # says K1 is active).
+        r = runner.invoke(cli, ["--store", str(s), "verify"])
+        assert r.exit_code != 0, \
+            f"verify must detect recall-seam defeat: {r.output}"
+        assert "FAIL" in r.output
+        # The error should mention the inconsistency — either:
+        # - identity_control_event_mismatch (the new check we're about to add)
+        # - or some other error that reveals the dark commit was caught
+        assert r.output != "", f"verify produced no output: {r.output}"
+
+    def test_identity_record_undeclares_revocation_api(
+        self, store_with_pre_rotation_commit, runner
+    ):
+        """Same as above but via the verify_store API, to check the
+        VerifyReport directly."""
+        s, k1_keypair, c1_id = store_with_pre_rotation_commit
+
+        runner.invoke(cli, ["--store", str(s), "key", "rotate"])
+
+        store = Store.open(s)
+        identities = store.load_identity_records_v2()
+        ident = next(iter(identities.values()))
+
+        # Move K1 back to active_keys
+        k1_entry = next(k for k in ident.revoked_keys if k["key_id"] == "key-001")
+        ident.revoked_keys = [k for k in ident.revoked_keys if k["key_id"] != "key-001"]
+        ident.active_keys.append({
+            "key_id": "key-001",
+            "public_key": k1_entry["public_key"],
+            "authorized_at": k1_entry.get("revoked_at", ""),
+            "authorized_by": k1_entry.get("revoked_by", ""),
+            "expires_at": None,
+        })
+        root_keypair = store.load_root_key()
+        ident.sign(root_keypair)
+        store.write_identity_record_v2(ident)
+
+        # Construct dark commit
+        constructed = MemoryCommit(
+            agent_id=ident.agent_id,
+            key_id="key-001",
+            parents=[c1_id],
+            content={"constructed": "API recall-seam test"},
+        )
+        constructed.sign(k1_keypair)
+        store.write_commit(constructed)
+
+        report = verify_store(store)
+        assert report.ok is False, \
+            "verify_store must reject when IdentityRecord is inconsistent " \
+            "with ControlEvent chain"

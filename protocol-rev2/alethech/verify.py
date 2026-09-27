@@ -419,6 +419,44 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
                         f"nonexistent cutoff_head {ev.cutoff_head}"
                     )
 
+        # RECALL-SEAM DEFENSE (0.5.4): Verify consistency between the
+        # ControlEvent chain and the IdentityRecord. A key_rotation or
+        # key_revoke ControlEvent declares that a key was revoked at a
+        # specific cutoff_head. The IdentityRecord MUST reflect this —
+        # the revoked key MUST appear in revoked_keys with the matching
+        # cutoff_head. If the IdentityRecord says the key is in
+        # active_keys instead, the reachability check in verify_store
+        # is silently bypassed — this is the "recall seam" defeat
+        # tonydzi described: the guarantee is defeated without editing
+        # the line that implements the check.
+        for ident in identities_v2.values():
+            for ev in events.values():
+                if ev.event_type not in ("key_rotation", "key_revoke"):
+                    continue
+                # key_rotation revokes old_key_id; key_revoke revokes key_id
+                revoked_key_id = ev.old_key_id if ev.event_type == "key_rotation" else ev.key_id
+                if not revoked_key_id:
+                    continue
+                # Only check if this key_id is associated with this identity.
+                # The IdentityRecord may have multiple keys; we need to find
+                # the one matching the ControlEvent.
+                in_revoked = any(
+                    k.get("key_id") == revoked_key_id
+                    and k.get("cutoff_head") == ev.cutoff_head
+                    for k in ident.revoked_keys
+                )
+                in_active = any(
+                    k.get("key_id") == revoked_key_id
+                    for k in ident.active_keys
+                )
+                if in_active and not in_revoked:
+                    report.errors.append(
+                        f"identity_control_event_mismatch: ControlEvent {ev.commit_id} "
+                        f"declares {revoked_key_id} revoked (event_type={ev.event_type}, "
+                        f"cutoff_head={ev.cutoff_head}) but IdentityRecord "
+                        f"{ident.agent_id} lists it as active — recall-seam defeat"
+                    )
+
     # Verify migration records
     try:
         migrations = store.load_migration_records()
