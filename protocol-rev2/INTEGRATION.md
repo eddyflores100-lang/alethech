@@ -27,6 +27,30 @@ What is implemented and tested:
 5. Invalid JWK passed verify_self → FIXED (JWK structure validation added)
 6. Missing RootAuthority with IdentityRecordV2 → FIXED (verify detects)
 
+Properties demonstrated — protocol (cryptographic core):
+  - Integrity of commits (SHA-256 + Ed25519)
+  - Cryptographic authorship
+  - Key authorization (ControlEvent chain)
+  - Non-destructive rotation (cutoff_head + ancestry)
+  - Bilateral migration
+  - Offline verification
+  - Tamper detection
+  - Export/import portability
+
+Properties demonstrated — hook/integration (not protocol):
+  - Atomicity with compensation (depends on ChromaDB.delete())
+  - Idempotency with conflict detection (depends on hook implementation)
+  NOTE: these are properties of the MemexAlethechHook adapter, not of the
+  alethech protocol itself. They depend on ChromaDB's behavior and the
+  hook's lock/compensation logic.
+
+NOT demonstrated:
+  - Consistency between ChromaDB and alethech (no distributed transaction)
+  - Physical time of commit creation
+  - Truth of commit content
+  - Global system state offline
+  - Equivocation without witness network
+
 Identity spec: rev 3.x APPROVED (semantics closed — cutoff_head defines
 causal frontier, not temporal. Alethech does not demonstrate physical time.)
 
