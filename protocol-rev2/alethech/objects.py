@@ -67,8 +67,27 @@ class Identity:
 
     def verify_self(self) -> bool:
         """Verify that agent_id derives from public_key (corrección 1 de GPT)."""
-        derived = crypto.derive_agent_id(self.public_key)
-        return derived == self.agent_id
+        # BUG 5 FIX: validate JWK structure first
+        if not isinstance(self.public_key, dict):
+            return False
+        if self.public_key.get("kty") != "OKP":
+            return False
+        if self.public_key.get("crv") != "Ed25519":
+            return False
+        x = self.public_key.get("x")
+        if not isinstance(x, str) or not x:
+            return False
+        # Try to decode the base64url to verify it's valid
+        try:
+            crypto.b64url_decode(x)
+        except Exception:
+            return False
+        # Now check derivation
+        try:
+            derived = crypto.derive_agent_id(self.public_key)
+            return derived == self.agent_id
+        except Exception:
+            return False
 
 
 # ---------- base signed object ----------
@@ -459,10 +478,27 @@ class IdentityRecordV2(SignedObject):
 
     def verify_self(self) -> bool:
         """Verify that agent_id derives from root_public_key."""
-        derived = "did:alethech:" + crypto.b32lower(crypto.sha256(
-            canonical_json_bytes(self.root_public_key)
-        )[0:16])
-        return derived == self.agent_id
+        # BUG 5 FIX: validate JWK structure
+        if not isinstance(self.root_public_key, dict):
+            return False
+        if self.root_public_key.get("kty") != "OKP":
+            return False
+        if self.root_public_key.get("crv") != "Ed25519":
+            return False
+        x = self.root_public_key.get("x")
+        if not isinstance(x, str) or not x:
+            return False
+        try:
+            crypto.b64url_decode(x)
+        except Exception:
+            return False
+        try:
+            derived = "did:alethech:" + crypto.b32lower(crypto.sha256(
+                canonical_json_bytes(self.root_public_key)
+            )[0:16])
+            return derived == self.agent_id
+        except Exception:
+            return False
 
 
 @dataclass

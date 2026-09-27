@@ -296,7 +296,13 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
     try:
         root = store.load_root_authority()
     except Exception:
-        # No root authority — this is a v0.1 store, skip identity layer verification
+        # No root authority — check if there are v2 identities (BUG 6)
+        v2_idents = store.load_identity_records_v2()
+        if v2_idents:
+            report.errors.append(
+                "missing_root_authority: IdentityRecordV2 exists but RootAuthority is missing — "
+                "possible tampering (root_authority.json deleted)"
+            )
         return report
 
     if not root.verify_self():
@@ -347,6 +353,19 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
                 break
             prev_hash = ev.commit_id
             expected_seq += 1
+
+        # BUG 3 FIX: Verify that cutoff_head exists in commit DAG
+        try:
+            commits = store.load_commits()
+        except Exception:
+            commits = {}
+        for ev in events.values():
+            if ev.event_type == "key_rotation" and ev.cutoff_head:
+                if ev.cutoff_head not in commits:
+                    report.errors.append(
+                        f"missing_cutoff_head: ControlEvent {ev.commit_id} references "
+                        f"nonexistent cutoff_head {ev.cutoff_head}"
+                    )
 
     # Verify migration records
     try:

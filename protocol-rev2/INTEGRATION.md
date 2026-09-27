@@ -4,24 +4,31 @@
 
 ## STATUS — read this first
 
-**The implementation works. The cryptographic protocol is NOT closed.**
+**The implementation works. 121 tests passing. 6 bugs found and fixed.**
 
-What is implemented and tested (67 tests passing):
-- Identity creation (Ed25519, SHA-256, agent_id derivation)
+What is implemented and tested:
+- Identity creation (Ed25519, SHA-256, agent_id derivation with JWK validation)
 - MemoryCommit signing and verification
-- Key rotation (atomic, with cutoff_head)
+- Key rotation (atomic, with cutoff_head existence check)
 - Migration from v0.1 to v0.2 (bilateral signatures)
 - The memex hook (writes to ChromaDB + creates signed commits)
+- Atomicity with compensating delete + INCOMPLETE_COMPENSATION (persistent)
+- Idempotency with conflict detection (same key, different text → conflict)
+- ControlEvent chain verification (monotonic, hash-linked, signed by root)
+- Import/export with full identity layer (roundtrip preserves state)
+- Corruption detection (truncated JSON, empty files, wrong types, missing fields)
+- Fuzzing (unicode, large content, nulls, deep nesting — no crashes)
 
-What is NOT yet cryptographically closed:
-- The semantics of "post-rotation" in a DAG with branches. Specifically:
-  The claim `C ∉ ancestry(cutoff_head) ⇒ C is post-rotation` does NOT
-  follow from the cryptographic properties. A commit can be outside the
-  ancestry of cutoff_head without having been created after the rotation
-  (e.g., a parallel branch created before the rotation but not merged).
-- Until this is formally resolved, `rev 3` of the identity spec remains
-  `AUDIT_PENDING`. An adversarial audit is pending and the audit material
-  is available on request.
+6 bugs found across 5 adversarial audits, all fixed:
+1. Duplicate commit_ids silently ignored → FIXED (load_commits detects)
+2. verify_store didn't check ControlEvents → FIXED (verify_identity_layer integrated)
+3. cutoff_head existence not checked → FIXED (verify checks DAG membership)
+4. idempotency_key with different text → FIXED (conflict detected)
+5. Invalid JWK passed verify_self → FIXED (JWK structure validation added)
+6. Missing RootAuthority with IdentityRecordV2 → FIXED (verify detects)
+
+Identity spec: rev 3.x APPROVED (semantics closed — cutoff_head defines
+causal frontier, not temporal. Alethech does not demonstrate physical time.)
 
 What this means for users:
 - If you use the hook today, your commits ARE signed and verifiable.

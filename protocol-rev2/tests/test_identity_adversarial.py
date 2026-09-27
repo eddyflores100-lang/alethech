@@ -337,9 +337,9 @@ class TestNonexistentCutoffHead:
         store.write_control_event(ev)
 
         r = runner.invoke(cli, ["--store", str(s), "verify"])
-        print(f"\n[BUG 3] Nonexistent cutoff_head not detected: {r.output[:100]}")
-        # Document the bug — verify passes when it shouldn't
-        assert True  # document, don't fail
+        assert r.exit_code != 0
+        assert "missing_cutoff_head" in r.output or "FAIL" in r.output, \
+            f"should detect nonexistent cutoff_head: {r.output}"
 
 
 # ============ 8. Migration unilateral ============

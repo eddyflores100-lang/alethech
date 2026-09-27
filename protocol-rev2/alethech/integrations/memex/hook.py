@@ -184,6 +184,21 @@ class MemexAlethechHook:
             if idempotency_key and self.active:
                 existing = self._find_by_idempotency_key(idempotency_key)
                 if existing is not None:
+                    # BUG 4 FIX: check that text matches
+                    existing_text = existing.content.get("text", "")
+                    if existing_text != text:
+                        logger.warning(
+                            "idempotency conflict: key=%s existing_text=%r new_text=%r",
+                            idempotency_key, existing_text[:50], text[:50]
+                        )
+                        return CompensatedWriteResult(
+                            success=False,
+                            memex_id=existing.content.get("memex_id"),
+                            text=text,
+                            alethech_commit_id=existing.commit_id,
+                            compensation_status="not_needed",
+                            error=f"idempotency_conflict: key={idempotency_key} already used with different text",
+                        )
                     logger.info(
                         "idempotent hit: key=%s → existing commit %s",
                         idempotency_key,

@@ -37,7 +37,7 @@ def _make_store():
 
 class TestIdempotencyConflict:
     def test_same_key_different_text(self):
-        """BUG 4: Same idempotency_key with different text returns existing without conflict."""
+        """FIXED: Same idempotency_key with different text now returns conflict."""
         p, d = _make_store()
         try:
             memex = MockMemexStore()
@@ -46,9 +46,8 @@ class TestIdempotencyConflict:
             r1 = hook.add("hello", idempotency_key=key)
             assert r1["success"]
             r2 = hook.add("world", idempotency_key=key)
-            # Returns existing — no conflict detection
-            print(f"\n[BUG 4] Same key, different text: returned existing (no conflict)")
-            assert True  # document
+            assert not r2["success"], "should detect conflict"
+            assert "idempotency_conflict" in (r2.get("error") or "")
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
@@ -114,16 +113,26 @@ class TestFuzzing:
             shutil.rmtree(d, ignore_errors=True)
 
     def test_invalid_jwk(self):
+        """FIXED: Invalid JWK now detected by verify_self."""
         p, d = _make_store()
         try:
+            # Corrupt the IdentityRecordV2 file (not the legacy Identity)
             id_files = list((p / "identities").glob("*.json"))
-            if id_files:
-                data = json.loads(id_files[0].read_text())
-                data["public_key"] = {"kty": "INVALID", "crv": "bad", "x": "not_base64"}
-                id_files[0].write_text(json.dumps(data, indent=2))
+            v2_file = None
+            for f in id_files:
+                data = json.loads(f.read_text())
+                if data.get("type") == "IdentityRecordV2":
+                    v2_file = f
+                    break
+            if v2_file is None:
+                v2_file = id_files[0] if id_files else None
+            if v2_file:
+                data = json.loads(v2_file.read_text())
+                data["root_public_key"] = {"kty": "INVALID", "crv": "bad", "x": "not_base64"}
+                v2_file.write_text(json.dumps(data, indent=2))
             r = CliRunner().invoke(cli, ["--store", str(p), "verify"])
-            print(f"\n[BUG 5] Invalid JWK: {r.output[:100]}")
-            assert True  # document
+            assert r.exit_code != 0 or "FAIL" in r.output, \
+                f"should detect invalid JWK: {r.output}"
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
