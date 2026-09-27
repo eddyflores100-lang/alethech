@@ -12,32 +12,48 @@ verified-transfer design and observed:
 
     "A check nobody has watched fail is a promise, not a guarantee."
 
-This file closes that gap for alethech. It introduces three classes of
+This file closes that gap for alethech. It introduces four classes of
 test:
 
-1. test_ancestry_check_distinguishes_reachable_from_unreachable
-   Direct unit test of ancestry_check(). Asserts both True cases AND
-   False cases on a synthetic 3-node DAG. This is the mutation guard:
-   if ancestry_check is mutated to `return True` (always reachable),
-   the False assertions fail. If mutated to `return False` (always
-   unreachable), the True assertions fail. If the call site is removed
-   from verify_store (as it was before this commit), tests 2 and 3
-   below fail.
+1. TestAncestryCheckMutationGuard
+   Direct unit test of ancestry_check() on a synthetic 3-node DAG.
+   Asserts BOTH reachable cases (return True) AND unreachable cases
+   (return False). This is the mutation guard: if anyone changes
+   ancestry_check to `return True` always, the False assertions fail;
+   if they change it to `return False` always, the True assertions
+   fail. If the call site is removed from verify_store (as it was
+   before 0.5.2), classes 3 and 4 below fail.
 
 2. TestRevokedKeyHistoricalCommitAccepted
-   A commit signed with K1 (revoked) that IS in ancestry(cutoff_head)
-   must pass verify. This is the legitimate "VALID_HISTORICAL" case:
-   the commit was made before rotation, and the cutoff_head includes
-   it in its history.
+   A commit signed with K1 (now in revoked_keys) that IS a member
+   of ancestry(cutoff_head) must pass verify and be reported as
+   VALID_HISTORICAL. This is the legitimate historical case: the
+   commit belongs to the causal history the rotation closed.
 
-3. TestRevokedKeyDarkCommitRejected
-   A commit signed with K1's actual private key AFTER rotation, with
-   parents pointing to cutoff_head (so the commit is a CHILD of the
-   cutoff, NOT in its ancestry). This is the "dark" commit case
-   tonydzi described: signature imports cleanly (K1's private key
-   still exists in the attacker's possession), but the commit is
-   unretrievable from the cutoff frontier. verify MUST reject with
-   `revoked_key_after_cutoff`.
+3. TestRevokedKeyNotInProvenPreRotationHistory
+   A commit signed with K1's actual private key (the attacker still
+   holds it), constructed with `parents = [cutoff_head]` — so the
+   commit is a CHILD of the cutoff, not a member of its ancestry.
+   Signature imports cleanly against K1's public_key (the key was
+   not cryptographically destroyed, only administratively revoked),
+   but the commit is unretrievable from the cutoff frontier.
+
+   verify MUST reject with `not_in_proven_pre_rotation_history`.
+
+   CRITICAL SEMANTIC NOTE (rev 3.x):
+   The verdict is strictly about membership in ancestry(cutoff_head).
+   The verifier does NOT claim to prove WHEN the commit was created.
+   In particular, it does NOT claim "this commit was created after
+   rotation". That would require a clock the protocol does not have.
+   The previous name `revoked_key_after_cutoff` was removed in 0.5.3
+   because it implied a temporal claim the artifact cannot support.
+
+4. TestReachabilityWiredIntoVerify
+   If a revoked key entry has an empty cutoff_head, verify cannot
+   prove membership in any pre-rotation history → must reject with
+   `not_in_proven_pre_rotation_history`. This catches the case where
+   a key is administratively revoked but the cutoff frontier was
+   never recorded.
 
 Acceptance criterion (tonydzi's):
     To prove the guarantee is real, you must be able to defeat the
@@ -45,15 +61,15 @@ Acceptance criterion (tonydzi's):
     try:
 
     (a) In verify_store, comment out the `if key_state == "REVOKED":`
-        block. Tests in TestRevokedKeyDarkCommitRejected fail.
+        block. Tests in class 3 and class 4 fail.
 
-    (b) In ancestry_check, change `return True` (line ~430) to
-        `return False`. Tests in TestRevokedKeyHistoricalCommitAccepted
-        fail, and so do the True assertions in test_ancestry_check_... .
+    (b) In ancestry_check, change `return True` to `return False`
+        in the equality shortcut AND the BFS find. Tests in class 2
+        fail, and so do the True assertions in class 1.
 
-    (c) In ancestry_check, change `return False` (line ~447) to
-        `return True`. Tests in TestRevokedKeyDarkCommitRejected fail,
-        and so do the False assertions in test_ancestry_check_... .
+    (c) In ancestry_check, change the final `return False` to
+        `return True`. Tests in class 3 fail, and so do the False
+        assertions in class 1.
 """
 import json
 import shutil
@@ -154,14 +170,22 @@ def v02_store(tmp_store, runner):
 @pytest.fixture
 def store_with_pre_rotation_commit(v02_store, runner):
     """v0.2 store with ONE commit signed with K1, plus K1's keypair saved
-    in memory so we can sign 'dark' commits after rotation.
+    in memory so we can sign additional commits with K1 after rotation
+    (simulating an attacker who kept a copy of the private key).
+
+    NOTE on language: "pre-rotation" here is test-harness shorthand for
+    "the commit was created by the test harness before invoking the
+    rotation command". It is NOT a claim the cryptographic artifact can
+    make on its own. The only claim the verifier can make about C1 after
+    rotation is: C1 ∈ ancestry(cutoff_head). The test uses the phrase
+    "pre-rotation" only to describe the order in which the harness ran.
 
     Returns (store_path, k1_keypair, c1_commit_id).
     """
     s = v02_store
     # Write content + commit with K1
     c = s / "c1.json"
-    c.write_text(json.dumps({"v": 1, "label": "pre-rotation"}))
+    c.write_text(json.dumps({"v": 1, "label": "commit-signed-by-K1"}))
     runner.invoke(cli, ["--store", str(s), "commit", "--content", str(c)])
 
     # Capture K1's keypair BEFORE rotation (rotation overwrites signing.key)
@@ -177,11 +201,16 @@ def store_with_pre_rotation_commit(v02_store, runner):
 # ============================================================================
 
 class TestRevokedKeyHistoricalCommitAccepted:
-    """After K1→K2 rotation with cutoff_head = C1, the pre-rotation commit
-    C1 (signed with K1) is still in ancestry(cutoff_head=C1). verify
-    must accept it as VALID_HISTORICAL, not reject it."""
+    """After K1→K2 rotation with cutoff_head = C1, the commit C1 (signed
+    with K1, now revoked) is a member of ancestry(cutoff_head=C1). verify
+    must accept it as VALID_HISTORICAL, not reject it.
 
-    def test_pre_rotation_commit_still_verifies(
+    What the verifier is proving here is strictly: "C1 is in ancestry of
+    the cutoff_head recorded for K1's revocation." It is NOT proving
+    that C1 was created before the rotation in any physical-clock sense.
+    The membership check IS the only evidence the protocol offers."""
+
+    def test_historical_commit_still_verifies(
         self, store_with_pre_rotation_commit, runner
     ):
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
@@ -190,7 +219,7 @@ class TestRevokedKeyHistoricalCommitAccepted:
         r = runner.invoke(cli, ["--store", str(s), "key", "rotate"])
         assert r.exit_code == 0, f"rotate failed: {r.output}"
 
-        # verify must still pass — C1 is in ancestry(cutoff_head=C1)
+        # verify must still pass — C1 is a member of ancestry(cutoff_head=C1)
         r = runner.invoke(cli, ["--store", str(s), "verify"])
         assert r.exit_code == 0, \
             f"verify must accept historical commit: {r.output}"
@@ -202,8 +231,9 @@ class TestRevokedKeyHistoricalCommitAccepted:
     def test_verify_report_counts_historical(
         self, store_with_pre_rotation_commit, runner
     ):
-        """Direct API test: VerifyReport.commits_valid_historical == 1 after
-        rotation, commits_revoked_key_after_cutoff == 0."""
+        """Direct API test: after rotation,
+        VerifyReport.commits_valid_historical == 1 and
+        commits_not_in_proven_pre_rotation_history == 0."""
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
 
         runner.invoke(cli, ["--store", str(s), "key", "rotate"])
@@ -213,25 +243,39 @@ class TestRevokedKeyHistoricalCommitAccepted:
         assert report.ok is True
         assert report.commits_valid_historical == 1, \
             f"expected 1 valid_historical, got {report.commits_valid_historical}"
-        assert report.commits_revoked_key_after_cutoff == 0
+        assert report.commits_not_in_proven_pre_rotation_history == 0
 
 
 # ============================================================================
-# 3. Dark commit (outside ancestry) must be rejected — tonydzi's case
+# 3. Commit outside ancestry must be rejected — tonydzi's case
 # ============================================================================
 
-class TestRevokedKeyDarkCommitRejected:
-    """After K1→K2 rotation, an attacker who still holds K1's private key
-    creates a NEW commit signed with K1. The commit's parents point to
-    cutoff_head (so the commit is a CHILD of the cutoff, not in its
-    ancestry). verify MUST reject with `revoked_key_after_cutoff`.
+class TestRevokedKeyNotInProvenPreRotationHistory:
+    """Scenario: an attacker who still holds K1's private key constructs
+    a NEW commit, signed with K1, with `parents = [cutoff_head]`. This
+    makes the commit a CHILD of the cutoff, so it is NOT a member of
+    ancestry(cutoff_head) — ancestry traverses parents upward, not
+    children downward.
 
-    This is the scenario tonydzi said no test constructs: a claim that
-    imports cleanly (valid Ed25519 signature against K1's public key)
-    but is unretrievable from the cutoff frontier.
+    The signature imports cleanly (Ed25519 verification against K1's
+    public_key succeeds — the key was administratively revoked, not
+    cryptographically destroyed). But the commit is unretrievable
+    from the cutoff frontier.
+
+    verify MUST reject with `not_in_proven_pre_rotation_history`.
+
+    SEMANTIC NOTE: the test harness constructs this commit AFTER calling
+    `key rotate`. That ordering is harness knowledge, not artifact
+    knowledge. The verifier does NOT claim "this commit was created after
+    rotation." It claims only: "this commit is NOT a member of the
+    ancestry covered by the rotation's cutoff_head." That is the only
+    claim the cryptographic evidence supports, and the only claim the
+    verdict makes. The previous verdict name `revoked_key_after_cutoff`
+    was retired in 0.5.3 precisely because it implied a temporal claim
+    the protocol cannot make.
     """
 
-    def test_dark_commit_child_of_cutoff_rejected(
+    def test_commit_child_of_cutoff_rejected(
         self, store_with_pre_rotation_commit, runner
     ):
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
@@ -247,32 +291,31 @@ class TestRevokedKeyDarkCommitRejected:
         assert any(k["key_id"] == "key-001" for k in ident.revoked_keys), \
             "K1 must be in revoked_keys after rotation"
 
-        # Attacker signs a 'dark' commit with K1's private key.
-        # parents = [c1_id] (the cutoff_head). This makes the dark commit
-        # a CHILD of c1, so it is NOT in ancestry(c1) — ancestry traverses
-        # parents upward, not children downward.
-        dark = MemoryCommit(
+        # Construct a commit signed with K1, parents = [c1_id] (the
+        # cutoff_head). The commit is therefore a CHILD of c1, so it is
+        # NOT in ancestry(c1). Membership check fails → reject.
+        constructed = MemoryCommit(
             agent_id=ident.agent_id,
             key_id="key-001",  # revoked
-            parents=[c1_id],   # child of cutoff_head → unreachable from c1
-            content={"dark": "post-rotation commit signed with revoked K1"},
+            parents=[c1_id],   # child of cutoff_head → not in its ancestry
+            content={"constructed": "commit signed with K1, outside cutoff frontier"},
         )
-        dark.sign(k1_keypair)  # sign with K1's actual private key
-        store.write_commit(dark)
+        constructed.sign(k1_keypair)  # sign with K1's actual private key
+        store.write_commit(constructed)
 
-        # verify MUST fail with revoked_key_after_cutoff
+        # verify MUST fail with not_in_proven_pre_rotation_history
         r = runner.invoke(cli, ["--store", str(s), "verify"])
         assert r.exit_code != 0, \
-            f"verify must reject dark commit: {r.output}"
+            f"verify must reject commit outside cutoff frontier: {r.output}"
         assert "FAIL" in r.output
-        assert "revoked_key_after_cutoff" in r.output, \
-            f"must specifically report revoked_key_after_cutoff: {r.output}"
+        assert "not_in_proven_pre_rotation_history" in r.output, \
+            f"must specifically report not_in_proven_pre_rotation_history: {r.output}"
 
-    def test_dark_commit_with_synthetic_parent_rejected(
+    def test_commit_with_synthetic_parent_rejected(
         self, store_with_pre_rotation_commit, runner
     ):
-        """Variant: the dark commit's parent is a hash that doesn't exist
-        in the DAG at all. Even more clearly 'unreachable'."""
+        """Variant: the constructed commit's parent is a hash that doesn't
+        exist in the DAG at all. Even more clearly 'not in ancestry'."""
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
 
         r = runner.invoke(cli, ["--store", str(s), "key", "rotate"])
@@ -282,25 +325,25 @@ class TestRevokedKeyDarkCommitRejected:
         identities = store.load_identity_records_v2()
         ident = next(iter(identities.values()))
 
-        dark = MemoryCommit(
+        constructed = MemoryCommit(
             agent_id=ident.agent_id,
             key_id="key-001",
             parents=["sha256:synthetic_nonexistent_parent_000000000000"],
-            content={"dark": "orphan dark commit"},
+            content={"constructed": "orphan commit signed with K1"},
         )
-        dark.sign(k1_keypair)
-        store.write_commit(dark)
+        constructed.sign(k1_keypair)
+        store.write_commit(constructed)
 
         r = runner.invoke(cli, ["--store", str(s), "verify"])
         assert r.exit_code != 0
-        assert "revoked_key_after_cutoff" in r.output, \
-            f"must report revoked_key_after_cutoff: {r.output}"
+        assert "not_in_proven_pre_rotation_history" in r.output, \
+            f"must report not_in_proven_pre_rotation_history: {r.output}"
 
-    def test_verify_report_counts_dark_commit(
+    def test_verify_report_counts_rejected_commit(
         self, store_with_pre_rotation_commit, runner
     ):
-        """Direct API test: VerifyReport.commits_revoked_key_after_cutoff
-        == 1 when a dark commit exists."""
+        """Direct API test: VerifyReport.commits_not_in_proven_pre_rotation_history
+        == 1 when a constructed commit outside ancestry exists."""
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
 
         runner.invoke(cli, ["--store", str(s), "key", "rotate"])
@@ -309,20 +352,21 @@ class TestRevokedKeyDarkCommitRejected:
         identities = store.load_identity_records_v2()
         ident = next(iter(identities.values()))
 
-        dark = MemoryCommit(
+        constructed = MemoryCommit(
             agent_id=ident.agent_id,
             key_id="key-001",
             parents=[c1_id],
-            content={"dark": "for API count test"},
+            content={"constructed": "for API count test"},
         )
-        dark.sign(k1_keypair)
-        store.write_commit(dark)
+        constructed.sign(k1_keypair)
+        store.write_commit(constructed)
 
         report = verify_store(store)
         assert report.ok is False
-        assert report.commits_revoked_key_after_cutoff == 1, \
-            f"expected 1 revoked_after_cutoff, got {report.commits_revoked_key_after_cutoff}"
-        assert any("revoked_key_after_cutoff" in e for e in report.errors)
+        assert report.commits_not_in_proven_pre_rotation_history == 1, \
+            f"expected 1 not_in_proven_pre_rotation_history, " \
+            f"got {report.commits_not_in_proven_pre_rotation_history}"
+        assert any("not_in_proven_pre_rotation_history" in e for e in report.errors)
 
 
 # ============================================================================
@@ -334,11 +378,15 @@ class TestReachabilityWiredIntoVerify:
     reachability check for revoked keys. This is what tonydzi's review
     was about — the function existed but wasn't enforced."""
 
-    def test_revoked_key_commit_with_no_cutoff_head_rejected(
+    def test_revoked_key_with_empty_cutoff_head_rejected(
         self, store_with_pre_rotation_commit, runner
     ):
-        """If a key is in revoked_keys but has no cutoff_head, verify
-        cannot prove any commit was pre-rotation → must reject."""
+        """If a key is in revoked_keys but has no cutoff_head recorded,
+        verify cannot prove membership in any pre-rotation history →
+        must reject with not_in_proven_pre_rotation_history.
+
+        Again: the verdict is about the absence of provable membership,
+        not about a temporal claim of when the commit was created."""
         s, k1_keypair, c1_id = store_with_pre_rotation_commit
 
         r = runner.invoke(cli, ["--store", str(s), "key", "rotate"])
@@ -358,16 +406,17 @@ class TestReachabilityWiredIntoVerify:
         store.write_identity_record_v2(ident)
 
         # Now sign a commit with K1 (still have the keypair)
-        dark = MemoryCommit(
+        constructed = MemoryCommit(
             agent_id=ident.agent_id,
             key_id="key-001",
             parents=[c1_id],
-            content={"dark": "no cutoff_head test"},
+            content={"constructed": "empty cutoff_head test"},
         )
-        dark.sign(k1_keypair)
-        store.write_commit(dark)
+        constructed.sign(k1_keypair)
+        store.write_commit(constructed)
 
         r = runner.invoke(cli, ["--store", str(s), "verify"])
         assert r.exit_code != 0
-        assert "revoked_key_after_cutoff" in r.output, \
-            f"must report revoked_key_after_cutoff when cutoff_head is empty: {r.output}"
+        assert "not_in_proven_pre_rotation_history" in r.output, \
+            f"must report not_in_proven_pre_rotation_history when cutoff_head " \
+            f"is empty: {r.output}"

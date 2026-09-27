@@ -58,10 +58,15 @@ What this means for users:
 - If you use the hook today, your commits ARE signed and verifiable.
 - If you never rotate keys, none of the open issue affects you.
 - If you DO rotate keys, the protocol correctly identifies commits
-  signed with revoked keys, but the distinction between
-  `VALID_HISTORICAL` and `REVOKED_KEY_AFTER_CUTOFF` in DAGs with
-  branches may not be as precise as the names suggest. We are working
-  on a formal definition.
+  signed with revoked keys, and distinguishes:
+    * `VALID_HISTORICAL` — commit IS in ancestry(cutoff_head)
+    * `NOT_IN_PROVEN_PRE_ROTATION_HISTORY` — commit is NOT in
+      ancestry(cutoff_head); the verifier cannot prove it belongs
+      to the causal history the rotation closed.
+  The verdict is strictly about membership in ancestry(cutoff_head).
+  The verifier does NOT claim to prove WHEN the commit was created.
+  In particular, it does not claim "this commit was created after
+  rotation" — that would require a clock the protocol does not have.
 
 For the full audit material (33 questions + 7 design tests + 5 new
 adversarial questions), see the project documentation or request it
