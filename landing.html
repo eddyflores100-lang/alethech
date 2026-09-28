@@ -368,8 +368,11 @@
     position:absolute;
     left:8%; right:8%; top:50%;
     border-top:2px solid var(--reject);
-    transform:rotate(-4deg);
+    transform: rotate(-4deg) scaleX(0);
+    transform-origin: left center;
+    transition: transform .55s cubic-bezier(.4,0,.2,1);
   }
+  .kbox--revoked.strike::after{ transform: rotate(-4deg) scaleX(1); }
   .kbox--active{ background:var(--valid); }
   .kbox .k-label{ font-size:1.5rem; font-weight:800; }
   .kbox .k-state{ font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; }
@@ -489,6 +492,112 @@
   }
   .agent-id b{ color:var(--ink); font-weight:700; }
 
+  /* ============ PAGE 02 — giant typewriter ============ */
+  .giant--type{
+    min-height: clamp(9rem, 30vh, 22rem);
+    white-space: pre-wrap;
+  }
+  .giant--type .caret{
+    display:inline-block;
+    color: var(--ink);
+    margin-left: 1px;
+    animation: blink 1s steps(2) infinite;
+  }
+  .giant--type.done .caret{ display: none; }
+
+  /* ============ PAGE 03 — DAG node glow + reject shake ============ */
+  .dag .node rect{ transition: filter .25s linear; }
+  .dag .node.lit rect{ animation: dagGlow .9s ease-out; }
+  @keyframes dagGlow{
+    0%   { filter: drop-shadow(0 0 0 rgba(0,255,136,0)); }
+    35%  { filter: drop-shadow(0 0 10px var(--valid)) drop-shadow(0 0 4px var(--valid)); }
+    100% { filter: drop-shadow(0 0 0 rgba(0,255,136,0)); }
+  }
+  .dag .node--reject.shake{ animation: rejectJitter .45s ease-out; }
+  @keyframes rejectJitter{
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(3px); }
+  }
+
+  /* ============ PAGE 04 — equation scanner ============ */
+  .eq code .ch{
+    color: var(--ink);
+    transition: color .14s linear;
+  }
+  .eq code .ch.scan{ color: var(--valid); }
+
+  /* ============ PAGE 05 — verdicts slide-in + divider ============ */
+  .verdicts{ position: relative; }
+  .verdicts::before{
+    content:"";
+    position:absolute;
+    top:0; bottom:0;
+    left:50%;
+    width:2px;
+    background:var(--ink);
+    transform: translateX(-50%) scaleY(0);
+    transform-origin: top center;
+    transition: transform .85s cubic-bezier(.4,0,.2,1) .35s;
+    z-index:1;
+  }
+  .verdicts.in::before{ transform: translateX(-50%) scaleY(1); }
+  .verdict{
+    opacity:0;
+    transition: opacity .55s cubic-bezier(.4,0,.2,1), transform .55s cubic-bezier(.4,0,.2,1);
+  }
+  .verdict--valid{ transform: translateX(-60px); }
+  .verdict--reject{ transform: translateX(60px); transition-delay:.12s; }
+  .verdicts.in .verdict{ opacity:1; transform: translateX(0); }
+  .verdicts.in .verdict--reject{ transition-delay:.12s; }
+
+  /* ============ PAGE 06 — rotate arrow draw + strikethrough ============ */
+  .karrow-path{
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset .65s cubic-bezier(.4,0,.2,1);
+  }
+  .karrow.in .karrow-path{ stroke-dashoffset: 0; }
+
+  /* ============ PAGE 07 — seqbox reject shake ============ */
+  .seqbox{ transition: color .2s; }
+  .seqbox--reject.shake-red{ animation: rejectShakeRed .45s ease-out; }
+  @keyframes rejectShakeRed{
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(3px); }
+  }
+
+  /* ============ PAGE 09 — honesty slide-in ============ */
+  .honesty li{
+    opacity: 0;
+    transform: translateX(-30px);
+    transition: opacity .4s cubic-bezier(.4,0,.2,1), transform .4s cubic-bezier(.4,0,.2,1);
+  }
+  .honesty.in li{ opacity:1; transform: translateX(0); }
+  .honesty.in li:nth-child(1){ transition-delay: 0ms; }
+  .honesty.in li:nth-child(2){ transition-delay: 50ms; }
+  .honesty.in li:nth-child(3){ transition-delay: 100ms; }
+  .honesty.in li:nth-child(4){ transition-delay: 150ms; }
+  .honesty.in li:nth-child(5){ transition-delay: 200ms; }
+  .honesty.in li:nth-child(6){ transition-delay: 250ms; }
+
+  /* ============ PAGE 10 — motto fade-in ============ */
+  .motto{
+    opacity: 0;
+    transition: opacity 2s ease-in;
+  }
+  .motto.in{ opacity: 1; }
+
   /* ============ responsive ============ */
   @media (max-width:760px){
     :root{ --gutter:42px; --stitch-x:20px; }
@@ -504,6 +613,18 @@
   @media (prefers-reduced-motion: reduce){
     .dag .edge{ transition:none !important; stroke-dashoffset:0 !important; }
     .term .cursor{ animation:none !important; }
+    .giant--type .caret{ animation:none !important; display:none !important; }
+    .giant--type{ min-height:auto !important; }
+    .dag .node.lit rect{ animation:none !important; }
+    .dag .node--reject.shake{ animation:none !important; }
+    .eq code .ch{ transition:none !important; color:var(--ink) !important; }
+    .verdict{ opacity:1 !important; transform:none !important; }
+    .verdicts::before{ transform: translateX(-50%) scaleY(1) !important; }
+    .honesty li{ opacity:1 !important; transform:none !important; }
+    .motto{ opacity:1 !important; }
+    .karrow-path{ stroke-dashoffset:0 !important; }
+    .kbox--revoked::after{ transform: rotate(-4deg) scaleX(1) !important; }
+    .seqbox--reject.shake-red{ animation:none !important; }
     *{ transition:none !important; }
   }
 </style>
@@ -536,10 +657,11 @@
 <section class="page" id="property">
   <div class="pagenum"><b>02</b> / 10 &nbsp;·&nbsp; THE PROPERTY</div>
   <div class="page__inner">
-    <p class="giant">this memory set forms part of a cryptographically verifiable history associated with a determined identity</p>
+    <p class="giant giant--type" id="property-giant" data-text="this memory set forms part of a cryptographically verifiable history associated with a determined identity"></p>
     <p class="lede" style="margin-top:2.5rem;">the protocol does <b style="color:var(--ink)">NOT</b> prove claims are true — only that they were signed.</p>
   </div>
 </section>
+<noscript><style>.giant--type::before{ content: attr(data-text); white-space: pre-wrap; }</style></noscript>
 
 <!-- ============ PAGE 03 — THE ARCHITECTURE ============ -->
 <section class="page" id="architecture">
@@ -579,29 +701,29 @@
           <line class="edge-reject" x1="470" y1="258" x2="470" y2="342" marker-end="url(#arrow-reject)"/>
 
           <!-- nodes -->
-          <g class="node">
+          <g class="node" id="dag-genesis">
             <rect x="45" y="185" width="130" height="70"/>
             <text class="node-title" x="110" y="212" text-anchor="middle">GENESIS</text>
             <text class="node-key" x="110" y="234" text-anchor="middle">key-000</text>
           </g>
-          <g class="node">
+          <g class="node" id="dag-c1">
             <rect x="225" y="185" width="130" height="70"/>
             <text class="node-title" x="290" y="212" text-anchor="middle">C1</text>
             <text class="node-key" x="290" y="234" text-anchor="middle">key-000</text>
           </g>
-          <g class="node node--cutoff">
+          <g class="node node--cutoff" id="dag-c2">
             <rect x="405" y="185" width="130" height="70"/>
             <text class="node-tag node-tag--cutoff" x="470" y="178" text-anchor="middle">cutoff_head</text>
             <text class="node-title" x="470" y="212" text-anchor="middle">C2</text>
             <text class="node-key" x="470" y="234" text-anchor="middle">key-001</text>
           </g>
-          <g class="node node--post">
+          <g class="node node--post" id="dag-c3">
             <rect x="615" y="185" width="130" height="70"/>
             <text class="node-tag" x="680" y="178" text-anchor="middle">post-rotation</text>
             <text class="node-title" x="680" y="212" text-anchor="middle">C3</text>
             <text class="node-key" x="680" y="234" text-anchor="middle">key-002</text>
           </g>
-          <g class="node node--reject">
+          <g class="node node--reject" id="dag-d">
             <rect x="405" y="345" width="130" height="70"/>
             <text class="node-tag node-tag--reject" x="470" y="338" text-anchor="middle">rejected</text>
             <text class="node-title" x="470" y="372" text-anchor="middle">D</text>
@@ -668,7 +790,7 @@
       <h2>valid or not</h2>
     </div>
 
-    <div class="verdicts">
+    <div class="verdicts" id="verdicts-grid">
       <div class="verdict verdict--valid">
         <span class="v-tag">verdict</span>
         <span class="v-name">VALID_HISTORICAL</span>
@@ -701,8 +823,10 @@
         <span class="k-label">key-001</span>
         <span class="k-state">revoked</span>
       </div>
-      <div class="karrow">
-        <span>→</span>
+      <div class="karrow" id="rotate-arrow">
+        <svg width="56" height="20" viewBox="0 0 56 20" aria-hidden="true" focusable="false">
+          <path class="karrow-path" d="M2,10 L50,10 M44,4 L50,10 L44,16" pathLength="1"/>
+        </svg>
         <span class="karrow-tag">cutoff_head</span>
       </div>
       <div class="kbox kbox--active">
@@ -727,7 +851,7 @@
     </div>
 
     <p class="body" style="color:var(--muted); margin-bottom:1.5rem;">forward monotonic sequence — accepted:</p>
-    <div class="seq-row">
+    <div class="seq-row" id="seq-accepted">
       <span class="seqbox">10</span><span class="seqarrow">→</span>
       <span class="seqbox">11</span><span class="seqarrow">→</span>
       <span class="seqbox">12</span><span class="seqarrow">→</span>
@@ -738,8 +862,8 @@
     </div>
 
     <p class="body" style="color:var(--muted); margin-top:2rem; margin-bottom:1.5rem;">stale sequence — rejected as rollback:</p>
-    <div class="seq-row">
-      <span class="seqbox seqbox--reject">5</span>
+    <div class="seq-row" id="seq-rejected">
+      <span class="seqbox seqbox--reject" id="seqbox-reject">5</span>
       <span class="seq-tag seq-tag--no">[ REJECTED — rollback ]</span>
     </div>
 
@@ -812,34 +936,120 @@ result: OK"></pre>
   "use strict";
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---------- 1. DAG edges draw themselves on scroll (purpose: explain architecture) ---------- */
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* Tiny helper: observe once, then unobserve + tag + cleanup. */
+  function observeOnce(el, threshold, fn){
+    if(!el) return;
+    if(reduce){
+      el.setAttribute('data-animated','true');
+      try{ fn(true); }catch(e){}
+      return;
+    }
+    var fired = false;
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting && !fired){
+          fired = true;
+          obs.unobserve(el);
+          obs.disconnect();
+          el.setAttribute('data-animated','true');
+          try{ fn(false); }catch(e){}
+        }
+      });
+    }, { threshold: threshold });
+    obs.observe(el);
+  }
+
+  /* =====================================================================
+     1. PAGE 03 — DAG: edges draw + node glow sequence + reject shake
+     Purpose: edges draw to show provenance flow; nodes pulse in sequence
+     to show the genesis→C1→C2→C3 chain; rejected commit D shakes to show
+     rejection. Node glow is staggered AFTER edges finish drawing (1.5s total).
+     Pin: threshold 0.35, fires once, unobserves + disconnects.
+     ===================================================================== */
   var dag = document.querySelector('.dag');
   if(dag){
     var edges = dag.querySelectorAll('.edge');
+    var nodeIds = ['dag-genesis','dag-c1','dag-c2','dag-c3'];
+    var rejectNode = document.getElementById('dag-d');
     if(reduce){
       edges.forEach(function(e){ e.classList.add('in'); });
+      nodeIds.forEach(function(id){
+        var n = document.getElementById(id);
+        if(n) n.setAttribute('data-animated','true');
+      });
+      if(rejectNode) rejectNode.setAttribute('data-animated','true');
     } else {
-      var dagObs = new IntersectionObserver(function(entries){
-        entries.forEach(function(en){
-          if(en.isIntersecting){
-            edges.forEach(function(e){ e.classList.add('in'); });
-            dagObs.unobserve(dag);
-          }
-        });
-      }, { threshold: 0.35 });
-      dagObs.observe(dag);
+      observeOnce(dag, 0.35, function(){
+        /* Step 1: draw edges immediately (CSS transition + delays handle stagger) */
+        edges.forEach(function(e){ e.classList.add('in'); });
+
+        /* Step 2: after edges finish drawing (last delay .75s + transition .75s = 1.5s),
+           pulse nodes in sequence — 200ms stagger — to show the flow genesis→C1→C2→C3 */
+        setTimeout(function(){
+          nodeIds.forEach(function(id, i){
+            setTimeout(function(){
+              var n = document.getElementById(id);
+              if(n) n.classList.add('lit');
+            }, i * 200);
+          });
+        }, 1500);
+
+        /* Step 3: shake the rejected commit D shortly after C2 lights up
+           (C2 is its parent — D's ancestry is rejected). Shows rejection visually. */
+        if(rejectNode){
+          setTimeout(function(){
+            rejectNode.classList.add('shake');
+            rejectNode.setAttribute('data-animated','true');
+            setTimeout(function(){
+              rejectNode.classList.remove('shake');
+            }, 500);
+          }, 1900);
+        }
+      });
     }
   }
 
-  /* ---------- 2. CLI typewriter (purpose: show actual usage) ---------- */
+  /* =====================================================================
+     2. PAGE 02 — Giant typewriter on THE core claim
+     Purpose: forces the reader to read it word by word; emphasizes it's
+     THE core claim of the project. 32ms/char, fires once.
+     Pin: threshold 0.5.
+     ===================================================================== */
+  var giant = document.getElementById('property-giant');
+  if(giant){
+    var giantText = giant.getAttribute('data-text') || '';
+    if(reduce){
+      giant.textContent = giantText;
+    } else {
+      observeOnce(giant, 0.5, function(){
+        var i = 0;
+        (function tick(){
+          if(i <= giantText.length){
+            giant.innerHTML = escapeHtml(giantText.slice(0, i)) + '<span class="caret">▌</span>';
+            i++;
+            setTimeout(tick, 32);
+          } else {
+            giant.innerHTML = escapeHtml(giantText);
+            giant.classList.add('done');
+          }
+        })();
+      });
+    }
+  }
+
+  /* =====================================================================
+     3. PAGE 08 — CLI typewriter (existing — kept + verified)
+     Purpose: show actual usage. 42ms/char, fires once, OK shown in green.
+     Pin: threshold 0.4.
+     ===================================================================== */
   var term = document.getElementById('term');
   if(term){
     var full = term.getAttribute('data-text') || '';
     var started = false;
-
-    function escapeHtml(s){
-      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
     function renderFinal(){
       var html = escapeHtml(full).replace('OK', '<span class="ok">OK</span>');
       term.innerHTML = html + '<span class="cursor">▌</span>';
@@ -856,21 +1066,176 @@ result: OK"></pre>
         }
       })();
     }
-
     if(reduce){
       renderFinal();
     } else {
-      var termObs = new IntersectionObserver(function(entries){
-        entries.forEach(function(en){
-          if(en.isIntersecting && !started){
-            started = true;
-            termObs.unobserve(term);
-            type();
-          }
-        });
-      }, { threshold: 0.4 });
-      termObs.observe(term);
+      observeOnce(term, 0.4, function(){
+        if(!started){
+          started = true;
+          type();
+        }
+      });
     }
+  }
+
+  /* =====================================================================
+     4. PAGE 04 — Equation scanner (each equation independent)
+     Purpose: shows the equations are computational, not just text —
+     a green scanner reads each formula left to right.
+     Pin: each <code> gets its own observer, threshold 0.6, fires independently.
+     ===================================================================== */
+  var eqs = document.querySelectorAll('.eq code');
+  eqs.forEach(function(code){
+    var raw = code.textContent;
+    if(reduce){
+      code.setAttribute('data-animated','true');
+      return;
+    }
+    var fired = false;
+    var eqObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting && !fired){
+          fired = true;
+          eqObs.unobserve(code);
+          eqObs.disconnect();
+          code.setAttribute('data-animated','true');
+          /* Wrap each char (except spaces) in a span */
+          var html = '';
+          for(var i=0; i<raw.length; i++){
+            var c = raw.charAt(i);
+            if(c === ' '){
+              html += ' ';
+            } else {
+              html += '<span class="ch">' + escapeHtml(c) + '</span>';
+            }
+          }
+          code.innerHTML = html;
+          /* Scan: highlight each char green for 240ms, 30ms stagger between chars */
+          var chars = code.querySelectorAll('.ch');
+          chars.forEach(function(ch, idx){
+            setTimeout(function(){
+              ch.classList.add('scan');
+              setTimeout(function(){
+                ch.classList.remove('scan');
+              }, 240);
+            }, idx * 30);
+          });
+        }
+      });
+    }, { threshold: 0.6 });
+    eqObs.observe(code);
+  });
+
+  /* =====================================================================
+     5. PAGE 05 — Two verdicts slide in from opposite sides + divider draws
+     Purpose: VALID_HISTORICAL from left, NOT_IN_PROVEN from right — shows they
+     are opposing verdicts. Divider line draws vertically between them.
+     Pin: threshold 0.4, both cards animate together, fire once.
+     ===================================================================== */
+  var verdicts = document.getElementById('verdicts-grid');
+  if(verdicts){
+    observeOnce(verdicts, 0.4, function(){
+      verdicts.classList.add('in');
+    });
+  }
+
+  /* =====================================================================
+     6. PAGE 06 — Key rotation: arrow draws + strikethrough on revoked key
+     Purpose: arrow draw shows the rotation flow; strikethrough on key-001
+     (drawn AFTER the arrow completes) shows revocation happens as part of rotation.
+     Pin: threshold 0.5.
+     ===================================================================== */
+  var rotateArrow = document.getElementById('rotate-arrow');
+  var revokedKey  = document.querySelector('.kbox--revoked');
+  if(rotateArrow && revokedKey){
+    if(reduce){
+      rotateArrow.classList.add('in');
+      revokedKey.classList.add('strike');
+      rotateArrow.setAttribute('data-animated','true');
+      revokedKey.setAttribute('data-animated','true');
+    } else {
+      observeOnce(rotateArrow, 0.5, function(){
+        /* Step 1: arrow draws (CSS transition .65s) */
+        rotateArrow.classList.add('in');
+        /* Step 2: after arrow completes, draw the strikethrough */
+        setTimeout(function(){
+          revokedKey.classList.add('strike');
+          revokedKey.setAttribute('data-animated','true');
+        }, 700);
+      });
+    }
+  }
+
+  /* =====================================================================
+     7. PAGE 07 — Sequence count up + rejected (5) shakes red
+     Purpose: numbers 10→15 count up rapidly to show monotonic progression;
+     the rejected sequence (5) shakes red briefly when it appears to show rejection.
+     Pin: threshold 0.5, fires once.
+     ===================================================================== */
+  var seqAccepted = document.getElementById('seq-accepted');
+  var seqRejectBox = document.getElementById('seqbox-reject');
+  if(seqAccepted){
+    var seqBoxes = seqAccepted.querySelectorAll('.seqbox');
+    var seqTargets = [10, 11, 12, 13, 14, 15];
+    if(reduce){
+      seqBoxes.forEach(function(b, i){ b.textContent = String(seqTargets[i]); });
+      seqAccepted.setAttribute('data-animated','true');
+      if(seqRejectBox) seqRejectBox.setAttribute('data-animated','true');
+    } else {
+      /* Pre-hide the numbers (the page is below the fold on load, so user won't see this) */
+      seqBoxes.forEach(function(b){ b.textContent = '0'; });
+      observeOnce(seqAccepted, 0.5, function(){
+        /* Count up each box from 0 to its target, staggered 120ms between boxes */
+        seqBoxes.forEach(function(b, i){
+          setTimeout(function(){
+            var v = 0;
+            (function tick(){
+              if(v <= seqTargets[i]){
+                b.textContent = String(v);
+                v++;
+                setTimeout(tick, 28);
+              }
+            })();
+          }, i * 120);
+        });
+        /* After the count-up wave has rolled through, shake the rejected 5 red */
+        var totalMs = (seqBoxes.length - 1) * 120 + seqTargets[seqTargets.length-1] * 28 + 120;
+        if(seqRejectBox){
+          setTimeout(function(){
+            seqRejectBox.classList.add('shake-red');
+            seqRejectBox.setAttribute('data-animated','true');
+            setTimeout(function(){
+              seqRejectBox.classList.remove('shake-red');
+            }, 500);
+          }, totalMs);
+        }
+      });
+    }
+  }
+
+  /* =====================================================================
+     8. PAGE 09 — Honesty: NOT items slide in staggered from the left
+     Purpose: emphasizes each limitation individually rather than as a wall of text.
+     50ms stagger between each item via CSS transition-delay.
+     Pin: threshold 0.3.
+     ===================================================================== */
+  var honesty = document.querySelector('.honesty');
+  if(honesty){
+    observeOnce(honesty, 0.3, function(){
+      honesty.classList.add('in');
+    });
+  }
+
+  /* =====================================================================
+     9. PAGE 10 — Colophon: greek motto fades in slowly (2s)
+     Purpose: closing meditation feel — the project's motto appears gently.
+     Pin: threshold 0.5.
+     ===================================================================== */
+  var motto = document.querySelector('.motto');
+  if(motto){
+    observeOnce(motto, 0.5, function(){
+      motto.classList.add('in');
+    });
   }
 })();
 </script>
