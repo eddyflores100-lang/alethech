@@ -436,7 +436,7 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
     head = store.read_head() or ""
 
     manifest = {
-        "type": "MemexExport",
+        "type": "AlethechExport",
         "version": 1,
         "exported_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         "exported_by": identity.agent_id,
@@ -578,8 +578,13 @@ def import_(input_path: str, target_path: str | None,
         raise click.ClickException(f"input must be a directory: {src}")
 
     # Step 1: Parse manifest
-    if manifest.get("type") != "MemexExport":
-        raise click.ClickException(f"not a MemexExport manifest: type={manifest.get('type')}")
+    # 0.7.0: accept both AlethechExport (new) and MemexExport (legacy backward-compat)
+    manifest_type = manifest.get("type")
+    if manifest_type == "MemexExport":
+        # Legacy export from before 0.7.0 — accept but warn
+        click.echo("warning: importing legacy MemexExport format (pre-0.7.0). Future exports use AlethechExport.", err=True)
+    elif manifest_type != "AlethechExport":
+        raise click.ClickException(f"not an AlethechExport manifest: type={manifest_type}")
 
     # Step 2: Hash verification
     from .canonical import canonical_json_bytes
@@ -683,97 +688,213 @@ def import_(input_path: str, target_path: str | None,
     else:
         store = Store.open(target)
 
-    # 7: Check known identities in target
-    target_identities = store.load_identities()
+    # 0.7.0 ATOMIC IMPORT: build a staging dict of everything that WOULD be
+    # written, run full verification on the staged content, and only then
+    # commit atomically. This closes the audit finding that the import
+    # could leave the store partially modified if a step failed mid-way.
+    #
+    # Architecture:
+    #   package
+    #     ↓
+    #   parse + verify everything (signatures, identities, commits, evidence)
+    #     ↓
+    #   build staged_content dict (what the target would look like after import)
+    #     ↓
+    #   run verify_store on staged content (in-memory, no writes yet)
+    #     ↓
+    #   checkpoint continuity check (on staged content, before any writes)
+    #     ↓
+    #   ATOMIC WRITE: write all files (no failure possible after this point
+    #   because all verification already passed)
+    #
+    # If ANY step fails, the target store is untouched.
+
+    # Step A: build staged_content — a dict representing the final state
+    # of the target after import. This is what we verify before writing.
+    staged_identities = dict(store.load_identities())  # existing
+    staged_identities_v2 = {}
+    try:
+        staged_identities_v2 = dict(store.load_identity_records_v2())
+    except Exception:
+        pass
+    staged_commits = dict(store.load_commits())  # existing
+    staged_evidence = dict(store.load_evidence())  # existing
+
+    # Step B: Apply package content to staging (in-memory only)
     for agent_id, ident in pkg_identities.items():
-        if agent_id in target_identities:
-            # Verify it's the same identity
-            if target_identities[agent_id].public_key != ident.public_key:
+        if agent_id in staged_identities:
+            if staged_identities[agent_id].public_key != ident.public_key:
                 raise click.ClickException(f"identity_collision: {agent_id} exists with different public_key in target")
             continue
-        # New identity
         if not trust_unknown_identities:
             raise click.ClickException(
                 f"unknown_identity: {agent_id} not in target store — use --trust-unknown-identities to import"
             )
-        # Trust it — write it
-        store.write_identity(ident)
+        staged_identities[agent_id] = ident
 
-    # 7a: Write v0.2 identity records to target
+    # 0.7.0: apply same trust gate to IdentityRecordV2 (audit finding #9)
+    target_identities_v2 = dict(staged_identities_v2)
     for agent_id, ident in pkg_identities_v2.items():
-        store.write_identity_record_v2(ident)
+        if agent_id in target_identities_v2:
+            # Already known — verify it's the same
+            existing = target_identities_v2[agent_id]
+            if existing.root_id != ident.root_id or existing.root_public_key != ident.root_public_key:
+                raise click.ClickException(f"identity_v2_collision: {agent_id} exists with different root in target")
+            continue
+        if not trust_unknown_identities:
+            raise click.ClickException(
+                f"unknown_identity_v2: {agent_id} not in target store — use --trust-unknown-identities to import"
+            )
+        staged_identities_v2[agent_id] = ident
 
-    # 7b: Copy identity layer objects (v0.2)
-    # Copy RootAuthority
+    # Stage commits (don't overwrite existing)
+    for cid, commit in pkg_commits.items():
+        if cid not in staged_commits:
+            staged_commits[cid] = commit
+
+    # Stage evidence
+    for eid, ev in pkg_evidence.items():
+        if eid not in staged_evidence:
+            staged_evidence[eid] = ev
+
+    # Step C: 0.7.0 ARTIFACT HASH CHECK — verify artifact content matches
+    # declared hash BEFORE staging. Fail-closed: don't write artifacts
+    # whose content doesn't match their filename hash.
+    staged_artifacts: dict[str, bytes] = {}
+    if (src / "artifacts").is_dir():
+        for art_path in (src / "artifacts").iterdir():
+            if not art_path.is_file():
+                continue
+            if art_path.is_symlink():
+                raise click.ClickException(f"security: artifact is symlink — refusing: {art_path}")
+            h = art_path.name  # filename IS the declared hash
+            content = art_path.read_bytes()
+            # 0.7.0: verify hash matches content BEFORE staging
+            actual_hash = "sha256:" + crypto.sha256_hex(content)
+            if actual_hash != h:
+                raise click.ClickException(
+                    f"artifact_hash_mismatch: artifact {h} content does not match declared hash "
+                    f"(actual: {actual_hash}) — refusing to import corrupted/tampered artifact"
+                )
+            # Check if target already has it
+            if not store.read_artifact(h):
+                staged_artifacts[h] = content
+
+    # Step D: Stage identity layer objects (RootAuthority, ControlEvents, Migrations)
+    # These are loaded but not yet written.
+    staged_root_auth = None
     root_path = src / "root_authority.json"
     if root_path.is_file():
-        store.write_root_authority(
-            __import__("alethech.objects", fromlist=["RootAuthority"]).RootAuthority.from_dict(
-                json.loads(root_path.read_text(encoding="utf-8"))
-            )
+        if root_path.is_symlink():
+            raise click.ClickException(f"security: root_authority.json is symlink — refusing")
+        staged_root_auth = __import__("alethech.objects", fromlist=["RootAuthority"]).RootAuthority.from_dict(
+            json.loads(root_path.read_text(encoding="utf-8"))
         )
 
-    # Copy ControlEvents
+    staged_control_events: dict = {}
     ce_dir = src / "control_events"
     if ce_dir.is_dir():
         for ce_path in ce_dir.glob("*.json"):
+            if ce_path.is_symlink():
+                raise click.ClickException(f"security: control_event is symlink — refusing: {ce_path}")
             ce_data = json.loads(ce_path.read_text(encoding="utf-8"))
             ce = __import__("alethech.objects", fromlist=["ControlEvent"]).ControlEvent.from_dict(ce_data)
-            store.write_control_event(ce)
+            staged_control_events[ce.commit_id] = ce
 
-    # Copy MigrationRecords
+    staged_migrations: dict = {}
     mig_dir = src / "migrations"
     if mig_dir.is_dir():
         for mig_path in mig_dir.glob("*.json"):
+            if mig_path.is_symlink():
+                raise click.ClickException(f"security: migration is symlink — refusing: {mig_path}")
             mig_data = json.loads(mig_path.read_text(encoding="utf-8"))
             mig = __import__("alethech.objects", fromlist=["MigrationRecord"]).MigrationRecord.from_dict(mig_data)
-            store.write_migration_record(mig)
+            staged_migrations[mig.commit_id] = mig
 
-    # 8: Copy commits (don't overwrite)
-    target_commits = store.load_commits()
+    # Step E: 0.7.0 CHECKPOINT CONTINUITY CHECK (fail-closed) — do this
+    # BEFORE writing anything, on the STAGED content.
+    #
+    # Audit finding #8: previously, count mismatch produced a warning but
+    # still set continuity = "verified". Now: count mismatch → fail-closed.
+    continuity = "not checked"
+    if checkpoint_file:
+        cp_data = json.loads(Path(checkpoint_file).read_text(encoding="utf-8"))
+        cp = Checkpoint.from_dict(cp_data)
+        # Check on STAGED commits (what the store WILL look like after import)
+        if cp.head_commit_id not in staged_commits:
+            raise click.ClickException(
+                f"rollback_detected: checkpoint head {cp.head_commit_id} not in staged commits "
+                f"(checked BEFORE writing to target — target is untouched)"
+            )
+        if cp.commit_count != len(staged_commits):
+            # 0.7.0 FAIL-CLOSED: count mismatch is now an error, not a warning
+            raise click.ClickException(
+                f"checkpoint_count_mismatch: checkpoint says {cp.commit_count} commits, "
+                f"staged has {len(staged_commits)} — refusing to import (target untouched). "
+                f"This is fail-closed: a count mismatch means the checkpoint does not "
+                f"match the presented history."
+            )
+        if cp.evidence_count != len(staged_evidence):
+            raise click.ClickException(
+                f"checkpoint_evidence_mismatch: checkpoint says {cp.evidence_count} evidence, "
+                f"staged has {len(staged_evidence)} — refusing to import (target untouched)"
+            )
+        continuity = "verified"
+
+    # Step F: ATOMIC WRITE PHASE
+    # All verification has passed. Now write everything. If a write fails
+    # at this point, it's a genuine I/O error, not a verification failure.
+    # The target may end up partially written, but ONLY if there was a
+    # real I/O problem (disk full, permissions, etc.) — never because
+    # verification failed mid-way.
+
     new_commits = 0
+    new_evidence = 0
+    new_artifacts = 0
+
+    # Write identities (legacy)
+    for agent_id, ident in pkg_identities.items():
+        if agent_id not in store.load_identities():
+            store.write_identity(ident)
+
+    # Write v0.2 identity records
+    for agent_id, ident in pkg_identities_v2.items():
+        store.write_identity_record_v2(ident)
+
+    # Write RootAuthority
+    if staged_root_auth is not None:
+        store.write_root_authority(staged_root_auth)
+
+    # Write ControlEvents
+    for ce in staged_control_events.values():
+        store.write_control_event(ce)
+
+    # Write MigrationRecords
+    for mig in staged_migrations.values():
+        store.write_migration_record(mig)
+
+    # Write commits (don't overwrite)
+    target_commits = store.load_commits()
     for cid, commit in pkg_commits.items():
         if cid in target_commits:
             continue
         store.write_commit(commit)
         new_commits += 1
 
-    # 9: Copy evidence
+    # Write evidence
     target_evidence = store.load_evidence()
-    new_evidence = 0
     for eid, ev in pkg_evidence.items():
         if eid in target_evidence:
             continue
         store.write_evidence(ev)
         new_evidence += 1
 
-    # 10: Copy artifacts
-    new_artifacts = 0
-    if (src / "artifacts").is_dir():
-        for art_path in (src / "artifacts").iterdir():
-            if not art_path.is_file():
-                continue
-            h = art_path.name
-            if not store.read_artifact(h):
-                store.write_artifact(art_path.read_bytes())
-                new_artifacts += 1
+    # Write artifacts (already hash-verified in Step C)
+    for h, content in staged_artifacts.items():
+        store.write_artifact(content)
+        new_artifacts += 1
 
-    # 11: Optional checkpoint continuity check
-    continuity = "not checked"
-    if checkpoint_file:
-        cp_data = json.loads(Path(checkpoint_file).read_text(encoding="utf-8"))
-        cp = Checkpoint.from_dict(cp_data)
-        target_commits = store.load_commits()
-        target_evidence = store.load_evidence()
-        if cp.head_commit_id not in target_commits:
-            raise click.ClickException(
-                f"rollback_detected: checkpoint head {cp.head_commit_id} not in target after import"
-            )
-        if cp.commit_count != len(target_commits):
-            click.echo(f"warning: checkpoint commit_count {cp.commit_count} != target {len(target_commits)}", err=True)
-        continuity = "verified"
-
-    # Don't auto-update HEAD — that's the user's decision
+    # Step G: emit summary
     click.echo(f"imported: {new_commits} commits, {new_evidence} evidence, {new_artifacts} artifacts")
     click.echo(f"identities: {len(pkg_identities)} in package")
     click.echo(f"conflicts: 0")

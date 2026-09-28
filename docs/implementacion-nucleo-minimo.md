@@ -17,12 +17,12 @@
 Seis comandos. Nada más.
 
 ```
-1. memex init
-2. memex commit
-3. memex evidence
-4. memex verify
-5. memex export
-6. memex import
+1. alethech init
+2. alethech commit
+3. alethech evidence
+4. alethech verify
+5. alethech export
+6. alethech import
 ```
 
 **Fuera de alcance explícitamente:**
@@ -78,7 +78,7 @@ Dado un par Ed25519 con `public_key_bytes` (32 bytes):
 
 1. `pk_canonical = canonical_json({"kty": "OKP", "crv": "Ed25519", "x": base64url(public_key_bytes)})`
 2. `pk_hash = sha256(pk_canonical)`
-3. `agent_id = "did:memex:" + base32(pk_hash[0:16])`
+3. `agent_id = "did:alethech:" + base32(pk_hash[0:16])`
 
 Donde:
 - `base32` usa RFC 4648 sin padding, lowercase.
@@ -111,7 +111,7 @@ Esto cierra el eslabón que rev 1 dejaba como convención.
 {
   "type": "Identity",
   "version": 1,
-  "agent_id": "did:memex:<base32(sha256(pk_canonical)[0:16])>",
+  "agent_id": "did:alethech:<base32(sha256(pk_canonical)[0:16])>",
   "public_key": {
     "kty": "OKP",
     "crv": "Ed25519",
@@ -190,7 +190,7 @@ Si los 6 pasos pasan, el commit es íntegro, firmado por la clave correspondient
   "type": "MemoryCommit",
   "version": 1,
   "commit_id": "sha256:...",
-  "agent_id": "did:memex:...",
+  "agent_id": "did:alethech:...",
   "key_id": "key-001",
   "parents": ["sha256:...", "sha256:..."],
   "timestamp": "2026-09-26T12:00:00.123Z",
@@ -219,7 +219,7 @@ Notas:
   "type": "EvidenceCommit",
   "version": 1,
   "commit_id": "sha256:...",
-  "agent_id": "did:memex:...",
+  "agent_id": "did:alethech:...",
   "key_id": "key-001",
   "timestamp": "2026-09-26T12:00:00.123Z",
   "event_type": "tool_execution|observation|external_event",
@@ -266,7 +266,7 @@ Para distinguir integridad de continuidad observable, el formato soporta un obje
   "type": "Checkpoint",
   "version": 1,
   "checkpoint_id": "sha256:...",
-  "agent_id": "did:memex:...",
+  "agent_id": "did:alethech:...",
   "head_commit_id": "sha256:...",
   "commit_count": 42,
   "evidence_count": 17,
@@ -298,20 +298,20 @@ Si todos los pasos pasan, puede afirmarse:
 
 ### generación del checkpoint
 
-`memex verify` puede generar un checkpoint opcionalmente:
+`alethech verify` puede generar un checkpoint opcionalmente:
 
 ```bash
-memex verify --emit-checkpoint <output-file>
+alethech verify --emit-checkpoint <output-file>
 ```
 
 Ese archivo se conserva fuera del almacén. Cualquier verificación futura contra rollback requiere que el verificador tenga acceso a ese archivo.
 
-## comando 1: memex init
+## comando 1: alethech init
 
 ### entrada
 
 ```bash
-memex init [--agent-name "<human readable name>"] [--recovery-key-file <path>]
+alethech init [--agent-name "<human readable name>"] [--recovery-key-file <path>]
 ```
 
 Argumentos opcionales. Si no se pasa `--recovery-key-file`, se genera un nuevo par recovery.
@@ -334,7 +334,7 @@ Argumentos opcionales. Si no se pasa `--recovery-key-file`, se genera un nuevo p
 ### salida
 
 ```
-agent_id: did:memex:abc23def456ghij
+agent_id: did:alethech:abc23def456ghij
 public_key: ed25519:...
 key_id: key-001
 genesis_commit: sha256:...
@@ -368,9 +368,9 @@ genesis_commit: sha256:...
 
 ### tests mínimos
 
-1. `memex init` crea todos los archivos esperados.
-2. `memex init` dos veces en el mismo directorio falla con error claro.
-3. `memex verify` después de `init` pasa sin errores.
+1. `alethech init` crea todos los archivos esperados.
+2. `alethech init` dos veces en el mismo directorio falla con error claro.
+3. `alethech verify` después de `init` pasa sin errores.
 4. La `agent_id` es determinista dada la misma public key (verificar regenerando).
 5. Modificar `public_key` en `identity.json` produce `identity_mismatch` en `verify`.
 
@@ -385,12 +385,12 @@ genesis_commit: sha256:...
 - La `identity.json` se puede exportar directamente.
 - Las claves privadas NO se exportan. Solo la public key forma parte del paquete portable.
 
-## comando 2: memex commit
+## comando 2: alethech commit
 
 ### entrada
 
 ```bash
-memex commit --content <json-file> [--type semantic|episodic|procedural] [--evidence <evidence-id>...] [--session <session-id>]
+alethech commit --content <json-file> [--type semantic|episodic|procedural] [--evidence <evidence-id>...] [--session <session-id>]
 ```
 
 `--content` es obligatorio. Los demás opcionales con defaults.
@@ -420,7 +420,7 @@ memex commit --content <json-file> [--type semantic|episodic|procedural] [--evid
 ```
 commit: sha256:...
 parent: sha256:...
-agent: did:memex:...
+agent: did:alethech:...
 timestamp: 2026-09-26T12:34:56.789Z
 ```
 
@@ -443,7 +443,7 @@ timestamp: 2026-09-26T12:34:56.789Z
 - `content` no es JSON válido.
 - `content` no es un objeto JSON (es un array o primitivo).
 - `signing.key` no existe o está corrupta.
-- HEAD apunta a commit que no existe (debe abortar y pedir `memex verify`).
+- HEAD apunta a commit que no existe (debe abortar y pedir `alethech verify`).
 - Evidence IDs referenciados no existen.
 - Timestamp fuera de rango razonable (default: now ± 5 minutos).
 
@@ -462,8 +462,8 @@ timestamp: 2026-09-26T12:34:56.789Z
 
 ### tests mínimos
 
-1. `memex commit` con content válido produce commit firmado.
-2. `memex verify` después de commit pasa.
+1. `alethech commit` con content válido produce commit firmado.
+2. `alethech verify` después de commit pasa.
 3. Modificar el archivo de commit rompe `verify`.
 4. `commit` con parent inválido falla.
 5. `commit` con evidence_id inexistente falla (a menos que `--allow-missing-evidence`).
@@ -479,12 +479,12 @@ timestamp: 2026-09-26T12:34:56.789Z
 
 - El commit se serializa como JSON canónico y se incluye en `project.memex/commits/`.
 
-## comando 3: memex evidence
+## comando 3: alethech evidence
 
 ### entrada
 
 ```bash
-memex evidence --tool <name> --input <file> --output <file> [--result success|failure|timeout] [--artifacts <file>...]
+alethech evidence --tool <name> --input <file> --output <file> [--result success|failure|timeout] [--artifacts <file>...]
 ```
 
 Todos los argumentos requeridos salvo `--result` (default: success) y `--artifacts` (opcional).
@@ -550,7 +550,7 @@ Tampoco demuestra:
 
 ### tests mínimos
 
-1. `memex evidence` con archivos válidos produce evidence firmada.
+1. `alethech evidence` con archivos válidos produce evidence firmada.
 2. Modificar el archivo de output después no afecta la firma (porque ya está hasheado).
 3. Cambiar un byte del archivo de output produce `output_hash` distinto que `verify` detecta como inconsistencia si se sustituye el archivo.
 4. `verify` detecta evidence sin artifacts referenciados.
@@ -568,12 +568,12 @@ Tampoco demuestra:
 - Los artifacts binarios se incluyen en `project.memex/artifacts/<hash>`.
 - El hash del artifact es su nombre de archivo — no hay colisiones (dedup automático).
 
-## comando 4: memex verify
+## comando 4: alethech verify
 
 ### entrada
 
 ```bash
-memex verify [--path <memex-dir>] [--strict] [--emit-checkpoint <output-file>] [--checkpoint <external-checkpoint-file>]
+alethech verify [--path <memex-dir>] [--strict] [--emit-checkpoint <output-file>] [--checkpoint <external-checkpoint-file>]
 ```
 
 Default: `.memex/` en cwd. `--strict` falla en warnings. `--emit-checkpoint` genera checkpoint al final. `--checkpoint` recibe un checkpoint externo para verificar continuidad.
@@ -694,12 +694,12 @@ Recalcula todos los hashes para verificar.
 
 - `verify` debe poder correr sobre un `project.memex/` exportado, no solo sobre `.memex/` runtime.
 
-## comando 5: memex export
+## comando 5: alethech export
 
 ### entrada
 
 ```bash
-memex export --output <path> [--from <commit-id>] [--include-artifacts] [--emit-checkpoint]
+alethech export --output <path> [--from <commit-id>] [--include-artifacts] [--emit-checkpoint]
 ```
 
 `--output` obligatorio. `--from` opcional (default: todos los commits). `--include-artifacts` opcional (default: true). `--emit-checkpoint` opcional (default: false) — genera un checkpoint firmado al final.
@@ -718,7 +718,7 @@ memex export --output <path> [--from <commit-id>] [--include-artifacts] [--emit-
      "type": "MemexExport",
      "version": 1,
      "exported_at": "2026-09-26T...",
-     "exported_by": "did:memex:...",
+     "exported_by": "did:alethech:...",
      "commit_count": 5,
      "evidence_count": 3,
      "artifact_count": 7,
@@ -790,12 +790,12 @@ checkpoint: /path/to/project.memex.checkpoint.json (preserve externally)
 - Sin timestamps dependientes de timezone (todos en UTC ISO 8601).
 - Permisos de archivo preservados cuando el filesystem lo permite.
 
-## comando 6: memex import (corrección 4 de GPT)
+## comando 6: alethech import (corrección 4 de GPT)
 
 ### entrada
 
 ```bash
-memex import --input <path> [--target <memex-dir>] [--trust-unknown-identities] [--allow-conflicts] [--checkpoint <external-checkpoint>]
+alethech import --input <path> [--target <memex-dir>] [--trust-unknown-identities] [--allow-conflicts] [--checkpoint <external-checkpoint>]
 ```
 
 `--input` obligatorio. `--target` default `.memex/`.

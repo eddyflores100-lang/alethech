@@ -304,12 +304,20 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
         elif checkpoint.head_commit_id not in commits:
             report.errors.append(f"rollback_detected: checkpoint head {checkpoint.head_commit_id} not present in store")
         elif checkpoint.commit_count != len(commits):
-            report.warnings.append(
-                f"checkpoint_count_mismatch: checkpoint says {checkpoint.commit_count} commits, store has {len(commits)}"
+            # 0.7.0 FAIL-CLOSED: count mismatch is now an ERROR, not a warning.
+            # Audit finding #8: previously this was a warning and the code
+            # fell through to set continuity_verified = True. That allowed
+            # "continuity: verified" to coexist with a count mismatch,
+            # which is semantically incoherent.
+            report.errors.append(
+                f"checkpoint_count_mismatch: checkpoint says {checkpoint.commit_count} commits, "
+                f"store has {len(commits)} — continuity cannot be verified (fail-closed)"
             )
         elif checkpoint.evidence_count != len(evidence):
-            report.warnings.append(
-                f"checkpoint_count_mismatch: checkpoint says {checkpoint.evidence_count} evidence, store has {len(evidence)}"
+            # 0.7.0 FAIL-CLOSED: same logic for evidence count
+            report.errors.append(
+                f"checkpoint_evidence_mismatch: checkpoint says {checkpoint.evidence_count} evidence, "
+                f"store has {len(evidence)} — continuity cannot be verified (fail-closed)"
             )
         else:
             # 0.5.6: verify causal continuity. The current HEAD must descend

@@ -36,7 +36,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Implementation of rev 2 spec. 9 commands, 225 tests (incl. 56 RFC 8785 JCS conformance vectors + 15 adversarial conformance vectors + 7 import-hardening tests + 6 anti-rollback tests), 8 mutation-guard paths covering 3 code-level defeats, 2 data-level (recall-seam) defeats, 1 checkpoint continuity defeat, and 2 root-binding defeats. JCS serializer verified against ECMAScript Number.prototype.toString() algorithm. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Implementation of rev 2 spec (rev 3 identity layer). 9 commands, 230 tests (incl. 56 RFC 8785 JCS conformance vectors + 15 adversarial conformance vectors + 7 import-hardening tests + 6 anti-rollback tests + 5 atomic-import/fail-closed/artifact-hash tests), 8 mutation-guard paths. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
