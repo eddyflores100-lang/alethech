@@ -171,7 +171,78 @@
     50%      { text-shadow: 0 0 6px rgba(255,136,0,0.9), 0 0 16px rgba(255,136,0,0.4); }
   }
 
-  /* Apply to ALL green-colored elements site-wide */
+  /* ============ HERO MUST BE ALIVE — the FIRST thing the user sees ============ */
+  /* The mega title pulses green/orange continuously */
+  @keyframes heroGlow {
+    0%, 100% {
+      color: #0a0a0a;
+      text-shadow:
+        0 0 10px rgba(0,255,136,0.4),
+        0 0 30px rgba(0,255,136,0.2);
+    }
+    33% {
+      color: #0a0a0a;
+      text-shadow:
+        0 0 15px rgba(0,255,136,0.7),
+        0 0 40px rgba(0,255,136,0.4),
+        0 0 60px rgba(0,255,136,0.2);
+    }
+    66% {
+      color: #0a0a0a;
+      text-shadow:
+        0 0 15px rgba(255,136,0,0.7),
+        0 0 40px rgba(255,136,0,0.4),
+        0 0 60px rgba(255,136,0,0.2);
+    }
+  }
+
+  /* Hero greek letter floats + color cycles */
+  @keyframes greekFloat {
+    0%, 100% { transform: translateY(0); color: #0a0a0a; }
+    25%      { transform: translateY(-4px); color: #00ff88; }
+    50%      { transform: translateY(0); color: #0a0a0a; }
+    75%      { transform: translateY(-4px); color: #ff8800; }
+  }
+
+  /* Tagline typewriter cursor blink */
+  @keyframes heroBlink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  /* Stats numbers pulse */
+  @keyframes statPulse {
+    0%, 100% { color: #0a0a0a; transform: scale(1); }
+    50%      { color: #00ff88; transform: scale(1.05); }
+  }
+
+  /* Apply hero animations */
+  .mega { animation: heroGlow 3s ease-in-out infinite; }
+  .eyebrow { animation: greekFloat 4s ease-in-out infinite; display: inline-block; }
+  .stat-num, .stats b { animation: statPulse 2.5s ease-in-out infinite; display: inline-block; }
+
+  /* Background symbols — STATIC pattern, not drifting (user said why move them) */
+  .ambient-symbols {
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(0,255,136,0.04) 0%, transparent 8%),
+      radial-gradient(circle at 80% 60%, rgba(255,136,0,0.04) 0%, transparent 8%),
+      radial-gradient(circle at 50% 80%, rgba(0,255,136,0.04) 0%, transparent 8%);
+  }
+  .ambient-symbols span {
+    position: absolute;
+    font-family: 'Cedarville Cursive', serif;
+    opacity: 0.12;
+    user-select: none;
+    font-weight: bold;
+    /* NO animation — symbols stay fixed as background pattern */
+  }
+
+  /* Removed drift animations — symbols are now static decoration */
+  .ambient-symbols span:nth-child(3n)   { color: #00ff88; animation: none !important; }
+  .ambient-symbols span:nth-child(3n+1) { color: #ff8800; animation: none !important; }
+  .ambient-symbols span:nth-child(3n+2) { color: #0a0a0a; animation: none !important; }
+
+  /* Re-apply green glow to green elements */
   .verdict--valid, .verdict--valid *,
   .kbox--active, .kbox--active *,
   .term .ok, .legend i.green,
