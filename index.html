@@ -546,9 +546,9 @@
     min-height:240px;
     overflow-x:auto;
   }
-  .term .prompt{ color:#9a9a9a; }
-  /* OK = bold bright white (was green) — distinguished by weight only */
-  .term .ok{ color:#fafafa; font-weight:800; }
+  .term .prompt{ color:#00ff88; }
+  /* OK = bold green — only color allowed on the page, used only inside terminals */
+  .term .ok{ color:#00ff88; font-weight:800; }
   .term .cursor{
     display:inline-block;
     width:.6ch;
@@ -557,7 +557,129 @@
     animation:blink 1.05s steps(2) infinite;
   }
 
-  /* ============ PAGE 12 — honesty ============ */
+  /* ============ PAGE 12 — INTERACTIVE TERMINAL ============ */
+  .iterm{
+    background:#0a0a0a;
+    border:2px solid var(--ink);
+    font-family:'JetBrains Mono',monospace;
+    font-size:clamp(.82rem,1.5vw,1rem);
+    line-height:1.6;
+    display:flex;
+    flex-direction:column;
+    max-height:540px;
+    overflow:hidden;
+  }
+  .iterm__bar{
+    background:#0a0a0a;
+    border-bottom:1px solid #1f1f1f;
+    padding:.6rem .95rem;
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+    flex:0 0 auto;
+  }
+  .iterm__dots{
+    display:flex;
+    gap:.4rem;
+    flex:0 0 auto;
+  }
+  .iterm__dots i{
+    width:11px;
+    height:11px;
+    border-radius:50%;
+    display:inline-block;
+    border:1.5px solid #6b6b6b;
+    box-sizing:border-box;
+  }
+  .iterm__dots i.r{ border-color:#ff5f56; }
+  .iterm__dots i.y{ border-color:#ffbd2e; }
+  .iterm__dots i.g{ border-color:#00ff88; }
+  .iterm__title{
+    color:#9a9a9a;
+    font-size:.78rem;
+    letter-spacing:.04em;
+    font-weight:500;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .iterm__body{
+    flex:1 1 auto;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:1rem 1.15rem;
+    color:#f5f5dc;
+    word-break:break-word;
+    white-space:pre-wrap;
+    font-family:'JetBrains Mono',monospace;
+    scrollbar-width:thin;
+    scrollbar-color:#2a2a2a #0a0a0a;
+  }
+  .iterm__body::-webkit-scrollbar{ width:8px; height:8px; }
+  .iterm__body::-webkit-scrollbar-track{ background:#0a0a0a; }
+  .iterm__body::-webkit-scrollbar-thumb{ background:#2a2a2a; border:1px solid #0a0a0a; }
+  .iterm__body::-webkit-scrollbar-thumb:hover{ background:#3a3a3a; }
+
+  .iterm__repo{
+    color:#6b6b6b;
+    font-size:.78rem;
+    letter-spacing:.04em;
+    margin-bottom:.5rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .iterm__line{ margin:0; padding:0; }
+  .iterm__prompt-line{
+    display:flex;
+    align-items:baseline;
+    gap:.4ch;
+    position:relative;
+    margin-top:.1rem;
+  }
+  .iterm__prompt{ color:#00ff88; flex:0 0 auto; font-weight:700; }
+  .iterm__text-wrap{
+    flex:1 1 auto;
+    min-width:0;
+    position:relative;
+    word-break:break-all;
+  }
+  .iterm__echo{ color:#00ff88; }
+  .iterm__cursor{
+    color:#00ff88;
+    animation:blink 1.05s steps(2) infinite;
+    margin-left:0;
+    display:inline-block;
+    font-weight:700;
+  }
+  .iterm__input{
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    background:transparent;
+    border:0;
+    outline:0;
+    color:transparent;
+    caret-color:transparent;
+    -webkit-text-fill-color:transparent;
+    font:inherit;
+    padding:0;
+    margin:0;
+    z-index:2;
+    cursor:text;
+  }
+  .iterm__ok{ color:#00ff88; font-weight:700; }
+  .iterm__muted{ color:#6b6b6b; }
+  .iterm__primary{ color:#f5f5dc; }
+  .iterm__hint{
+    margin-top:1rem;
+    font-size:.82rem;
+    color:var(--muted);
+    letter-spacing:.04em;
+  }
+
+  /* ============ PAGE 13 — honesty ============ */
   .honesty{ list-style:none; display:flex; flex-direction:column; gap:0; }
   .honesty li{
     padding:1.15rem 0;
@@ -573,7 +695,7 @@
   .honesty .not{ font-weight:800; color:var(--ink); letter-spacing:.04em; }
   .honesty .x{ color:var(--muted); }
 
-  /* ============ PAGE 13 — stats grid ============ */
+  /* ============ PAGE 14 — stats grid ============ */
   .stats-grid{
     display:grid;
     grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
@@ -604,7 +726,7 @@
     line-height:1.4;
   }
 
-  /* ============ PAGE 14 — colophon ============ */
+  /* ============ PAGE 15 — colophon ============ */
   .motto{
     font-size:clamp(1.6rem,4vw,2.6rem);
     font-weight:700;
@@ -721,7 +843,7 @@
     80% { transform: translateX(3px); }
   }
 
-  /* ============ PAGE 12 — honesty slide-in ============ */
+  /* ============ PAGE 13 — honesty slide-in ============ */
   .honesty li{
     opacity: 0;
     transform: translateX(-30px);
@@ -735,7 +857,7 @@
   .honesty.in li:nth-child(5){ transition-delay: 200ms; }
   .honesty.in li:nth-child(6){ transition-delay: 250ms; }
 
-  /* ============ PAGE 13 — stats count-up reveal ============ */
+  /* ============ PAGE 14 — stats count-up reveal ============ */
   .stats-grid > div{
     opacity:0;
     transform: translateY(12px);
@@ -753,7 +875,7 @@
   .stats-grid.in > div:nth-child(9){ transition-delay:400ms; }
   .stats-grid.in > div:nth-child(10){ transition-delay:450ms; }
 
-  /* ============ PAGE 14 — motto fade-in ============ */
+  /* ============ PAGE 15 — motto fade-in ============ */
   .motto{
     opacity: 0;
     transition: opacity 2s ease-in;
@@ -771,11 +893,16 @@
     .dag .node-title{ font-size:15px; }
     .dag .node-key{ font-size:11px; }
     .stats-grid{ grid-template-columns:1fr 1fr; }
+    .iterm{ font-size:.78rem; max-height:440px; }
+    .iterm__body{ padding:.8rem .9rem; }
+    .iterm__title{ font-size:.72rem; }
+    .iterm__repo{ font-size:.72rem; }
   }
 
   @media (prefers-reduced-motion: reduce){
     .dag .edge{ transition:none !important; stroke-dashoffset:0 !important; }
     .term .cursor{ animation:none !important; }
+    .iterm__cursor{ animation:none !important; }
     .giant--type .caret{ animation:none !important; display:none !important; }
     .giant--type{ min-height:auto !important; }
     .dag .node.lit rect{ animation:none !important; }
@@ -797,7 +924,7 @@
 
 <!-- ============ PAGE 01 — COVER ============ -->
 <section class="page" id="cover">
-  <div class="pagenum"><b>01</b> / 14 &nbsp;·&nbsp; COVER</div>
+  <div class="pagenum"><b>01</b> / 15 &nbsp;·&nbsp; COVER</div>
   <div class="page__inner">
     <div class="eyebrow">ἀλήθεια</div>
     <h1 class="mega">alethech</h1>
@@ -819,7 +946,7 @@
 
 <!-- ============ PAGE 02 — THE PROPERTY ============ -->
 <section class="page" id="property">
-  <div class="pagenum"><b>02</b> / 14 &nbsp;·&nbsp; THE PROPERTY</div>
+  <div class="pagenum"><b>02</b> / 15 &nbsp;·&nbsp; THE PROPERTY</div>
   <div class="page__inner">
     <p class="giant giant--type" id="property-giant" data-text="this memory set forms part of a cryptographically verifiable history associated with a determined identity"></p>
     <p class="lede" style="margin-top:2.5rem;">the protocol does <b style="color:var(--ink)">NOT</b> prove claims are true — only that they were signed.</p>
@@ -834,7 +961,7 @@
 
 <!-- ============ PAGE 03 — WHAT IS ALETHECH (NEW) ============ -->
 <section class="page" id="what">
-  <div class="pagenum"><b>03</b> / 14 &nbsp;·&nbsp; WHAT IS ALETHECH</div>
+  <div class="pagenum"><b>03</b> / 15 &nbsp;·&nbsp; WHAT IS ALETHECH</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">what is alethech</span>
@@ -864,7 +991,7 @@
 
 <!-- ============ PAGE 04 — THE ARCHITECTURE (DAG) ============ -->
 <section class="page" id="architecture">
-  <div class="pagenum"><b>04</b> / 14 &nbsp;·&nbsp; ARCHITECTURE</div>
+  <div class="pagenum"><b>04</b> / 15 &nbsp;·&nbsp; ARCHITECTURE</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the protagonist</span>
@@ -953,7 +1080,7 @@
 
 <!-- ============ PAGE 05 — HOW IT WORKS (NEW) ============ -->
 <section class="page" id="how">
-  <div class="pagenum"><b>05</b> / 14 &nbsp;·&nbsp; HOW IT WORKS</div>
+  <div class="pagenum"><b>05</b> / 15 &nbsp;·&nbsp; HOW IT WORKS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">how it works</span>
@@ -988,7 +1115,7 @@
 
 <!-- ============ PAGE 06 — THE FOUR EQUATIONS ============ -->
 <section class="page" id="equations">
-  <div class="pagenum"><b>06</b> / 14 &nbsp;·&nbsp; EQUATIONS</div>
+  <div class="pagenum"><b>06</b> / 15 &nbsp;·&nbsp; EQUATIONS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the four equations</span>
@@ -1023,7 +1150,7 @@
 
 <!-- ============ PAGE 07 — THE TWO VERDICTS ============ -->
 <section class="page" id="verdicts">
-  <div class="pagenum"><b>07</b> / 14 &nbsp;·&nbsp; VERDICTS</div>
+  <div class="pagenum"><b>07</b> / 15 &nbsp;·&nbsp; VERDICTS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the two verdicts</span>
@@ -1059,7 +1186,7 @@
 
 <!-- ============ PAGE 08 — THE GUARANTEES (NEW) ============ -->
 <section class="page" id="guarantees">
-  <div class="pagenum"><b>08</b> / 14 &nbsp;·&nbsp; GUARANTEES</div>
+  <div class="pagenum"><b>08</b> / 15 &nbsp;·&nbsp; GUARANTEES</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the guarantees</span>
@@ -1100,7 +1227,7 @@
 
 <!-- ============ PAGE 09 — KEY ROTATION ============ -->
 <section class="page" id="rotation">
-  <div class="pagenum"><b>09</b> / 14 &nbsp;·&nbsp; KEY ROTATION</div>
+  <div class="pagenum"><b>09</b> / 15 &nbsp;·&nbsp; KEY ROTATION</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">key rotation</span>
@@ -1137,7 +1264,7 @@
 
 <!-- ============ PAGE 10 — ANTI-ROLLBACK ============ -->
 <section class="page" id="rollback">
-  <div class="pagenum"><b>10</b> / 14 &nbsp;·&nbsp; ANTI-ROLLBACK</div>
+  <div class="pagenum"><b>10</b> / 15 &nbsp;·&nbsp; ANTI-ROLLBACK</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">anti-rollback</span>
@@ -1177,7 +1304,7 @@
 
 <!-- ============ PAGE 11 — CLI DEMO ============ -->
 <section class="page" id="cli">
-  <div class="pagenum"><b>11</b> / 14 &nbsp;·&nbsp; CLI DEMO</div>
+  <div class="pagenum"><b>11</b> / 15 &nbsp;·&nbsp; CLI DEMO</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">cli demo</span>
@@ -1190,7 +1317,7 @@ $ alethech key rotate
 $ alethech verify
 result: OK"></pre>
 
-    <p class="small" style="margin-top:1.25rem;">typed live when this page enters the viewport — the only typewriter on the site.</p>
+    <p class="small" style="margin-top:1.25rem;">typed live when this page enters the viewport — the only auto-typewriter on the site.</p>
 
     <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
       <b>the loop</b>
@@ -1199,9 +1326,44 @@ result: OK"></pre>
   </div>
 </section>
 
-<!-- ============ PAGE 12 — HONESTY ============ -->
+<!-- ============ PAGE 12 — LIVE TERMINAL (interactive) ============ -->
+<section class="page" id="live">
+  <div class="pagenum"><b>12</b> / 15 &nbsp;·&nbsp; LIVE TERMINAL</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">live terminal</span>
+      <h2>try it yourself</h2>
+    </div>
+
+    <div class="iterm" id="iterm" tabindex="0" aria-label="interactive alethech terminal">
+      <div class="iterm__bar">
+        <span class="iterm__dots" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+        <span class="iterm__title">alethech — interactive terminal</span>
+      </div>
+      <div class="iterm__body" id="iterm-body">
+        <div class="iterm__repo">↳ live from github.com/eddyflores100-lang/alethech</div>
+        <div class="iterm__prompt-line">
+          <span class="iterm__prompt">$</span>
+          <span class="iterm__text-wrap">
+            <span class="iterm__echo" id="iterm-echo"></span><span class="iterm__cursor" id="iterm-cursor" aria-hidden="true">▌</span>
+          </span>
+          <input type="text" class="iterm__input" id="iterm-input" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="terminal input"/>
+        </div>
+      </div>
+    </div>
+
+    <p class="iterm__hint">type 'help' for commands · try: alethech init, alethech verify, tests</p>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
+      <b>simulation, not execution</b>
+      The terminal runs pre-programmed commands that mirror the real alethech CLI. Output values are illustrative — but the version (0.7.0), the test count (230), and the command surface match the live repository on GitHub. Click the terminal and type.
+    </aside>
+  </div>
+</section>
+
+<!-- ============ PAGE 13 — HONESTY ============ -->
 <section class="page" id="honesty">
-  <div class="pagenum"><b>12</b> / 14 &nbsp;·&nbsp; HONESTY</div>
+  <div class="pagenum"><b>13</b> / 15 &nbsp;·&nbsp; HONESTY</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">honesty</span>
@@ -1224,9 +1386,9 @@ result: OK"></pre>
   </div>
 </section>
 
-<!-- ============ PAGE 13 — STATS (NEW) ============ -->
+<!-- ============ PAGE 14 — STATS (NEW) ============ -->
 <section class="page" id="stats">
-  <div class="pagenum"><b>13</b> / 14 &nbsp;·&nbsp; STATS</div>
+  <div class="pagenum"><b>14</b> / 15 &nbsp;·&nbsp; STATS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">stats</span>
@@ -1253,9 +1415,9 @@ result: OK"></pre>
   </div>
 </section>
 
-<!-- ============ PAGE 14 — COLOPHON ============ -->
+<!-- ============ PAGE 15 — COLOPHON ============ -->
 <footer class="page page--footer" id="colophon">
-  <div class="pagenum"><b>14</b> / 14 &nbsp;·&nbsp; COLOPHON</div>
+  <div class="pagenum"><b>15</b> / 15 &nbsp;·&nbsp; COLOPHON</div>
   <div class="page__inner">
     <p class="motto">τέχνη ἀληθείας</p>
 
@@ -1373,14 +1535,16 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     3. PAGE 11 — CLI typewriter (OK shown in bold white, not color)
+     3. PAGE 11 — CLI typewriter ($ prompt + OK shown in green)
      ===================================================================== */
   var term = document.getElementById('term');
   if(term){
     var full = term.getAttribute('data-text') || '';
     var started = false;
     function renderFinal(){
-      var html = escapeHtml(full).replace('OK', '<span class="ok">OK</span>');
+      var html = escapeHtml(full)
+        .replace(/\$/g, '<span class="prompt">$</span>')
+        .replace('OK', '<span class="ok">OK</span>');
       term.innerHTML = html + '<span class="cursor">▌</span>';
     }
     function type(){
@@ -1524,7 +1688,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     8. PAGE 12 — Honesty: NOT items slide in staggered from the left
+     8. PAGE 13 — Honesty: NOT items slide in staggered from the left
      ===================================================================== */
   var honesty = document.querySelector('.honesty');
   if(honesty){
@@ -1534,7 +1698,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     9. PAGE 13 — Stats grid: cells fade-in staggered
+     9. PAGE 14 — Stats grid: cells fade-in staggered
      ===================================================================== */
   var statsGrid = document.getElementById('stats-grid');
   if(statsGrid){
@@ -1544,13 +1708,334 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     10. PAGE 14 — Colophon: greek motto fades in slowly (2s)
+    10. PAGE 15 — Colophon: greek motto fades in slowly (2s)
      ===================================================================== */
   var motto = document.querySelector('.motto');
   if(motto){
     observeOnce(motto, 0.5, function(){
       motto.classList.add('in');
     });
+  }
+
+  /* =====================================================================
+    11. PAGE 12 — Interactive terminal: simulated alethech commands
+        (vanilla JS · no backend · commands mirror the real CLI surface)
+     ===================================================================== */
+  var iterm = document.getElementById('iterm');
+  if(iterm){
+    var itermBody  = document.getElementById('iterm-body');
+    var itermInput = document.getElementById('iterm-input');
+    var itermEcho  = document.getElementById('iterm-echo');
+
+    var AGENT_ID      = 'did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu';
+    var VERSION       = '0.7.0';
+    var PUBKEY        = '3f7a9c1e8b2d4f6a5c0e7d8b9a1f2c3e4d5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c';
+    var GENESIS       = '4a2f8c1d9b3e7f5a0c6d8e2b4f9a1c3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d5';
+    var COMMIT_HASH   = 'c0d8e2f6a1b39c5d7e9f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2';
+    var PARENT_HASH   = '4a2f8c1d9b3e7f5a0c6d8e2b4f9a1c3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d5';
+    var CUTOFF_HEAD   = '8b3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d54a2f8c1d9b3e7f5a0c6d8e2b4f9a';
+    var CONTROL_EVENT = 'd5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d54a2f8c1d9b3e7f5a0c6d8e2b4f9a1c';
+
+    var history = [];
+    var historyIdx = 0;
+
+    function green(text){ return '<span class="iterm__ok">' + escapeHtml(text) + '</span>'; }
+
+    function getPromptLine(){
+      return itermBody.querySelector('.iterm__prompt-line');
+    }
+    function addLineEl(className){
+      var div = document.createElement('div');
+      div.className = 'iterm__line' + (className ? ' ' + className : '');
+      itermBody.insertBefore(div, getPromptLine());
+      return div;
+    }
+    function printHTML(html){
+      var div = addLineEl();
+      div.innerHTML = html;
+      scrollToBottom();
+      return div;
+    }
+    function printText(text, cls){
+      if(!cls) cls = 'iterm__primary';
+      var div = addLineEl(cls);
+      div.textContent = text;
+      scrollToBottom();
+      return div;
+    }
+    function printPromptEcho(cmd){
+      printHTML('<span class="iterm__prompt">$</span> <span class="iterm__echo">' + escapeHtml(cmd) + '</span>');
+    }
+    function scrollToBottom(){
+      itermBody.scrollTop = itermBody.scrollHeight;
+    }
+    function clearTerminal(){
+      var lines = itermBody.querySelectorAll('.iterm__line');
+      lines.forEach(function(l){ l.remove(); });
+    }
+
+    /* ---- command handlers ---- */
+    function cmdHelp(){
+      printText([
+        'available commands:',
+        '  help                              show this help',
+        '  alethech --version                print version',
+        '  alethech --help                   print CLI help',
+        '  alethech init                     initialize identity + keypair',
+        '  alethech verify                   verify the local store',
+        '  alethech commit --content <file>  sign + link a content commit',
+        '  alethech key rotate               rotate the active signing key',
+        '  alethech export --output <dir>    export a portable signed bundle',
+        '  alethech import --input <dir>     verify + atomically import a bundle',
+        '  tests                             run the simulated test suite (230 tests)',
+        '  whoami                            print your agent_id',
+        '  clear                             clear the terminal'
+      ].join('\n'));
+    }
+    function cmdVersion(){
+      printText('alethech ' + VERSION, 'iterm__echo');
+    }
+    function cmdAlethechHelp(){
+      printText([
+        'alethech — verifiable agent continuity protocol',
+        '',
+        'usage:',
+        '  alethech <command> [options]',
+        '',
+        'commands:',
+        '  init                              generate Ed25519 keypair + identity',
+        '  commit --content <file>           sign + link a content commit',
+        '  verify                            verify the local store',
+        '  key rotate                        rotate the active signing key',
+        '  export --output <dir>             export a portable signed bundle',
+        '  import --input <dir>              verify + atomically import a bundle',
+        '',
+        'options:',
+        '  -v, --version                     print version',
+        '  -h, --help                        print this help',
+        '',
+        'docs: https://github.com/eddyflores100-lang/alethech'
+      ].join('\n'));
+    }
+    function cmdInit(){
+      printText('initializing alethech store...');
+      setTimeout(function(){
+        printText('agent_id:        ' + AGENT_ID);
+        printText('public_key:      ' + PUBKEY, 'iterm__muted');
+        printText('key_id:          key-000');
+        printText('genesis_commit:  ' + GENESIS, 'iterm__muted');
+        printHTML('result: ' + green('OK'));
+      }, 220);
+    }
+    function cmdVerify(){
+      printText('verifying local store...');
+      setTimeout(function(){
+        printText('identities: 1 verified, 0 invalid');
+        printText('commits:    3 verified, 0 invalid');
+        printText('signatures: 3 valid, 0 invalid');
+        printText('key rotations: 1 (cutoff_head present)');
+        printText('atomic imports: ok');
+        printHTML('result: ' + green('OK'));
+      }, 220);
+    }
+    function cmdCommit(args){
+      var content = null;
+      for(var i = 0; i < args.length; i++){
+        if(args[i] === '--content' && i+1 < args.length){ content = args[i+1]; }
+      }
+      if(!content){
+        printText('error: --content <file> is required', 'iterm__muted');
+        printText('usage: alethech commit --content <file>', 'iterm__muted');
+        return;
+      }
+      printText('reading ' + content + '...');
+      setTimeout(function(){
+        printText('commit:    ' + COMMIT_HASH, 'iterm__muted');
+        printText('parent:    ' + PARENT_HASH, 'iterm__muted');
+        printText('agent:     ' + AGENT_ID, 'iterm__muted');
+        printText('timestamp: 2026-01-15T14:23:47Z');
+        printHTML('result: ' + green('OK'));
+      }, 220);
+    }
+    function cmdKey(args){
+      var sub = args[0];
+      if(sub !== 'rotate'){
+        printText('alethech key: unknown subcommand: ' + (sub || '(none)'), 'iterm__muted');
+        printText('usage: alethech key rotate', 'iterm__muted');
+        return;
+      }
+      printText('rotating active signing key...');
+      setTimeout(function(){
+        printText('revoked:        key-001');
+        printText('granted:        key-002');
+        printText('cutoff_head:    ' + CUTOFF_HEAD, 'iterm__muted');
+        printText('control_event:  ' + CONTROL_EVENT, 'iterm__muted');
+        printHTML('result: ' + green('OK'));
+      }, 220);
+    }
+    function cmdExport(args){
+      var out = null;
+      for(var i = 0; i < args.length; i++){
+        if(args[i] === '--output' && i+1 < args.length){ out = args[i+1]; }
+      }
+      if(!out){
+        printText('error: --output <dir> is required', 'iterm__muted');
+        printText('usage: alethech export --output <dir>', 'iterm__muted');
+        return;
+      }
+      printText('exporting to ' + out + '...');
+      setTimeout(function(){
+        printText('commits:   3 exported');
+        printText('evidence:  12 files (signatures, keys, manifest)');
+        printHTML('exported: ' + green(out));
+      }, 220);
+    }
+    function cmdImport(args){
+      var inp = null;
+      for(var i = 0; i < args.length; i++){
+        if(args[i] === '--input' && i+1 < args.length){ inp = args[i+1]; }
+      }
+      if(!inp){
+        printText('error: --input <dir> is required', 'iterm__muted');
+        printText('usage: alethech import --input <dir>', 'iterm__muted');
+        return;
+      }
+      printText('verifying bundle at ' + inp + '...');
+      setTimeout(function(){
+        printText('signatures: 3 verified');
+        printText('commits:    3 verified');
+        printText('atomic check: target untouched on failure');
+        printHTML('imported: ' + green(inp));
+      }, 220);
+    }
+    function cmdTests(){
+      var total = 230;
+      var width = 24;
+      printText('running ' + total + ' tests...');
+      var barDiv   = addLineEl();
+      var finalDiv = addLineEl();
+      var cur = 0;
+      var interval = setInterval(function(){
+        cur += 23;
+        if(cur > total) cur = total;
+        var filled = Math.round((cur / total) * width);
+        var bar = '';
+        for(var i = 0; i < width; i++){ bar += (i < filled) ? '█' : '░'; }
+        barDiv.innerHTML =
+          '<span class="iterm__muted">[</span>' +
+          '<span class="iterm__primary">' + bar + '</span>' +
+          '<span class="iterm__muted">]</span> ' +
+          '<span class="iterm__muted">' + Math.round((cur/total)*100) + '% (' + cur + '/' + total + ')</span>';
+        scrollToBottom();
+        if(cur >= total){
+          clearInterval(interval);
+          setTimeout(function(){
+            finalDiv.innerHTML = green('230 passed in 1.4s');
+            scrollToBottom();
+          }, 180);
+        }
+      }, 140);
+    }
+    function cmdWhoami(){
+      printText(AGENT_ID, 'iterm__echo');
+    }
+    function cmdNotFound(name){
+      printText('command not found: ' + name, 'iterm__muted');
+      printText('type \'help\' for available commands.', 'iterm__muted');
+    }
+
+    function executeCommand(raw){
+      var cmd = raw.trim();
+      if(!cmd) return;
+      printPromptEcho(cmd);
+      history.push(cmd);
+      historyIdx = history.length;
+      try {
+        var parts = cmd.split(/\s+/);
+        var head  = parts[0].toLowerCase();
+        switch(head){
+          case 'help':   cmdHelp();   break;
+          case 'clear':  clearTerminal(); break;
+          case 'whoami': cmdWhoami(); break;
+          case 'tests':  cmdTests();  break;
+          case 'alethech':
+            var sub  = parts[1] || '';
+            var rest = parts.slice(2);
+            if(sub === '--version' || sub === '-v'){
+              cmdVersion();
+            } else if(sub === '--help' || sub === '-h' || sub === ''){
+              cmdAlethechHelp();
+            } else if(sub === 'init'){
+              cmdInit();
+            } else if(sub === 'verify'){
+              cmdVerify();
+            } else if(sub === 'commit'){
+              cmdCommit(rest);
+            } else if(sub === 'key'){
+              cmdKey(rest);
+            } else if(sub === 'export'){
+              cmdExport(rest);
+            } else if(sub === 'import'){
+              cmdImport(rest);
+            } else {
+              printText('alethech: unknown subcommand: ' + sub, 'iterm__muted');
+              printText('type \'alethech --help\' for usage.', 'iterm__muted');
+            }
+            break;
+          default:
+            cmdNotFound(head);
+        }
+      } catch(err){
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
+    }
+
+    /* ---- input handlers ---- */
+    itermInput.addEventListener('input', function(){
+      itermEcho.textContent = itermInput.value;
+      scrollToBottom();
+    });
+    itermInput.addEventListener('keydown', function(e){
+      if(e.key === 'Enter' || e.keyCode === 13){
+        e.preventDefault();
+        var val = itermInput.value;
+        itermInput.value = '';
+        itermEcho.textContent = '';
+        executeCommand(val);
+      } else if(e.key === 'ArrowUp'){
+        e.preventDefault();
+        if(history.length > 0 && historyIdx > 0){
+          historyIdx--;
+          itermInput.value = history[historyIdx];
+          itermEcho.textContent = history[historyIdx];
+          scrollToBottom();
+        }
+      } else if(e.key === 'ArrowDown'){
+        e.preventDefault();
+        if(historyIdx < history.length - 1){
+          historyIdx++;
+          itermInput.value = history[historyIdx];
+          itermEcho.textContent = history[historyIdx];
+        } else {
+          historyIdx = history.length;
+          itermInput.value = '';
+          itermEcho.textContent = '';
+        }
+        scrollToBottom();
+      } else if(e.key === 'l' && e.ctrlKey){
+        e.preventDefault();
+        clearTerminal();
+      }
+    });
+
+    /* click anywhere on the terminal focuses the input */
+    iterm.addEventListener('click', function(){
+      itermInput.focus();
+    });
+
+    /* initial welcome banner (lines stay clearable by `clear`) */
+    printHTML('<span class="iterm__muted">alethech ' + VERSION + ' — interactive terminal (simulated)</span>');
+    printHTML('<span class="iterm__muted">type \'help\' for available commands</span>');
   }
 })();
 </script>
