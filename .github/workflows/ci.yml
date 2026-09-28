@@ -36,7 +36,8 @@ jobs:
       - name: Verify CLI works end-to-end
         run: |
           alethech --help
-          alethech init --store /tmp/alethech-ci-test
+          # --store is a ROOT option (must precede the subcommand), not an init option
+          alethech --store /tmp/alethech-ci-test init
           echo '{"test": true}' > /tmp/alethech-ci-content.json
-          alethech commit --store /tmp/alethech-ci-test --content /tmp/alethech-ci-content.json
-          alethech verify --store /tmp/alethech-ci-test
+          alethech --store /tmp/alethech-ci-test commit --content /tmp/alethech-ci-content.json
+          alethech --store /tmp/alethech-ci-test verify
