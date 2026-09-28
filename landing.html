@@ -221,86 +221,47 @@
   .eyebrow { animation: greekFloat 4s ease-in-out infinite; display: inline-block; }
   .stat-num, .stats b { animation: statPulse 2.5s ease-in-out infinite; display: inline-block; }
 
-  /* ============ 3D PARALLAX DEPTH — 3 layers create spatial illusion ============ */
-  /* Layer 1 (far): fixed background, NEVER moves with scroll.
-     Layer 2 (mid): moves SLOWLY with scroll (parallax 0.3x).
-     Layer 3 (near): moves FASTER than content (parallax 1.5x) — gives depth.
-     Content sits at z-index 1, normal scroll.
+  /* ============ FALLING LETTERS — scroll-triggered gravity effect ============ */
+  /* When scrolling DOWN: letters detach from their position and fall down
+     (translateY +300px + opacity 0 + rotate), like they were glued to a wall
+     and the glue gave way.
+     When scrolling UP: letters come back from BELOW (translateY from +300
+     back to 0), opacity 0 → 1, like they fall UP back into place.
+     This creates the "peeling off the wall" effect the user wants. */
 
-     The combination creates a 3D feel: far things barely move,
-     near things move fast, like looking through a window. */
-
-  /* LAYER 1 — FAR BACKGROUND (z-index: -3, position: fixed, NO scroll movement) */
-  .layer-far {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: -3;
-    overflow: hidden;
-  }
-  .layer-far span {
-    position: absolute;
-    font-family: 'Cedarville Cursive', serif;
-    opacity: 0.08;
-    user-select: none;
-    font-weight: bold;
-    font-size: 80px;
+  .fall-target {
+    display: inline-block;
+    transition:
+      transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      opacity 0.6s ease-out,
+      filter 0.6s ease-out;
+    will-change: transform, opacity, filter;
   }
 
-  /* LAYER 2 — MID BACKGROUND (z-index: -2, parallax 0.3x via JS) */
-  .layer-mid {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: -2;
-    overflow: hidden;
-  }
-  .layer-mid span {
-    position: absolute;
-    font-family: 'Cedarville Cursive', serif;
-    opacity: 0.15;
-    user-select: none;
-    font-weight: bold;
-    font-size: 50px;
+  /* When section is ABOVE viewport (user scrolled DOWN past it):
+     letters have FALLEN — translated down + faded out + rotated */
+  .fall-target.fallen {
+    transform: translateY(400px) rotate(8deg);
+    opacity: 0;
+    filter: blur(2px);
   }
 
-  /* LAYER 3 — NEAR FOREGROUND (z-index: -1, parallax 1.4x via JS — moves faster) */
-  .layer-near {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: -1;
-    overflow: hidden;
-  }
-  .layer-near span {
-    position: absolute;
-    font-family: 'Cedarville Cursive', serif;
-    opacity: 0.22;
-    user-select: none;
-    font-weight: bold;
-    font-size: 32px;
+  /* When section is BELOW viewport (user scrolled UP past it):
+     letters return FROM BELOW — start translated down, animate to 0 */
+  .fall-target.returning {
+    transform: translateY(400px) rotate(-4deg);
+    opacity: 0;
+    filter: blur(1px);
   }
 
-  /* Color assignment per layer */
-  .layer-far span:nth-child(4n)   { color: #00ff88; }
-  .layer-far span:nth-child(4n+1) { color: #ff8800; }
-  .layer-far span:nth-child(4n+2) { color: #0a0a0a; }
-  .layer-far span:nth-child(4n+3) { color: #00ff88; }
+  /* When section is IN viewport: letters are stuck to the wall (normal) */
+  .fall-target.stuck {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+    filter: blur(0);
+  }
 
-  .layer-mid span:nth-child(4n)   { color: #ff8800; }
-  .layer-mid span:nth-child(4n+1) { color: #00ff88; }
-  .layer-mid span:nth-child(4n+2) { color: #0a0a0a; }
-  .layer-mid span:nth-child(4n+3) { color: #ff8800; }
-
-  .layer-near span:nth-child(4n)   { color: #0a0a0a; }
-  .layer-near span:nth-child(4n+1) { color: #ff8800; }
-  .layer-near span:nth-child(4n+2) { color: #00ff88; }
-  .layer-near span:nth-child(4n+3) { color: #0a0a0a; }
-
-  /* Re-apply green glow to green elements */
+  /* ============ GREEN/ORANGE GLOW — continuous ============ */
   .verdict--valid, .verdict--valid *,
   .kbox--active, .kbox--active *,
   .term .ok, .legend i.green,
@@ -936,11 +897,6 @@
 </head>
 <body>
 
-<!-- ============ 3D PARALLAX LAYERS — far/mid/near ============ -->
-<div class="layer-far" id="layer-far"></div>
-<div class="layer-mid" id="layer-mid"></div>
-<div class="layer-near" id="layer-near"></div>
-
 <!-- ============ PAGE 01 — COVER ============ -->
 <section class="page" id="cover">
   <div class="pagenum"><b>01</b> / 10 &nbsp;·&nbsp; COVER</div>
@@ -1553,61 +1509,84 @@ result: OK"></pre>
   }
 })();
 
-/* ============ 3D PARALLAX — 3 depth layers with scroll ============ */
-/* Far layer: stays put (0x scroll movement) — feels infinitely far
-   Mid layer: moves 0.3x of scroll — feels mid-distance
-   Near layer: moves 0.6x of scroll OPPOSITE direction — feels close
-
-   This creates the 3D depth illusion the user asked for:
-   "create another layer that goes up with scroll, to create 3D background sensation"
-*/
+/* ============ FALLING LETTERS — gravity effect on scroll ============ */
+/* Each .page section's heading and key text elements get .fall-target class.
+   - IN viewport: 'stuck' (normal, stuck to wall)
+   - ABOVE viewport (scrolled DOWN past): 'fallen' (letters fell down + faded)
+   - BELOW viewport (scrolled UP past): 'returning' (letters waiting below,
+     will snap back up when section re-enters)
+   This creates the "peeling off the wall" effect the user requested. */
 (function(){
   "use strict";
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var symbols = ['∑','∫','∂','∇','∞','π','σ','Δ','∀','∃','∈','∉','⊆','⊕','⊗','√','λ','φ','ψ','Ω','α','β','γ','δ','ε','η','θ','κ','μ','ν','ρ','τ','χ','ω','ℵ','ℝ','ℤ','ℕ','≡','≠','≤','≥','⊂','⊃','∪','∩'];
+  if(reduce) return;
 
-  function fillLayer(id, count, seedOffset){
-    var container = document.getElementById(id);
-    if(!container) return;
-    for(var i=0; i<count; i++){
-      var span = document.createElement('span');
-      span.textContent = symbols[(i + seedOffset) % symbols.length];
-      span.style.left = (Math.random()*100) + '%';
-      span.style.top = (Math.random()*100) + '%';
-      container.appendChild(span);
+  // Select key text elements per page to apply falling effect
+  var selectors = '.mega, .eyebrow, .tagline, .section-head h2, .kicker, ' +
+                   '.verdict-name, .verdict-formula, .verdict-desc, ' +
+                   '.eq code, .eq .eq-desc, ' +
+                   '.kbox-id, .kbox-status, ' +
+                   '.seqbox-num, .seqbox-label, ' +
+                   '.term, .honesty li, .motto, .colophon-links a, .agent-line, .agent-id';
+
+  var targets = [];
+  document.querySelectorAll(selectors).forEach(function(el){
+    // Skip elements inside the hero (page 01) — hero already has its own animations
+    if(el.closest('#cover')) return;
+    el.classList.add('fall-target', 'stuck');
+    targets.push(el);
+  });
+
+  // Also wrap individual words in headings so they fall with stagger
+  // (optional — for now, the whole element falls together, which is cleaner)
+
+  function update(){
+    var vh = window.innerHeight;
+    for(var i=0; i<targets.length; i++){
+      var el = targets[i];
+      var rect = el.getBoundingClientRect();
+      // Section is IN viewport (with some margin)
+      if(rect.bottom > 0 && rect.top < vh){
+        el.classList.remove('fallen', 'returning');
+        el.classList.add('stuck');
+      }
+      // Section is ABOVE viewport (user scrolled DOWN past it) — letters FELL
+      else if(rect.bottom <= 0){
+        el.classList.remove('stuck', 'returning');
+        el.classList.add('fallen');
+      }
+      // Section is BELOW viewport (user scrolled UP past it) — letters WAIT BELOW
+      else if(rect.top >= vh){
+        el.classList.remove('stuck', 'fallen');
+        el.classList.add('returning');
+      }
     }
   }
 
-  fillLayer('layer-far', 12, 0);
-  fillLayer('layer-mid', 16, 5);
-  fillLayer('layer-near', 20, 11);
-
-  if(reduce) return;
-
-  // Parallax on scroll — mid moves slow, near moves faster (opposite for depth)
-  var far = document.getElementById('layer-far');
-  var mid = document.getElementById('layer-mid');
-  var near = document.getElementById('layer-near');
-
   var ticking = false;
-  function updateParallax(){
-    var sy = window.pageYOffset || document.documentElement.scrollTop;
-    // Far: 0x (no movement) — fixed background
-    // Mid: 0.25x of scroll (moves up slowly)
-    // Near: 0.5x of scroll OPPOSITE (moves down, creating parallax depth)
-    if(mid)  mid.style.transform  = 'translateY(' + (-sy * 0.25) + 'px)';
-    if(near) near.style.transform = 'translateY(' + (sy * 0.5) + 'px)';
-    ticking = false;
-  }
-
   window.addEventListener('scroll', function(){
     if(!ticking){
-      window.requestAnimationFrame(updateParallax);
+      window.requestAnimationFrame(function(){
+        update();
+        ticking = false;
+      });
       ticking = true;
     }
   }, { passive: true });
 
-  updateParallax();
+  // Also update on resize
+  window.addEventListener('resize', function(){
+    if(!ticking){
+      window.requestAnimationFrame(function(){
+        update();
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+
+  // Initial state
+  update();
 })();
 </script>
 
