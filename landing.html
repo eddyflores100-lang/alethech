@@ -891,6 +891,58 @@
   }
   .motto.in{ opacity: 1; }
 
+  /* ============ MERGE HELPERS — for condensed 8-page layout ============ */
+  /* generic 2-column split (responsive → stacks on mobile) */
+  .split{ display:flex; gap:2.5rem; align-items:flex-start; flex-wrap:wrap; }
+  .split--half > *{ flex:1 1 0; min-width:0; }
+  .split--half > :first-child{ flex:1 1 380px; }
+  .split--half > :last-child{ flex:1 1 380px; }
+  .split--wide-narrow > :first-child{ flex:1 1 60ch; min-width:0; }
+  .split--wide-narrow > .marginalia-stack{ flex:0 0 240px; }
+
+  /* sub-section divider inside a merged page */
+  .merge-section{
+    margin-top:3rem;
+    padding-top:2rem;
+    border-top:2px dashed var(--thread);
+    position:relative;
+  }
+  .merge-section:first-of-type{ margin-top:0; padding-top:0; border-top:0; }
+  .merge-section__label{
+    display:inline-block;
+    font-size:.72rem;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:1.25rem;
+    font-weight:700;
+  }
+
+  /* blockquote-style giant property sentence (page 2) */
+  .property-quote{
+    border:2px solid var(--ink);
+    padding:1.6rem 1.75rem 1.4rem;
+    background:var(--bg);
+    position:relative;
+    margin:0;
+  }
+  .property-quote::before{
+    content:"THE PROPERTY";
+    position:absolute;
+    top:-.65rem;
+    left:1.25rem;
+    background:var(--bg);
+    padding:0 .55rem;
+    font-size:.68rem;
+    letter-spacing:.2em;
+    font-weight:700;
+    color:var(--muted);
+  }
+  .property-quote .giant--type{ min-height: clamp(6rem, 22vh, 14rem); }
+
+  /* tight steps list when shown beside the DAG */
+  .split .steps li{ padding:1rem 0; font-size:clamp(.95rem,1.4vw,1.1rem); }
+
   /* ============ responsive ============ */
   @media (max-width:760px){
     :root{ --gutter:42px; --stitch-x:20px; }
@@ -898,6 +950,10 @@
     .pagenum{ top:1.25rem; right:1.25rem; }
     .with-margin{ flex-direction:column; }
     .with-margin > .marginalia-stack{ flex-basis:auto; width:100%; }
+    .split{ flex-direction:column; }
+    .split--half > *,
+    .split--wide-narrow > *,
+    .split--wide-narrow > .marginalia-stack{ flex:1 1 auto; width:100%; }
     .verdicts{ grid-template-columns:1fr; }
     .dag .node-title{ font-size:15px; }
     .dag .node-key{ font-size:11px; }
@@ -907,6 +963,7 @@
     .iterm__title{ font-size:.72rem; }
     .iterm__repo{ font-size:.72rem; }
     .iterm__badge{ display:none; }
+    .rotate-diagram{ justify-content:flex-start; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -932,9 +989,9 @@
 </head>
 <body>
 
-<!-- ============ PAGE 01 — COVER ============ -->
+<!-- ============ PAGE 01 / 08 — COVER ============ -->
 <section class="page" id="cover">
-  <div class="pagenum"><b>01</b> / 15 &nbsp;·&nbsp; COVER</div>
+  <div class="pagenum"><b>01</b> / 08 &nbsp;·&nbsp; COVER</div>
   <div class="page__inner">
     <div class="eyebrow">ἀλήθεια</div>
     <h1 class="mega">alethech</h1>
@@ -954,28 +1011,13 @@
   </div>
 </section>
 
-<!-- ============ PAGE 02 — THE PROPERTY ============ -->
-<section class="page" id="property">
-  <div class="pagenum"><b>02</b> / 15 &nbsp;·&nbsp; THE PROPERTY</div>
-  <div class="page__inner">
-    <p class="giant giant--type" id="property-giant" data-text="this memory set forms part of a cryptographically verifiable history associated with a determined identity"></p>
-    <p class="lede" style="margin-top:2.5rem;">the protocol does <b style="color:var(--ink)">NOT</b> prove claims are true — only that they were signed.</p>
-
-    <aside class="marginalia marginalia--full" style="max-width:60ch; margin-top:2.5rem;">
-      <b>plain reading</b>
-      The protocol's claim is narrow on purpose: a memory set, signed under an identity, is provably part of that identity's verifiable history. Verifiability is about authorship + integrity — not epistemic truth.
-    </aside>
-  </div>
-</section>
-<noscript><style>.giant--type::before{ content: attr(data-text); white-space: pre-wrap; }</style></noscript>
-
-<!-- ============ PAGE 03 — WHAT IS ALETHECH (NEW) ============ -->
+<!-- ============ PAGE 02 / 08 — WHAT + PROPERTY (merged) ============ -->
 <section class="page" id="what">
-  <div class="pagenum"><b>03</b> / 15 &nbsp;·&nbsp; WHAT IS ALETHECH</div>
+  <div class="pagenum"><b>02</b> / 08 &nbsp;·&nbsp; WHAT IS ALETHECH</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">what is alethech</span>
-      <h2>definition</h2>
+      <h2>definition + the property</h2>
     </div>
 
     <div class="with-margin">
@@ -983,12 +1025,23 @@
         <p class="big">alethech is a Python package that provides cryptographically verifiable memory continuity for AI agents.</p>
         <p class="body">It lets an agent sign its memory commits with <code>Ed25519</code>, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.</p>
         <p class="body" style="color:var(--muted);">The protocol does <b style="color:var(--ink)">NOT</b> prove that the agent's claims are true — only that they were signed by the identity that claims them.</p>
+
+        <!-- the giant property sentence, now as a highlighted blockquote -->
+        <blockquote class="property-quote" style="margin-top:1.75rem;">
+          <p class="giant giant--type" id="property-giant" data-text="this memory set forms part of a cryptographically verifiable history associated with a determined identity"></p>
+        </blockquote>
+
+        <p class="lede" style="margin-top:1.25rem;">the protocol does <b style="color:var(--ink)">NOT</b> prove claims are true — only that they were signed.</p>
       </div>
 
       <div class="marginalia-stack">
         <aside class="marginalia">
           <b>scope</b>
           The unit of verification is the commit. Identity is the key. The DAG is the proof.
+        </aside>
+        <aside class="marginalia">
+          <b>plain reading</b>
+          The protocol's claim is narrow on purpose: a memory set, signed under an identity, is provably part of that identity's verifiable history. Verifiability is about authorship + integrity — not epistemic truth.
         </aside>
         <aside class="marginalia">
           <b>audience</b>
@@ -998,18 +1051,20 @@
     </div>
   </div>
 </section>
+<noscript><style>.giant--type::before{ content: attr(data-text); white-space: pre-wrap; }</style></noscript>
 
-<!-- ============ PAGE 04 — THE ARCHITECTURE (DAG) ============ -->
-<section class="page" id="architecture">
-  <div class="pagenum"><b>04</b> / 15 &nbsp;·&nbsp; ARCHITECTURE</div>
+<!-- ============ PAGE 03 / 08 — ARCHITECTURE + HOW IT WORKS (merged) ============ -->
+<section class="page" id="how">
+  <div class="pagenum"><b>03</b> / 08 &nbsp;·&nbsp; HOW IT WORKS</div>
   <div class="page__inner">
     <div class="section-head">
-      <span class="kicker">the protagonist</span>
-      <h2>merkle dag</h2>
+      <span class="kicker">how it works</span>
+      <h2>dag + six steps</h2>
     </div>
 
-    <div class="with-margin">
-      <div class="content dag-wrap">
+    <div class="split split--half">
+      <!-- LEFT: the Merkle DAG -->
+      <div class="dag-wrap">
         <svg class="dag" viewBox="0 0 800 470" role="img"
              aria-label="Merkle DAG: Genesis to C1 to C2 cutoff head to C3 post rotation, with rejected commit D dangling.">
           <defs>
@@ -1074,31 +1129,8 @@
         </div>
       </div>
 
-      <div class="marginalia-stack">
-        <aside class="marginalia">
-          <b>read the graph</b>
-          D dangles off C2 but sits past the cutoff — its ancestry is not proven, so it is rejected. C3 is signed under key-002 and still reaches back through the cutoff_head, so it is valid.
-        </aside>
-        <aside class="marginalia">
-          <b>cutoff_head</b>
-          The causal frontier at the moment of key rotation — not a timestamp. It is a commit hash, not a wall-clock reading.
-        </aside>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PAGE 05 — HOW IT WORKS (NEW) ============ -->
-<section class="page" id="how">
-  <div class="pagenum"><b>05</b> / 15 &nbsp;·&nbsp; HOW IT WORKS</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">how it works</span>
-      <h2>six steps</h2>
-    </div>
-
-    <div class="with-margin">
-      <div class="content">
+      <!-- RIGHT: the six CLI steps -->
+      <div>
         <ol class="steps">
           <li><span><code>alethech init</code> generates an Ed25519 keypair + identity derived from public key</span></li>
           <li><span><code>alethech commit --content memory.json</code> signs the content + links to DAG parent</span></li>
@@ -1108,65 +1140,94 @@
           <li><span><code>alethech import --input dir/</code> verifies bundle + writes atomically (target untouched on failure)</span></li>
         </ol>
       </div>
-
-      <div class="marginalia-stack">
-        <aside class="marginalia">
-          <b>workflow</b>
-          Init once. Commit per memory delta. Verify on demand. Rotate when a key is compromised or aged out.
-        </aside>
-        <aside class="marginalia">
-          <b>atomicity</b>
-          Import verifies the entire bundle before writing a single byte to the target store. Failure leaves the target untouched.
-        </aside>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PAGE 06 — THE FOUR EQUATIONS ============ -->
-<section class="page" id="equations">
-  <div class="pagenum"><b>06</b> / 15 &nbsp;·&nbsp; EQUATIONS</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">the four equations</span>
-      <h2>math, not magic</h2>
     </div>
 
-    <div class="eqs">
-      <div class="eq">
-        <code>commit_id = sha256(JCS(object − {commit_id, signature}))</code>
-        <p class="explain">content-addressed id over the canonicalized object, with the id and signature fields removed.</p>
-      </div>
-      <div class="eq">
-        <code>signature = Ed25519_sk(JCS(object + commit_id))</code>
-        <p class="explain">deterministic Ed25519 signature over the canonical object plus its freshly computed commit_id.</p>
-      </div>
-      <div class="eq">
-        <code>agent_id = did:alethech: + b32(sha256(JCS(pk))[:16])</code>
-        <p class="explain">identity derives from the root public key — operational keys rotate, the agent_id does not.</p>
-      </div>
-      <div class="eq">
-        <code>C ∈ ancestry(cutoff_head) ⟹ VALID_HISTORICAL</code>
-        <p class="explain">a commit is valid iff its ancestry is reachable from the last pre-rotation head.</p>
-      </div>
-    </div>
-
-    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
-      <b>note</b>
-      JCS = RFC 8785 canonical JSON. Same bytes in, same hash out — every time, on every machine. Without canonicalization, two semantically-equal JSON objects could hash differently and break content addressing entirely.
+    <aside class="marginalia marginalia--full" style="margin-top:2.5rem; max-width:100%;">
+      <b>read the graph</b>
+      D dangles off C2 but sits past the cutoff — its ancestry is not proven, so it is rejected. C3 is signed under key-002 and still reaches back through the cutoff_head, so it is valid. The <code>cutoff_head</code> is the causal frontier at the moment of key rotation — not a timestamp, but a commit hash. Workflow: init once, commit per memory delta, verify on demand, rotate when a key is compromised or aged out. Import verifies the entire bundle before writing a single byte — failure leaves the target untouched.
     </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 07 — THE TWO VERDICTS ============ -->
-<section class="page" id="verdicts">
-  <div class="pagenum"><b>07</b> / 15 &nbsp;·&nbsp; VERDICTS</div>
+<!-- ============ PAGE 04 / 08 — EQUATIONS + GUARANTEES (merged) ============ -->
+<section class="page" id="math">
+  <div class="pagenum"><b>04</b> / 08 &nbsp;·&nbsp; MATH + GUARANTEES</div>
   <div class="page__inner">
     <div class="section-head">
-      <span class="kicker">the two verdicts</span>
-      <h2>valid or not</h2>
+      <span class="kicker">the math + the guarantees</span>
+      <h2>equations, then the checklist</h2>
     </div>
 
+    <div class="split split--wide-narrow">
+      <div class="content">
+        <!-- 4 equations -->
+        <div class="eqs">
+          <div class="eq">
+            <code>commit_id = sha256(JCS(object − {commit_id, signature}))</code>
+            <p class="explain">content-addressed id over the canonicalized object, with the id and signature fields removed.</p>
+          </div>
+          <div class="eq">
+            <code>signature = Ed25519_sk(JCS(object + commit_id))</code>
+            <p class="explain">deterministic Ed25519 signature over the canonical object plus its freshly computed commit_id.</p>
+          </div>
+          <div class="eq">
+            <code>agent_id = did:alethech: + b32(sha256(JCS(pk))[:16])</code>
+            <p class="explain">identity derives from the root public key — operational keys rotate, the agent_id does not.</p>
+          </div>
+          <div class="eq">
+            <code>C ∈ ancestry(cutoff_head) ⟹ VALID_HISTORICAL</code>
+            <p class="explain">a commit is valid iff its ancestry is reachable from the last pre-rotation head.</p>
+          </div>
+        </div>
+
+        <!-- guarantees checklist -->
+        <div class="merge-section" style="margin-top:2.75rem;">
+          <span class="merge-section__label">the guarantees · ✓ does · ✗ does not</span>
+          <ul class="guarantees">
+            <li class="ok"><span class="mark">✓</span><span>signature verifies against declared public key</span></li>
+            <li class="ok"><span class="mark">✓</span><span>commit_id matches SHA-256 of canonical JSON</span></li>
+            <li class="ok"><span class="mark">✓</span><span>agent_id derives from public key (not declared)</span></li>
+            <li class="ok"><span class="mark">✓</span><span>key rotation preserves identity (root-bound)</span></li>
+            <li class="ok"><span class="mark">✓</span><span>revoked key commits checked against ancestry(cutoff_head)</span></li>
+            <li class="ok"><span class="mark">✓</span><span>checkpoint head must be ancestor of current HEAD</span></li>
+            <li class="ok"><span class="mark">✓</span><span>import is atomic (verify-then-write, target untouched on failure)</span></li>
+            <li class="no"><span class="mark">✗</span><span><b>does NOT</b> prove content truth</span></li>
+            <li class="no"><span class="mark">✗</span><span><b>does NOT</b> encrypt at rest</span></li>
+            <li class="no"><span class="mark">✗</span><span><b>does NOT</b> detect rollback without external checkpoint</span></li>
+            <li class="no"><span class="mark">✗</span><span><b>does NOT</b> delegate permissions between agents</span></li>
+            <li class="no"><span class="mark">✗</span><span><b>does NOT</b> call any LLM</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>JCS = RFC 8785</b>
+          Same bytes in, same hash out — every time, on every machine. Without canonicalization, two semantically-equal JSON objects could hash differently and break content addressing entirely.
+        </aside>
+        <aside class="marginalia">
+          <b>membership, not timing</b>
+          The verifier checks ancestry membership. It does not check wall-clock creation time. A commit proven to be in ancestry was made before the cutoff — that is the only timing claim.
+        </aside>
+        <aside class="marginalia">
+          <b>read carefully</b>
+          The ✓ items are properties the verifier checks. The ✗ items are properties no signature-based verifier can check from bytes alone. alethech is a pure cryptographic protocol — it signs, hashes, and verifies. It does not infer, summarize, or judge.
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 05 / 08 — VERDICTS + ROTATION + ROLLBACK (merged) ============ -->
+<section class="page" id="verdicts">
+  <div class="pagenum"><b>05</b> / 08 &nbsp;·&nbsp; VERDICTS · ROTATION · ROLLBACK</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">verdicts, rotation, rollback</span>
+      <h2>three faces of one cutoff</h2>
+    </div>
+
+    <!-- VERDICTS -->
     <div class="verdicts" id="verdicts-grid">
       <div class="verdict verdict--valid">
         <span class="v-tag">verdict</span>
@@ -1180,172 +1241,84 @@
       </div>
     </div>
 
-    <div class="with-margin" style="margin-top:2rem; align-items:flex-start;">
-      <div class="verdict-note" style="flex:1 1 40ch; min-width:0;">
-        <b>critical:</b> the verifier does NOT claim to prove WHEN the commit was created — only that it is reachable from a verified head.
-      </div>
-      <div class="marginalia-stack">
-        <aside class="marginalia">
-          <b>membership, not timing</b>
-          The verifier checks ancestry membership. It does not check wall-clock creation time. A commit proven to be in ancestry was made before the cutoff — that is the only timing claim.
-        </aside>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PAGE 08 — THE GUARANTEES (NEW) ============ -->
-<section class="page" id="guarantees">
-  <div class="pagenum"><b>08</b> / 15 &nbsp;·&nbsp; GUARANTEES</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">the guarantees</span>
-      <h2>what it does and does not</h2>
+    <div class="verdict-note" style="margin-top:2rem;">
+      <b>critical:</b> the verifier does NOT claim to prove WHEN the commit was created — only that it is reachable from a verified head. Membership, not timing.
     </div>
 
-    <div class="with-margin">
-      <div class="content">
-        <ul class="guarantees">
-          <li class="ok"><span class="mark">✓</span><span>signature verifies against declared public key</span></li>
-          <li class="ok"><span class="mark">✓</span><span>commit_id matches SHA-256 of canonical JSON</span></li>
-          <li class="ok"><span class="mark">✓</span><span>agent_id derives from public key (not declared)</span></li>
-          <li class="ok"><span class="mark">✓</span><span>key rotation preserves identity (root-bound)</span></li>
-          <li class="ok"><span class="mark">✓</span><span>revoked key commits checked against ancestry(cutoff_head)</span></li>
-          <li class="ok"><span class="mark">✓</span><span>checkpoint head must be ancestor of current HEAD</span></li>
-          <li class="ok"><span class="mark">✓</span><span>import is atomic (verify-then-write, target untouched on failure)</span></li>
-          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> prove content truth</span></li>
-          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> encrypt at rest</span></li>
-          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> detect rollback without external checkpoint</span></li>
-          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> delegate permissions between agents</span></li>
-          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> call any LLM</span></li>
-        </ul>
+    <!-- KEY ROTATION -->
+    <div class="merge-section">
+      <span class="merge-section__label">key rotation — revoke the key, keep the identity</span>
+
+      <div class="rotate-diagram">
+        <div class="kbox kbox--revoked">
+          <span class="k-label">key-001</span>
+          <span class="k-state">revoked</span>
+        </div>
+        <div class="karrow" id="rotate-arrow">
+          <svg width="56" height="20" viewBox="0 0 56 20" aria-hidden="true" focusable="false">
+            <path class="karrow-path" d="M2,10 L50,10 M44,4 L50,10 L44,16" pathLength="1"/>
+          </svg>
+          <span class="karrow-tag">cutoff_head</span>
+        </div>
+        <div class="kbox kbox--active">
+          <span class="k-label">key-002</span>
+          <span class="k-state">active</span>
+        </div>
       </div>
 
-      <div class="marginalia-stack">
-        <aside class="marginalia">
-          <b>read carefully</b>
-          The ✓ items are properties the verifier checks. The ✗ items are properties no signature-based verifier can check from bytes alone.
-        </aside>
-        <aside class="marginalia">
-          <b>no LLM</b>
-          alethech is a pure cryptographic protocol. It does not infer, summarize, or judge — it signs, hashes, and verifies.
-        </aside>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ PAGE 09 — KEY ROTATION ============ -->
-<section class="page" id="rotation">
-  <div class="pagenum"><b>09</b> / 15 &nbsp;·&nbsp; KEY ROTATION</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">key rotation</span>
-      <h2>rotate keys, keep identity</h2>
-    </div>
-
-    <div class="rotate-diagram">
-      <div class="kbox kbox--revoked">
-        <span class="k-label">key-001</span>
-        <span class="k-state">revoked</span>
-      </div>
-      <div class="karrow" id="rotate-arrow">
-        <svg width="56" height="20" viewBox="0 0 56 20" aria-hidden="true" focusable="false">
-          <path class="karrow-path" d="M2,10 L50,10 M44,4 L50,10 L44,16" pathLength="1"/>
-        </svg>
-        <span class="karrow-tag">cutoff_head</span>
-      </div>
-      <div class="kbox kbox--active">
-        <span class="k-label">key-002</span>
-        <span class="k-state">active</span>
-      </div>
-    </div>
-
-    <p class="body" style="margin-top:2.5rem; max-width:60ch;">
-      <b>agent_id derives from the root, not the operational key.</b> Keys can be revoked and replaced; the identity they attest to does not move. Reachability through the cutoff_head is what carries continuity across the rotation.
-    </p>
-
-    <aside class="marginalia" style="margin-top:2rem; max-width:60ch;">
-      <b>why strike-through</b>
-      Revocation is permanent and visible. A struck key still exists in the DAG as a historical signer — but no post-cutoff commit signed by it is accepted.
-    </aside>
-  </div>
-</section>
-
-<!-- ============ PAGE 10 — ANTI-ROLLBACK ============ -->
-<section class="page" id="rollback">
-  <div class="pagenum"><b>10</b> / 15 &nbsp;·&nbsp; ANTI-ROLLBACK</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">anti-rollback</span>
-      <h2>sequence is the authority</h2>
-    </div>
-
-    <p class="body" style="color:var(--muted); margin-bottom:1.5rem;">forward monotonic sequence — accepted:</p>
-    <div class="seq-row" id="seq-accepted">
-      <span class="seqbox">10</span><span class="seqarrow">→</span>
-      <span class="seqbox">11</span><span class="seqarrow">→</span>
-      <span class="seqbox">12</span><span class="seqarrow">→</span>
-      <span class="seqbox">13</span><span class="seqarrow">→</span>
-      <span class="seqbox">14</span><span class="seqarrow">→</span>
-      <span class="seqbox">15</span>
-      <span class="seq-tag seq-tag--ok">[ ACCEPTED ]</span>
-    </div>
-
-    <p class="body" style="color:var(--muted); margin-top:2rem; margin-bottom:1.5rem;">stale sequence — rejected as rollback:</p>
-    <div class="seq-row" id="seq-rejected">
-      <span class="seqbox seqbox--reject" id="seqbox-reject">5</span>
-      <span class="seq-tag seq-tag--no">[ REJECTED — rollback ]</span>
-    </div>
-
-    <div class="with-margin" style="margin-top:2.5rem; align-items:flex-start;">
-      <p class="body" style="flex:1 1 40ch; min-width:0; max-width:60ch;">
-        <b>the system clock is NOT the authority — sequence is.</b> Time lies; monotonic counters cannot be wound back without breaking the chain.
+      <p class="body" style="margin-top:1.5rem; max-width:80ch;">
+        <b>agent_id derives from the root, not the operational key.</b> Keys can be revoked and replaced; the identity they attest to does not move. Revocation is permanent and visible — a struck key still exists in the DAG as a historical signer, but no post-cutoff commit signed by it is accepted.
       </p>
-      <div class="marginalia-stack">
-        <aside class="marginalia">
-          <b>monotonic, not temporal</b>
-          The sequence is monotonic — the system clock is NOT the authority. Two commits cannot share a sequence number; the counter only moves forward.
-        </aside>
+    </div>
+
+    <!-- ANTI-ROLLBACK -->
+    <div class="merge-section">
+      <span class="merge-section__label">anti-rollback — sequence is the authority</span>
+
+      <p class="body" style="color:var(--muted); margin-bottom:1rem;">forward monotonic sequence — accepted:</p>
+      <div class="seq-row" id="seq-accepted">
+        <span class="seqbox">10</span><span class="seqarrow">→</span>
+        <span class="seqbox">11</span><span class="seqarrow">→</span>
+        <span class="seqbox">12</span><span class="seqarrow">→</span>
+        <span class="seqbox">13</span><span class="seqarrow">→</span>
+        <span class="seqbox">14</span><span class="seqarrow">→</span>
+        <span class="seqbox">15</span>
+        <span class="seq-tag seq-tag--ok">[ ACCEPTED ]</span>
       </div>
+
+      <p class="body" style="color:var(--muted); margin-top:1.25rem; margin-bottom:1rem;">stale sequence — rejected as rollback:</p>
+      <div class="seq-row" id="seq-rejected">
+        <span class="seqbox seqbox--reject" id="seqbox-reject">5</span>
+        <span class="seq-tag seq-tag--no">[ REJECTED — rollback ]</span>
+      </div>
+
+      <p class="body" style="margin-top:1.5rem; max-width:80ch;">
+        <b>the system clock is NOT the authority — sequence is.</b> Time lies; monotonic counters cannot be wound back without breaking the chain. Two commits cannot share a sequence number; the counter only moves forward.
+      </p>
     </div>
   </div>
 </section>
 
-<!-- ============ PAGE 11 — CLI DEMO ============ -->
-<section class="page" id="cli">
-  <div class="pagenum"><b>11</b> / 15 &nbsp;·&nbsp; CLI DEMO</div>
+<!-- ============ PAGE 06 / 08 — LIVE TERMINAL (STRATEGIC POSITION) ============ -->
+<section class="page" id="live">
+  <div class="pagenum"><b>06</b> / 08 &nbsp;·&nbsp; LIVE TERMINAL</div>
   <div class="page__inner">
     <div class="section-head">
-      <span class="kicker">cli demo</span>
-      <h2>four commands</h2>
+      <span class="kicker">try it — real crypto in your browser</span>
+      <h2>live terminal</h2>
     </div>
 
+    <!-- small CLI intro typewriter (the loop, typed live) -->
     <pre class="term" id="term" data-text="$ alethech init
 $ alethech commit --content memory.json
 $ alethech key rotate
 $ alethech verify
 result: OK"></pre>
 
-    <p class="small" style="margin-top:1.25rem;">typed live when this page enters the viewport — the only auto-typewriter on the site.</p>
+    <p class="small" style="margin-top:.9rem;">the loop, typed live when this section enters view: init → commit → rotate → verify.</p>
 
-    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
-      <b>the loop</b>
-      init → commit → (rotate, if needed) → verify. Four commands cover the entire lifecycle of a signed memory chain.
-    </aside>
-  </div>
-</section>
-
-<!-- ============ PAGE 12 — LIVE TERMINAL (interactive) ============ -->
-<section class="page" id="live">
-  <div class="pagenum"><b>12</b> / 15 &nbsp;·&nbsp; LIVE TERMINAL</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">live terminal</span>
-      <h2>try it yourself</h2>
-    </div>
-
-    <div class="iterm" id="iterm" tabindex="0" aria-label="interactive alethech terminal">
+    <!-- interactive terminal with real Web Crypto API -->
+    <div class="iterm" id="iterm" tabindex="0" aria-label="interactive alethech terminal" style="margin-top:1.5rem;">
       <div class="iterm__bar">
         <span class="iterm__dots" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></span>
         <span class="iterm__title">alethech — interactive terminal</span>
@@ -1363,72 +1336,66 @@ result: OK"></pre>
       </div>
     </div>
 
-    <p class="iterm__hint">type 'help' for commands · try: alethech init, alethech commit --content {"x":1}, alethech verify, tests</p>
+    <p class="iterm__hint">type 'help' or 'alethech init' to begin · arrow keys navigate history</p>
 
-    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
-      <b>real crypto, in your browser</b>
-      Every command runs actual cryptography via the Web Crypto API — real Ed25519 keypairs, real SHA-256 commits, real signature verification. Nothing is hardcoded. Click the terminal and type.
+    <aside class="marginalia" style="margin-top:2rem; max-width:100%;">
+      <b>this is real Ed25519 + SHA-256 + JCS, running in your browser via Web Crypto API</b>
+      No backend, no simulation. Every command runs actual cryptography — real Ed25519 keypairs, real SHA-256 commits, real signature verification. Click the terminal and type. Export a bundle, paste it back into <code>alethech import</code>, and watch the verifier check every signature from public keys alone.
     </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 13 — HONESTY ============ -->
+<!-- ============ PAGE 07 / 08 — HONESTY + STATS (merged) ============ -->
 <section class="page" id="honesty">
-  <div class="pagenum"><b>13</b> / 15 &nbsp;·&nbsp; HONESTY</div>
+  <div class="pagenum"><b>07</b> / 08 &nbsp;·&nbsp; HONESTY + STATS</div>
   <div class="page__inner">
     <div class="section-head">
-      <span class="kicker">honesty</span>
-      <h2>what it does not do</h2>
+      <span class="kicker">honesty + stats</span>
+      <h2>what it refuses + the numbers</h2>
     </div>
 
-    <ul class="honesty">
-      <li><span class="not">NOT</span> <span class="x">·</span> prove truth</li>
-      <li><span class="not">NOT</span> <span class="x">·</span> rollback without checkpoint</li>
-      <li><span class="not">NOT</span> <span class="x">·</span> encrypt at rest</li>
-      <li><span class="not">NOT</span> <span class="x">·</span> delegate permissions</li>
-      <li><span class="not">NOT</span> <span class="x">·</span> call any LLM</li>
-      <li><span class="not">NOT</span> <span class="x">·</span> prove physical time</li>
-    </ul>
+    <div class="split split--half">
+      <!-- LEFT: honesty (six NOT items) -->
+      <div>
+        <span class="merge-section__label">what it does NOT do</span>
+        <ul class="honesty">
+          <li><span class="not">NOT</span> <span class="x">·</span> prove truth</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> rollback without checkpoint</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> encrypt at rest</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> delegate permissions</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> call any LLM</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> prove physical time</li>
+        </ul>
+      </div>
 
-    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
+      <!-- RIGHT: stats grid -->
+      <div>
+        <span class="merge-section__label">by the numbers</span>
+        <dl class="stats-grid" id="stats-grid">
+          <div><dt>230</dt><dd>tests passing</dd></div>
+          <div><dt>8</dt><dd>mutation-guard paths</dd></div>
+          <div><dt>56</dt><dd>JCS conformance vectors</dd></div>
+          <div><dt>15</dt><dd>adversarial conformance vectors</dd></div>
+          <div><dt>9</dt><dd>CLI commands</dd></div>
+          <div><dt>4</dt><dd>cryptographic primitives (Ed25519, SHA-256, JCS, base32)</dd></div>
+          <div><dt>0</dt><dd>open issues</dd></div>
+          <div><dt>1</dt><dd>branch (main)</dd></div>
+          <div><dt>MIT</dt><dd>license</dd></div>
+          <div><dt>0.7.0</dt><dd>current version</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:100%;">
       <b>by design</b>
-      Every NOT here is a deliberate non-goal. alethech is a narrow tool — its strength is what it refuses to promise.
+      Every NOT here is a deliberate non-goal. alethech is a narrow tool — its strength is what it refuses to promise. The 0 open issues is a snapshot, not a promise. The 4 primitives are the entire cryptographic surface — nothing else is trusted.
     </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 14 — STATS (NEW) ============ -->
-<section class="page" id="stats">
-  <div class="pagenum"><b>14</b> / 15 &nbsp;·&nbsp; STATS</div>
-  <div class="page__inner">
-    <div class="section-head">
-      <span class="kicker">stats</span>
-      <h2>by the numbers</h2>
-    </div>
-
-    <dl class="stats-grid" id="stats-grid">
-      <div><dt>230</dt><dd>tests passing</dd></div>
-      <div><dt>8</dt><dd>mutation-guard paths</dd></div>
-      <div><dt>56</dt><dd>JCS conformance vectors</dd></div>
-      <div><dt>15</dt><dd>adversarial conformance vectors</dd></div>
-      <div><dt>9</dt><dd>CLI commands</dd></div>
-      <div><dt>4</dt><dd>cryptographic primitives (Ed25519, SHA-256, JCS, base32)</dd></div>
-      <div><dt>0</dt><dd>open issues</dd></div>
-      <div><dt>1</dt><dd>branch (main)</dd></div>
-      <div><dt>MIT</dt><dd>license</dd></div>
-      <div><dt>0.7.0</dt><dd>current version</dd></div>
-    </dl>
-
-    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
-      <b>read the numbers</b>
-      The 0 open issues is a snapshot, not a promise. The 4 primitives are the entire cryptographic surface — nothing else is trusted.
-    </aside>
-  </div>
-</section>
-
-<!-- ============ PAGE 15 — COLOPHON ============ -->
+<!-- ============ PAGE 08 / 08 — COLOPHON ============ -->
 <footer class="page page--footer" id="colophon">
-  <div class="pagenum"><b>15</b> / 15 &nbsp;·&nbsp; COLOPHON</div>
+  <div class="pagenum"><b>08</b> / 08 &nbsp;·&nbsp; COLOPHON</div>
   <div class="page__inner">
     <p class="motto">τέχνη ἀληθείας</p>
 
@@ -1448,6 +1415,7 @@ result: OK"></pre>
     </p>
   </div>
 </footer>
+
 
 <script>
 (function(){
