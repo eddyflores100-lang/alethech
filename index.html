@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>alethech — the art of un-concealing transmission integrity</title>
+<meta name="description" content="Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+/* ============================================
+   ALETHECH LANDING — chalkboard meets cryptography
+   ============================================ */
+:root {
+  --chalk-bg: #0d1117;
+  --chalk-green: #1a2f1a;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff00ea;
+  --neon-yellow: #ffe600;
+  --neon-green: #00ff88;
+  --neon-orange: #ff8800;
+  --chalk-white: #e8e8e8;
+  --chalk-dim: #888;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--chalk-bg);
+  color: var(--chalk-white);
+  font-family: var(--font-mono);
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(0,240,255,0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255,0,234,0.03) 0%, transparent 50%),
+    radial-gradient(circle at 50% 20%, rgba(0,255,136,0.02) 0%, transparent 50%);
+}
+
+/* Chalkboard texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image:
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255,255,255,0.008) 2px, rgba(255,255,255,0.008) 4px),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.008) 2px, rgba(255,255,255,0.008) 4px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Floating math symbols background */
+#math-bg {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.08;
+}
+
+/* ============================================
+   HERO
+   ============================================ */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 2rem;
+  z-index: 2;
+}
+
+#hero-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: -1;
+  opacity: 0.6;
+}
+
+.hero-content {
+  text-align: center;
+  position: relative;
+  z-index: 3;
+}
+
+.hero-greek {
+  font-family: var(--font-serif);
+  font-size: 5rem;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,240,255,0.5);
+  animation: glow-pulse 3s ease-in-out infinite;
+  margin-bottom: 0.5rem;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px rgba(0,240,255,0.5); }
+  50% { text-shadow: 0 0 30px var(--neon-cyan), 0 0 60px rgba(0,240,255,0.8); }
+}
+
+.hero-title {
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-magenta) 50%, var(--neon-yellow) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 0.9;
+  margin-bottom: 1rem;
+}
+
+.hero-tagline {
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  color: var(--chalk-white);
+  max-width: 700px;
+  margin: 0 auto 2rem;
+  font-style: italic;
+  font-family: var(--font-serif);
+  line-height: 1.4;
+}
+
+.hero-formula {
+  font-size: 1.2rem;
+  color: var(--neon-green);
+  margin: 2rem 0;
+  padding: 1rem 2rem;
+  border: 1px solid var(--neon-green);
+  border-radius: 4px;
+  display: inline-block;
+  background: rgba(0,255,136,0.05);
+  box-shadow: 0 0 20px rgba(0,255,136,0.2);
+}
+
+.hero-stats {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 3rem;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--neon-yellow);
+  text-shadow: 0 0 15px var(--neon-yellow);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--chalk-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.hero-cta {
+  margin-top: 3rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 1rem 2rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 2px solid;
+  border-radius: 4px;
+  transition: all 0.3s;
+  display: inline-block;
+}
+
+.btn-primary {
+  background: var(--neon-cyan);
+  color: var(--chalk-bg);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 20px rgba(0,240,255,0.4);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 40px rgba(0,240,255,0.8);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--neon-magenta);
+  border-color: var(--neon-magenta);
+}
+
+.btn-secondary:hover {
+  background: var(--neon-magenta);
+  color: var(--chalk-bg);
+  box-shadow: 0 0 30px rgba(255,0,234,0.6);
+}
+
+/* Einstein corner */
+.einstein-corner {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  z-index: 100;
+  opacity: 0.4;
+  transition: opacity 0.3s;
+  cursor: pointer;
+}
+
+.einstein-corner:hover {
+  opacity: 1;
+}
+
+.einstein-corner svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   SECTIONS
+   ============================================ */
+.section {
+  position: relative;
+  z-index: 2;
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-label {
+  font-size: 0.8rem;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.section-label::before {
+  content: '';
+  width: 30px;
+  height: 1px;
+  background: var(--neon-cyan);
+}
+
+.section-title {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  margin-bottom: 2rem;
+  line-height: 1.1;
+  font-family: var(--font-serif);
+}
+
+.section-title .accent {
+  color: var(--neon-yellow);
+  font-style: italic;
+}
+
+/* ============================================
+   THE PROPERTY
+   ============================================ */
+.property-box {
+  border: 2px solid var(--neon-green);
+  border-radius: 8px;
+  padding: 3rem;
+  background: rgba(0,255,136,0.03);
+  position: relative;
+  margin: 2rem 0;
+  box-shadow: 0 0 40px rgba(0,255,136,0.1);
+}
+
+.property-box::before {
+  content: '⟨ PROPERTY ⟩';
+  position: absolute;
+  top: -12px;
+  left: 20px;
+  background: var(--chalk-bg);
+  padding: 0 10px;
+  color: var(--neon-green);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+}
+
+.property-text {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.property-text .highlight {
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+/* ============================================
+   FORMULAS
+   ============================================ */
+.formula-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+.formula-card {
+  border: 1px solid var(--chalk-dim);
+  border-radius: 8px;
+  padding: 2rem;
+  background: rgba(255,255,255,0.02);
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.formula-card:hover {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 30px rgba(0,240,255,0.2);
+  transform: translateY(-4px);
+}
+
+.formula-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.05), transparent);
+  transition: left 0.6s;
+}
+
+.formula-card:hover::before {
+  left: 100%;
+}
+
+.formula-label {
+  font-size: 0.75rem;
+  color: var(--neon-magenta);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 1rem;
+}
+
+.formula-math {
+  font-size: 1.3rem;
+  color: var(--neon-cyan);
+  margin: 1.5rem 0;
+  text-align: center;
+  min-height: 50px;
+}
+
+.formula-desc {
+  font-size: 0.9rem;
+  color: var(--chalk-dim);
+  line-height: 1.5;
+}
+
+/* ============================================
+   DAG VISUALIZATION
+   ============================================ */
+.dag-container {
+  margin: 3rem 0;
+  padding: 2rem;
+  border: 1px solid var(--chalk-dim);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.3);
+}
+
+.dag-svg {
+  width: 100%;
+  height: 400px;
+}
+
+.dag-node {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.dag-node:hover circle {
+  r: 28;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+/* ============================================
+   VERDICT SECTION
+   ============================================ */
+.verdict-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+@media (max-width: 768px) {
+  .verdict-grid { grid-template-columns: 1fr; }
+}
+
+.verdict-card {
+  padding: 2.5rem;
+  border-radius: 8px;
+  border: 2px solid;
+  position: relative;
+  overflow: hidden;
+}
+
+.verdict-good {
+  border-color: var(--neon-green);
+  background: rgba(0,255,136,0.05);
+  box-shadow: 0 0 30px rgba(0,255,136,0.1);
+}
+
+.verdict-bad {
+  border-color: var(--neon-orange);
+  background: rgba(255,136,0,0.05);
+  box-shadow: 0 0 30px rgba(255,136,0,0.1);
+}
+
+.verdict-name {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: 0.05em;
+}
+
+.verdict-good .verdict-name { color: var(--neon-green); }
+.verdict-bad .verdict-name { color: var(--neon-orange); }
+
+.verdict-formula {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.verdict-desc {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--chalk-white);
+  margin-top: 1rem;
+}
+
+/* ============================================
+   CLI DEMO
+   ============================================ */
+.cli-demo {
+  margin: 3rem 0;
+  border: 1px solid var(--chalk-dim);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 40px rgba(0,240,255,0.1);
+}
+
+.cli-header {
+  background: #1a1a1a;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.cli-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.cli-dot.red { background: #ff5f56; }
+.cli-dot.yellow { background: #ffbd2e; }
+.cli-dot.green { background: #27c93f; }
+
+.cli-title {
+  margin-left: 1rem;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.cli-body {
+  padding: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  min-height: 300px;
+  color: var(--chalk-white);
+}
+
+.cli-line {
+  margin-bottom: 0.3rem;
+}
+
+.cli-prompt {
+  color: var(--neon-green);
+}
+
+.cli-cmd {
+  color: var(--chalk-white);
+}
+
+.cli-output {
+  color: var(--chalk-dim);
+}
+
+.cli-success { color: var(--neon-green); }
+.cli-error { color: var(--neon-orange); }
+.cli-info { color: var(--neon-cyan); }
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--neon-green);
+  animation: blink 1s infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* ============================================
+   ANTI-ROLLBACK
+   ============================================ */
+.rollback-viz {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin: 3rem 0;
+  flex-wrap: wrap;
+}
+
+.checkpoint-tower {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.cp-block {
+  padding: 1rem 1.5rem;
+  border: 2px solid;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-align: center;
+  min-width: 200px;
+  position: relative;
+  transition: all 0.5s;
+}
+
+.cp-current {
+  border-color: var(--neon-green);
+  background: rgba(0,255,136,0.1);
+  box-shadow: 0 0 20px rgba(0,255,136,0.3);
+}
+
+.cp-old {
+  border-color: var(--neon-orange);
+  background: rgba(255,136,0,0.1);
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.cp-seq {
+  font-size: 0.7rem;
+  color: var(--chalk-dim);
+  margin-top: 0.25rem;
+}
+
+.cp-arrow {
+  color: var(--neon-cyan);
+  font-size: 1.5rem;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.footer {
+  position: relative;
+  z-index: 2;
+  padding: 4rem 2rem 2rem;
+  text-align: center;
+  border-top: 1px solid var(--chalk-dim);
+  margin-top: 4rem;
+}
+
+.footer-greek {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  color: var(--neon-magenta);
+  margin-bottom: 1rem;
+}
+
+.footer-text {
+  color: var(--chalk-dim);
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.footer-links {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.footer-links a {
+  color: var(--neon-cyan);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.3s;
+}
+
+.footer-links a:hover {
+  color: var(--neon-yellow);
+  text-shadow: 0 0 10px var(--neon-yellow);
+}
+
+/* ============================================
+   SCROLL ANIMATIONS
+   ============================================ */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s, transform 0.8s;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================
+   MOBILE
+   ============================================ */
+@media (max-width: 768px) {
+  .hero-greek { font-size: 3rem; }
+  .hero-stats { gap: 1rem; }
+  .stat-num { font-size: 1.8rem; }
+  .section { padding: 4rem 1rem; }
+  .property-box { padding: 2rem 1.5rem; }
+  .formula-grid { grid-template-columns: 1fr; }
+}
+
+/* Selection */
+::selection {
+  background: var(--neon-cyan);
+  color: var(--chalk-bg);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--chalk-bg); }
+::-webkit-scrollbar-thumb { background: var(--chalk-dim); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+</style>
+</head>
+<body>
+
+<!-- Floating math symbols background -->
+<canvas id="math-bg"></canvas>
+
+<!-- ============================================
+     HERO
+     ============================================ -->
+<section class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-content">
+    <div class="hero-greek">ἀλήθεια</div>
+    <h1 class="hero-title">alethech</h1>
+    <p class="hero-tagline">
+      The art of un-concealing transmission integrity.<br>
+      From Greek <em>aletheia</em> (truth as un-concealment) + <em>techne</em> (art, craft).
+    </p>
+    <div class="hero-formula">
+      commit_id = sha256( JCS( object − {commit_id, signature} ) )
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">230</div>
+        <div class="stat-label">tests passing</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">8</div>
+        <div class="stat-label">mutation paths</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">0.7.0</div>
+        <div class="stat-label">current version</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">MIT</div>
+        <div class="stat-label">license</div>
+      </div>
+    </div>
+    <div class="hero-cta">
+      <a href="https://github.com/eddyflores100-lang/alethech" class="btn btn-primary" target="_blank">view source →</a>
+      <a href="https://pypi.org/project/alethech/" class="btn btn-secondary" target="_blank">pip install alethech</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     THE PROPERTY
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 01 — the property</div>
+  <h2 class="section-title">what does it mean to <span class="accent">un-conceal</span>?</h2>
+
+  <div class="property-box reveal">
+    <p class="property-text">
+      This memory set forms part of a <span class="highlight">cryptographically verifiable history</span>
+      associated with a determined identity, whose commits can be independently verified
+      with respect to their <span class="highlight">integrity</span>,
+      <span class="highlight">cryptographic authorship</span>, and
+      <span class="highlight">provenance relations</span>.
+    </p>
+    <br>
+    <p class="property-text">
+      When a reference checkpoint exists, it can additionally be verified that the
+      presented history <span class="highlight">continues from that checkpoint</span>.
+    </p>
+  </div>
+
+  <p style="margin-top: 2rem; color: var(--chalk-dim); font-size: 1rem; line-height: 1.7;">
+    The protocol does <strong style="color: var(--neon-orange);">NOT</strong> prove that the agent's claims are <em>true</em> —
+    only that they were <em>signed</em> by the identity that claims them.
+    The truth being un-concealed is the truth about <strong style="color: var(--neon-cyan);">transmission integrity</strong>,
+    not about content.
+  </p>
+</section>
+
+<!-- ============================================
+     THE MATH
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 02 — the mathematics</div>
+  <h2 class="section-title">four equations, <span class="accent">one guarantee</span></h2>
+
+  <div class="formula-grid">
+    <div class="formula-card reveal">
+      <div class="formula-label">commit identity</div>
+      <div class="formula-math" data-katex="\text{commit\_id} = \texttt{sha256}\big(\text{JCS}(\text{object} \setminus \{\text{commit\_id}, \text{signature}\})\big)"></div>
+      <div class="formula-desc">
+        The commit's identifier is the SHA-256 hash of its canonical JSON
+        (per RFC 8785), excluding the commit_id and signature fields.
+        Changing any content changes the hash. The hash IS the identity.
+      </div>
+    </div>
+
+    <div class="formula-card reveal">
+      <div class="formula-label">signature</div>
+      <div class="formula-math" data-katex="\sigma = \text{Ed25519}_{\text{sk}}\big(\text{JCS}(\text{object} + \text{commit\_id})\big)"></div>
+      <div class="formula-desc">
+        The signature authenticates the object <em>plus</em> its commit_id.
+        This binds the signature to the exact bytes that produced the hash.
+        Tampering with content breaks the hash; tampering with the hash
+        breaks the signature.
+      </div>
+    </div>
+
+    <div class="formula-card reveal">
+      <div class="formula-label">agent identity</div>
+      <div class="formula-math" data-katex="\text{agent\_id} = \texttt{did:alethech:} + \text{b32}\big(\text{sha256}(\text{JCS}(pk))^{[:16]}\big)"></div>
+      <div class="formula-desc">
+        The agent's identity is cryptographically derived from its public key.
+        You cannot claim an agent_id without controlling the corresponding
+        Ed25519 private key. Identity is not declared — it is <em>derived</em>.
+      </div>
+    </div>
+
+    <div class="formula-card reveal">
+      <div class="formula-label">reachability</div>
+      <div class="formula-math" data-katex="C \in \text{ancestry}(\text{cutoff\_head}) \Rightarrow \text{VALID\_HISTORICAL}"></div>
+      <div class="formula-desc">
+        A commit signed with a revoked key is accepted only if it is reachable
+        from the cutoff_head — the causal frontier at the moment of key rotation.
+        If not reachable: <span style="color: var(--neon-orange);">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</span>.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     DAG VISUALIZATION
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 03 — the architecture</div>
+  <h2 class="section-title">a <span class="accent">Merkle DAG</span> of signed memory</h2>
+
+  <div class="dag-container reveal">
+    <svg class="dag-svg" viewBox="0 0 800 400" id="dag-svg">
+      <!-- Genesis -->
+      <g class="dag-node" transform="translate(100, 200)">
+        <circle r="24" fill="none" stroke="var(--neon-cyan)" stroke-width="2"/>
+        <text text-anchor="middle" dy="5" fill="var(--neon-cyan)" font-size="11" font-family="monospace">G</text>
+        <text text-anchor="middle" dy="45" fill="#888" font-size="9" font-family="monospace">genesis</text>
+      </g>
+
+      <!-- C1 -->
+      <g class="dag-node" transform="translate(280, 120)">
+        <circle r="24" fill="none" stroke="var(--neon-green)" stroke-width="2"/>
+        <text text-anchor="middle" dy="5" fill="var(--neon-green)" font-size="11" font-family="monospace">C₁</text>
+        <text text-anchor="middle" dy="45" fill="#888" font-size="9" font-family="monospace">key-001</text>
+      </g>
+
+      <!-- C2 (cutoff_head) -->
+      <g class="dag-node" transform="translate(460, 120)">
+        <circle r="28" fill="none" stroke="var(--neon-yellow)" stroke-width="3" class="cutoff-glow"/>
+        <text text-anchor="middle" dy="5" fill="var(--neon-yellow)" font-size="11" font-family="monospace">C₂</text>
+        <text text-anchor="middle" dy="50" fill="var(--neon-yellow)" font-size="9" font-family="monospace">cutoff_head</text>
+      </g>
+
+      <!-- C3 (post-rotation, new key) -->
+      <g class="dag-node" transform="translate(640, 120)">
+        <circle r="24" fill="none" stroke="var(--neon-magenta)" stroke-width="2"/>
+        <text text-anchor="middle" dy="5" fill="var(--neon-magenta)" font-size="11" font-family="monospace">C₃</text>
+        <text text-anchor="middle" dy="45" fill="#888" font-size="9" font-family="monospace">key-002</text>
+      </g>
+
+      <!-- Dark commit D (child of C2, signed with revoked key-001) -->
+      <g class="dag-node" transform="translate(640, 280)">
+        <circle r="24" fill="none" stroke="var(--neon-orange)" stroke-width="2" stroke-dasharray="4 2"/>
+        <text text-anchor="middle" dy="5" fill="var(--neon-orange)" font-size="11" font-family="monospace">D</text>
+        <text text-anchor="middle" dy="45" fill="var(--neon-orange)" font-size="9" font-family="monospace">dark commit</text>
+      </g>
+
+      <!-- Edges -->
+      <line x1="124" y1="200" x2="256" y2="120" stroke="#444" stroke-width="1.5"/>
+      <line x1="304" y1="120" x2="436" y2="120" stroke="var(--neon-green)" stroke-width="2"/>
+      <line x1="484" y1="120" x2="616" y2="120" stroke="var(--neon-magenta)" stroke-width="2"/>
+      <line x1="484" y1="120" x2="616" y2="280" stroke="var(--neon-orange)" stroke-width="1.5" stroke-dasharray="4 2"/>
+
+      <!-- Legend -->
+      <g transform="translate(50, 340)">
+        <circle cx="10" cy="10" r="6" fill="none" stroke="var(--neon-cyan)" stroke-width="2"/>
+        <text x="25" y="14" fill="#888" font-size="10" font-family="monospace">genesis</text>
+
+        <circle cx="110" cy="10" r="6" fill="none" stroke="var(--neon-green)" stroke-width="2"/>
+        <text x="125" y="14" fill="#888" font-size="10" font-family="monospace">signed (active key)</text>
+
+        <circle cx="280" cy="10" r="6" fill="none" stroke="var(--neon-yellow)" stroke-width="2"/>
+        <text x="295" y="14" fill="#888" font-size="10" font-family="monospace">cutoff frontier</text>
+
+        <circle cx="420" cy="10" r="6" fill="none" stroke="var(--neon-magenta)" stroke-width="2"/>
+        <text x="435" y="14" fill="#888" font-size="10" font-family="monospace">post-rotation</text>
+
+        <circle cx="580" cy="10" r="6" fill="none" stroke="var(--neon-orange)" stroke-width="2" stroke-dasharray="2 1"/>
+        <text x="595" y="14" fill="#888" font-size="10" font-family="monospace">DARK (rejected)</text>
+      </g>
+    </svg>
+
+    <p style="color: var(--chalk-dim); font-size: 0.9rem; text-align: center; margin-top: 1rem;">
+      Commit <strong style="color: var(--neon-orange);">D</strong> is signed with the revoked key-001, but its parent is
+      <strong style="color: var(--neon-yellow);">C₂</strong> (the cutoff_head). Since D is a <em>child</em> of C₂, not an
+      <em>ancestor</em>, the reachability check fails. D is rejected as
+      <code style="color: var(--neon-orange);">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</code>.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================
+     VERDICTS
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 04 — the verdicts</div>
+  <h2 class="section-title">two verdicts, <span class="accent">no temporal claims</span></h2>
+
+  <p style="color: var(--chalk-dim); margin-bottom: 2rem;">
+    When a commit is signed with a revoked key, the verifier can only demonstrate
+    one of two things. It deliberately does <strong style="color: var(--neon-cyan);">NOT</strong> claim to prove
+    <em>when</em> the commit was created.
+  </p>
+
+  <div class="verdict-grid">
+    <div class="verdict-card verdict-good reveal">
+      <div class="verdict-name">VALID_HISTORICAL</div>
+      <div class="verdict-formula">
+        C ∈ ancestry(cutoff_head)
+      </div>
+      <div class="verdict-desc">
+        The commit IS a member of the ancestry covered by the rotation's
+        cutoff_head. The signature is valid, and the commit belongs to the
+        causal history the rotation closed. This is the legitimate
+        historical case — the commit was made before rotation, and the
+        cutoff_head includes it in its history.
+      </div>
+    </div>
+
+    <div class="verdict-card verdict-bad reveal">
+      <div class="verdict-name">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</div>
+      <div class="verdict-formula">
+        C ∉ ancestry(cutoff_head)
+      </div>
+      <div class="verdict-desc">
+        The commit is NOT a member of ancestry(cutoff_head). The verifier
+        cannot prove it belongs to the causal history the rotation closed.
+        This is <strong>not</strong> a claim that the commit was "created
+        after rotation" — that would require a clock the protocol does not
+        have. It is strictly a membership verdict.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     ANTI-ROLLBACK
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 05 — anti-rollback</div>
+  <h2 class="section-title">monotonic <span class="accent">sequence</span>, not system clock</h2>
+
+  <p style="color: var(--chalk-dim); margin-bottom: 2rem;">
+    A correctly-signed but old checkpoint could be presented as current.
+    The system clock is <strong style="color: var(--neon-orange);">NOT</strong> the authority.
+    The <code style="color: var(--neon-cyan);">sequence</code> field is.
+  </p>
+
+  <div class="rollback-viz reveal">
+    <div class="checkpoint-tower">
+      <div class="cp-block cp-current">
+        checkpoint B<br>
+        <span style="color: var(--neon-cyan);">head = H₁₅₀</span><br>
+        <div class="cp-seq">sequence = 15</div>
+      </div>
+      <div style="color: var(--neon-green); font-size: 1.5rem;">↑</div>
+      <div class="cp-block cp-current" style="opacity: 0.7;">
+        checkpoint A<br>
+        <span style="color: var(--neon-cyan);">head = H₁₀₀</span><br>
+        <div class="cp-seq">sequence = 10</div>
+      </div>
+      <div style="color: var(--chalk-dim);">consumer accepted</div>
+    </div>
+
+    <div style="color: var(--neon-magenta); font-size: 2rem;">VS</div>
+
+    <div class="checkpoint-tower">
+      <div class="cp-block cp-old">
+        attacker presents<br>
+        <span style="color: var(--neon-orange);">head = H₀₅₀</span><br>
+        <div class="cp-seq">sequence = 5</div>
+      </div>
+      <div style="color: var(--neon-orange); font-size: 1.5rem;">✗</div>
+      <div style="color: var(--neon-orange); font-family: var(--font-mono); font-size: 0.85rem;">
+        REJECTED: sequence < 10<br>
+        <span style="color: var(--chalk-dim);">rollback detected</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     CLI DEMO
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 06 — live demo</div>
+  <h2 class="section-title">nine commands, <span class="accent">offline verification</span></h2>
+
+  <div class="cli-demo reveal">
+    <div class="cli-header">
+      <div class="cli-dot red"></div>
+      <div class="cli-dot yellow"></div>
+      <div class="cli-dot green"></div>
+      <div class="cli-title">alethech — terminal</div>
+    </div>
+    <div class="cli-body" id="cli-body">
+      <!-- Lines will be added by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     WHAT IT DOES NOT DO
+     ============================================ -->
+<section class="section">
+  <div class="section-label">§ 07 — honesty</div>
+  <h2 class="section-title">what it does <span class="accent">NOT</span> do</h2>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem;">
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> prove claims are true
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">Only that they were signed by the identity that claims them.</p>
+    </div>
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> detect rollback without checkpoint
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">External checkpoint required for continuity verification.</p>
+    </div>
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> encrypt content at rest
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">Integrity ≠ confidentiality. A signature does not encrypt.</p>
+    </div>
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> delegate permissions
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">No inter-agent authorization. Each identity is sovereign.</p>
+    </div>
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> call any LLM
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">Zero-LLM by design. Bytes and cryptographic properties only.</p>
+    </div>
+    <div style="padding: 1.5rem; border-left: 3px solid var(--neon-orange); background: rgba(255,136,0,0.03);">
+      <strong style="color: var(--neon-orange);">NOT</strong> prove physical signing time
+      <p style="color: var(--chalk-dim); font-size: 0.85rem; margin-top: 0.5rem;">Only the timestamp recorded in the artifact. No clock authority.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================
+     FOOTER
+     ============================================ -->
+<footer class="footer">
+  <div class="footer-greek">τέχνη ἀληθείας</div>
+  <p class="footer-text">
+    alethech — verifiable agent continuity protocol<br>
+    Ed25519 · SHA-256 · JCS RFC 8785 · MIT License · Python 3.10+
+  </p>
+  <div class="footer-links">
+    <a href="https://github.com/eddyflores100-lang/alethech" target="_blank">github →</a>
+    <a href="https://pypi.org/project/alethech/" target="_blank">pypi →</a>
+    <a href="https://github.com/eddyflores100-lang/alethech/releases" target="_blank">releases →</a>
+    <a href="https://github.com/eddyflores100-lang/alethech/blob/main/docs/implementacion-nucleo-minimo.md" target="_blank">spec →</a>
+  </div>
+  <p style="color: var(--chalk-dim); font-size: 0.75rem; margin-top: 2rem;">
+    built by an agent, for agents · agent_id: did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu
+  </p>
+</footer>
+
+<!-- Einstein corner SVG -->
+<div class="einstein-corner" title="E = mc²">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <!-- Hair -->
+    <path d="M 20 30 Q 25 10 50 10 Q 75 10 80 30 Q 85 25 82 35 Q 78 30 75 35 Q 70 28 65 33 Q 60 25 55 30 Q 50 22 45 28 Q 40 24 35 30 Q 30 26 25 32 Q 22 28 20 30 Z" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>
+    <!-- Face outline -->
+    <ellipse cx="50" cy="55" rx="22" ry="28" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>
+    <!-- Eyes -->
+    <circle cx="42" cy="50" r="2" fill="#e8e8e8"/>
+    <circle cx="58" cy="50" r="2" fill="#e8e8e8"/>
+    <!-- Mustache -->
+    <path d="M 38 65 Q 42 68 50 66 Q 58 68 62 65 Q 58 70 50 70 Q 42 70 38 65 Z" fill="#e8e8e8"/>
+    <!-- Nose -->
+    <path d="M 50 55 L 48 62 L 52 62 Z" fill="none" stroke="#e8e8e8" stroke-width="1"/>
+    <!-- E=mc² text below -->
+    <text x="50" y="92" text-anchor="middle" fill="#00f0ff" font-size="10" font-family="serif" font-style="italic">E=mc²</text>
+  </svg>
+</div>
+
+<script>
+// ============================================
+// MATH SYMBOLS BACKGROUND
+// ============================================
+const mathBg = document.getElementById('math-bg');
+const mathCtx = mathBg.getContext('2d');
+const symbols = ['∑', '∫', '∂', '∇', '∞', 'π', 'σ', 'Δ', '∀', '∃', '∈', '∉', '⊆', '⊕', '⊗', '√', 'λ', 'φ', 'ψ', 'Ω', 'α', 'β', 'γ', 'δ', 'ε', 'η', 'θ', 'κ', 'μ', 'ν', 'ρ', 'τ', 'χ', 'ω'];
+const particles = [];
+
+function resizeMathBg() {
+  mathBg.width = window.innerWidth;
+  mathBg.height = window.innerHeight;
+}
+resizeMathBg();
+window.addEventListener('resize', resizeMathBg);
+
+for (let i = 0; i < 40; i++) {
+  particles.push({
+    x: Math.random() * mathBg.width,
+    y: Math.random() * mathBg.height,
+    symbol: symbols[Math.floor(Math.random() * symbols.length)],
+    size: 14 + Math.random() * 30,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    color: ['#00f0ff', '#ff00ea', '#00ff88', '#ffe600'][Math.floor(Math.random() * 4)],
+    rotation: Math.random() * Math.PI * 2,
+    vr: (Math.random() - 0.5) * 0.005
+  });
+}
+
+function animateMathBg() {
+  mathCtx.clearRect(0, 0, mathBg.width, mathBg.height);
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rotation += p.vr;
+    if (p.x < -50) p.x = mathBg.width + 50;
+    if (p.x > mathBg.width + 50) p.x = -50;
+    if (p.y < -50) p.y = mathBg.height + 50;
+    if (p.y > mathBg.height + 50) p.y = -50;
+
+    mathCtx.save();
+    mathCtx.translate(p.x, p.y);
+    mathCtx.rotate(p.rotation);
+    mathCtx.font = `${p.size}px serif`;
+    mathCtx.fillStyle = p.color;
+    mathCtx.globalAlpha = 0.15;
+    mathCtx.fillText(p.symbol, 0, 0);
+    mathCtx.restore();
+  });
+  requestAnimationFrame(animateMathBg);
+}
+animateMathBg();
+
+// ============================================
+// HERO CANVAS — animated cryptographic visualization
+// ============================================
+const heroCanvas = document.getElementById('hero-canvas');
+const heroCtx = heroCanvas.getContext('2d');
+
+function resizeHero() {
+  heroCanvas.width = heroCanvas.offsetWidth;
+  heroCanvas.height = heroCanvas.offsetHeight;
+}
+resizeHero();
+window.addEventListener('resize', resizeHero);
+
+const nodes = [];
+const edges = [];
+const NODE_COUNT = 25;
+
+for (let i = 0; i < NODE_COUNT; i++) {
+  nodes.push({
+    x: Math.random() * heroCanvas.width,
+    y: Math.random() * heroCanvas.height,
+    vx: (Math.random() - 0.5) * 0.5,
+    vy: (Math.random() - 0.5) * 0.5,
+    radius: 2 + Math.random() * 3,
+    color: ['#00f0ff', '#ff00ea', '#00ff88', '#ffe600'][Math.floor(Math.random() * 4)],
+    pulse: Math.random() * Math.PI * 2
+  });
+}
+
+function animateHero() {
+  heroCtx.clearRect(0, 0, heroCanvas.width, heroCanvas.height);
+
+  // Update positions
+  nodes.forEach(n => {
+    n.x += n.vx;
+    n.y += n.vy;
+    n.pulse += 0.02;
+    if (n.x < 0 || n.x > heroCanvas.width) n.vx *= -1;
+    if (n.y < 0 || n.y > heroCanvas.height) n.vy *= -1;
+  });
+
+  // Draw edges between nearby nodes
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = nodes[i].x - nodes[j].x;
+      const dy = nodes[i].y - nodes[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 150) {
+        const opacity = (1 - dist / 150) * 0.3;
+        heroCtx.strokeStyle = `rgba(0, 240, 255, ${opacity})`;
+        heroCtx.lineWidth = 0.5;
+        heroCtx.beginPath();
+        heroCtx.moveTo(nodes[i].x, nodes[i].y);
+        heroCtx.lineTo(nodes[j].x, nodes[j].y);
+        heroCtx.stroke();
+      }
+    }
+  }
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const glow = 4 + Math.sin(n.pulse) * 2;
+    heroCtx.shadowBlur = glow * 2;
+    heroCtx.shadowColor = n.color;
+    heroCtx.fillStyle = n.color;
+    heroCtx.beginPath();
+    heroCtx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+    heroCtx.fill();
+  });
+  heroCtx.shadowBlur = 0;
+
+  requestAnimationFrame(animateHero);
+}
+animateHero();
+
+// ============================================
+// SCROLL REVEAL
+// ============================================
+const revealElements = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+revealElements.forEach(el => observer.observe(el));
+
+// ============================================
+// CLI DEMO — typewriter animation
+// ============================================
+const cliLines = [
+  { type: 'cmd', text: 'alethech --store ~/.alethech init' },
+  { type: 'output', text: 'agent_id: did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu' },
+  { type: 'output', text: 'public_key: ed25519:7hTWOd_5XMfIMCFk_N9kpSmHoDdT65IwXwA7Q3pNPTc' },
+  { type: 'output', text: 'key_id: key-001' },
+  { type: 'output', text: 'genesis_commit: sha256:b0f920c954a687448dfc095336a090da5efac823...' },
+  { type: 'blank', text: '' },
+  { type: 'cmd', text: 'alethech --store ~/.alethech commit --content memory.json' },
+  { type: 'success', text: 'commit: sha256:b557605aa07b5642b34ee1aed454237683433d93...' },
+  { type: 'output', text: 'parent: sha256:b0f920c954a687448dfc095336a090da5efac823...' },
+  { type: 'output', text: 'agent: did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu' },
+  { type: 'blank', text: '' },
+  { type: 'cmd', text: 'alethech --store ~/.alethech key rotate' },
+  { type: 'info', text: 'rotated: key-001 → key-002' },
+  { type: 'output', text: 'cutoff_head: sha256:b557605aa07b5642b34ee1aed454237683433d93...' },
+  { type: 'output', text: 'control_event: sha256:152cbceae737bcc3a99c87366d3c2945b03e3b96...' },
+  { type: 'blank', text: '' },
+  { type: 'cmd', text: 'alethech --store ~/.alethech verify' },
+  { type: 'output', text: 'identities: 1 verified, 0 invalid' },
+  { type: 'output', text: 'commits: 2 verified, 0 invalid, 0 not_in_proven_pre_rotation_history' },
+  { type: 'output', text: 'HEAD: sha256:b557605aa07b5642b34ee1aed454237683433d93 (valid)' },
+  { type: 'success', text: 'result: OK' },
+];
+
+const cliBody = document.getElementById('cli-body');
+let cliIndex = 0;
+
+function typeNextLine() {
+  if (cliIndex >= cliLines.length) {
+    // Reset after 3 seconds
+    setTimeout(() => {
+      cliBody.innerHTML = '';
+      cliIndex = 0;
+      typeNextLine();
+    }, 4000);
+    return;
+  }
+
+  const line = cliLines[cliIndex];
+  const div = document.createElement('div');
+  div.className = 'cli-line';
+
+  if (line.type === 'cmd') {
+    div.innerHTML = '<span class="cli-prompt">$ </span><span class="cli-cmd">' + line.text + '</span>';
+  } else if (line.type === 'success') {
+    div.innerHTML = '<span class="cli-success">' + line.text + '</span>';
+  } else if (line.type === 'error') {
+    div.innerHTML = '<span class="cli-error">' + line.text + '</span>';
+  } else if (line.type === 'info') {
+    div.innerHTML = '<span class="cli-info">' + line.text + '</span>';
+  } else if (line.type === 'blank') {
+    div.innerHTML = '&nbsp;';
+  } else {
+    div.innerHTML = '<span class="cli-output">' + line.text + '</span>';
+  }
+
+  cliBody.appendChild(div);
+  cliBody.scrollTop = cliBody.scrollHeight;
+
+  cliIndex++;
+  setTimeout(typeNextLine, line.type === 'cmd' ? 600 : 150);
+}
+
+// Start CLI demo when it scrolls into view
+const cliObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting && cliIndex === 0) {
+      typeNextLine();
+      cliObserver.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.3 });
+
+cliObserver.observe(cliBody);
+
+// ============================================
+// KATEX RENDERING
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  // Render KaTeX for elements with data-katex attribute
+  document.querySelectorAll('[data-katex]').forEach(elem => {
+    const expr = elem.getAttribute('data-katex');
+    if (typeof katex !== 'undefined') {
+      try {
+        katex.render(expr, elem, { throwOnError: false, displayMode: true });
+      } catch(e) {
+        elem.textContent = expr;
+      }
+    } else {
+      elem.textContent = expr;
+    }
+  });
+});
+
+// Check if katex loaded (defer)
+window.addEventListener('load', () => {
+  if (typeof katex !== 'undefined') {
+    document.querySelectorAll('[data-katex]').forEach(elem => {
+      const expr = elem.getAttribute('data-katex');
+      try {
+        katex.render(expr, elem, { throwOnError: false, displayMode: true });
+      } catch(e) {
+        elem.textContent = expr;
+      }
+    });
+  }
+});
+
+// ============================================
+// DAG node interaction
+// ============================================
+document.querySelectorAll('.dag-node').forEach(node => {
+  node.addEventListener('mouseenter', () => {
+    const circle = node.querySelector('circle');
+    if (circle) {
+      circle.style.filter = 'drop-shadow(0 0 15px currentColor)';
+    }
+  });
+  node.addEventListener('mouseleave', () => {
+    const circle = node.querySelector('circle');
+    if (circle) {
+      circle.style.filter = '';
+    }
+  });
+});
+</script>
+</body>
+</html>
