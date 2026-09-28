@@ -11,91 +11,21 @@
 <style>
   *,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
 
+  /* ============================================================
+     PALETTE — only 2 colors + 2 neutrals. NO green. NO orange.
+     ============================================================ */
   :root{
     --bg:#fafafa;          /* paper */
-    --ink:#0a0a0a;         /* main text */
+    --ink:#0a0a0a;         /* main text + accent */
     --paper-edge:#efefef;
     --thread:#9a9a9a;      /* stitch + marginalia */
-    --muted:#6b6b6b;
-    --valid:#00ff88;       /* accepted accent */
-    --reject:#ff8800;      /* rejected accent */
+    --muted:#6b6b6b;       /* secondary text */
     --stitch-x:30px;       /* stitching column position */
     --gutter:64px;         /* left gutter for stitching */
   }
 
-  /* ============ CONTINUOUS LIFE — page stays alive while scrolling ============ */
-  /* Green pulse keyframes — keeps the page breathing */
-  @keyframes greenPulse {
-    0%, 100% {
-      text-shadow: 0 0 4px rgba(0,255,136,0.4), 0 0 12px rgba(0,255,136,0.2);
-      color: #00ff88;
-    }
-    50% {
-      text-shadow: 0 0 8px rgba(0,255,136,0.8), 0 0 24px rgba(0,255,136,0.5), 0 0 40px rgba(0,255,136,0.2);
-      color: #00ff88;
-    }
-  }
-
-  @keyframes greenBreathe {
-    0%, 100% { box-shadow: 0 0 4px rgba(0,255,136,0.3), inset 0 0 4px rgba(0,255,136,0.1); }
-    50%      { box-shadow: 0 0 16px rgba(0,255,136,0.6), inset 0 0 8px rgba(0,255,136,0.2); }
-  }
-
-  @keyframes orangePulse {
-    0%, 100% { text-shadow: 0 0 4px rgba(255,136,0,0.4), 0 0 12px rgba(255,136,0,0.2); }
-    50%      { text-shadow: 0 0 8px rgba(255,136,0,0.8), 0 0 24px rgba(255,136,0,0.5); }
-  }
-
-  @keyframes threadShimmer {
-    0%, 100% { opacity: 0.4; }
-    50%      { opacity: 0.7; }
-  }
-
-  @keyframes caretBlink {
-    0%, 49%   { opacity: 1; }
-    50%, 100% { opacity: 0; }
-  }
-
-  /* Apply continuous pulse to green-accented elements that should stay alive */
-  .verdict--valid .verdict-name,
-  .term .ok,
-  .kbox--active .kbox-id,
-  .legend i.green,
-  .dag .node--cutoff rect {
-    animation: greenPulse 2.4s ease-in-out infinite;
-  }
-
-  .verdict--valid {
-    animation: greenBreathe 3s ease-in-out infinite;
-  }
-
-  /* Orange accents breathe too */
-  .verdict--reject .verdict-name,
-  .kbox--revoked .kbox-id {
-    animation: orangePulse 2.8s ease-in-out infinite;
-  }
-
-  /* The stitching shimmer — keeps the notebook alive */
-  body::before,
-  body::after {
-    animation: threadShimmer 4s ease-in-out infinite;
-  }
-
-  /* Respect reduced motion — pause all continuous animations */
-  @media (prefers-reduced-motion: reduce) {
-    .verdict--valid .verdict-name,
-    .term .ok,
-    .kbox--active .kbox-id,
-    .legend i.green,
-    .dag .node--cutoff rect,
-    .verdict--valid,
-    .verdict--reject .verdict-name,
-    .kbox--revoked .kbox-id,
-    body::before,
-    body::after {
-      animation: none !important;
-    }
-  }
+  /* caret blink — only used by the two scroll-triggered typewriters */
+  @keyframes blink{ 50%{ opacity:0; } }
 
   html{ scroll-behavior:smooth; }
 
@@ -112,159 +42,7 @@
     overflow-x:hidden;
   }
 
-  /* ============ GLOBAL AMBIENT LIFE — entire viewport breathes ============ */
-  /* 1. Animated gradient border that pulses green/orange on all 4 edges */
-  @keyframes edgePulse {
-    0%   { box-shadow: inset 0 0 80px 0 rgba(0,255,136,0.15), inset 0 0 160px 0 rgba(0,255,136,0.08); }
-    25%  { box-shadow: inset 0 0 120px 0 rgba(0,255,136,0.25), inset 0 0 240px 0 rgba(0,255,136,0.12); }
-    50%  { box-shadow: inset 0 0 80px 0 rgba(255,136,0,0.15), inset 0 0 160px 0 rgba(255,136,0,0.08); }
-    75%  { box-shadow: inset 0 0 120px 0 rgba(255,136,0,0.25), inset 0 0 240px 0 rgba(255,136,0,0.12); }
-    100% { box-shadow: inset 0 0 80px 0 rgba(0,255,136,0.15), inset 0 0 160px 0 rgba(0,255,136,0.08); }
-  }
-  body::after {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none;
-    z-index: 1;
-    animation: edgePulse 8s ease-in-out infinite;
-  }
-
-  /* 2. Drifting math symbols in background — continuous, global */
-  @keyframes drift1 { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(40px, -60px) rotate(180deg); } }
-  @keyframes drift2 { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(-50px, -40px) rotate(-180deg); } }
-  @keyframes drift3 { from { transform: translate(0, 0) rotate(0deg); } to { transform: translate(30px, 50px) rotate(360deg); } }
-
-  .ambient-symbols {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-  .ambient-symbols span {
-    position: absolute;
-    font-family: 'Cedarville Cursive', serif;
-    opacity: 0.35;
-    user-select: none;
-    will-change: transform;
-    font-weight: bold;
-  }
-  .ambient-symbols span:nth-child(3n)   { animation: drift1 18s linear infinite; color: #00ff88; }
-  .ambient-symbols span:nth-child(3n+1) { animation: drift2 22s linear infinite; color: #ff8800; }
-  .ambient-symbols span:nth-child(3n+2) { animation: drift3 26s linear infinite; color: #0a0a0a; }
-
-  /* 3. Stitching line animates — looks like it's being sewn continuously */
-  @keyframes sewProgress {
-    0%   { stroke-dashoffset: 0; }
-    100% { stroke-dashoffset: -40; }
-  }
-
-  /* 4. All green/orange text pulses — AGGRESSIVE, visible */
-  @keyframes greenGlow {
-    0%, 100% { text-shadow: 0 0 2px rgba(0,255,136,0.3); }
-    50%      { text-shadow: 0 0 6px rgba(0,255,136,0.9), 0 0 16px rgba(0,255,136,0.4); }
-  }
-  @keyframes orangeGlow {
-    0%, 100% { text-shadow: 0 0 2px rgba(255,136,0,0.3); }
-    50%      { text-shadow: 0 0 6px rgba(255,136,0,0.9), 0 0 16px rgba(255,136,0,0.4); }
-  }
-
-  /* ============ HERO MUST BE ALIVE — the FIRST thing the user sees ============ */
-  /* The mega title pulses green/orange continuously */
-  @keyframes heroGlow {
-    0%, 100% {
-      color: #0a0a0a;
-      text-shadow:
-        0 0 10px rgba(0,255,136,0.4),
-        0 0 30px rgba(0,255,136,0.2);
-    }
-    33% {
-      color: #0a0a0a;
-      text-shadow:
-        0 0 15px rgba(0,255,136,0.7),
-        0 0 40px rgba(0,255,136,0.4),
-        0 0 60px rgba(0,255,136,0.2);
-    }
-    66% {
-      color: #0a0a0a;
-      text-shadow:
-        0 0 15px rgba(255,136,0,0.7),
-        0 0 40px rgba(255,136,0,0.4),
-        0 0 60px rgba(255,136,0,0.2);
-    }
-  }
-
-  /* Hero greek letter floats + color cycles */
-  @keyframes greekFloat {
-    0%, 100% { transform: translateY(0); color: #0a0a0a; }
-    25%      { transform: translateY(-4px); color: #00ff88; }
-    50%      { transform: translateY(0); color: #0a0a0a; }
-    75%      { transform: translateY(-4px); color: #ff8800; }
-  }
-
-  /* Tagline typewriter cursor blink */
-  @keyframes heroBlink {
-    0%, 49%   { opacity: 1; }
-    50%, 100% { opacity: 0; }
-  }
-
-  /* Stats numbers pulse */
-  @keyframes statPulse {
-    0%, 100% { color: #0a0a0a; transform: scale(1); }
-    50%      { color: #00ff88; transform: scale(1.05); }
-  }
-
-  /* Apply hero animations */
-  .mega { animation: heroGlow 3s ease-in-out infinite; }
-  .eyebrow { animation: greekFloat 4s ease-in-out infinite; display: inline-block; }
-  .stat-num, .stats b { animation: statPulse 2.5s ease-in-out infinite; display: inline-block; }
-
-  /* ============ GREEN/ORANGE GLOW — continuous ============ */
-  .verdict--valid, .verdict--valid *,
-  .kbox--active, .kbox--active *,
-  .term .ok, .legend i.green,
-  .seqbox--accept, .seqbox--accept *,
-  .dag .node--cutoff rect {
-    animation: greenGlow 2s ease-in-out infinite !important;
-  }
-
-  /* Apply to ALL orange-colored elements site-wide */
-  .verdict--reject, .verdict--reject *,
-  .kbox--revoked, .kbox--revoked *,
-  .seqbox--reject, .seqbox--reject *,
-  .dag .node--reject rect {
-    animation: orangeGlow 2.4s ease-in-out infinite !important;
-  }
-
-  /* 5. Section headers breathe */
-  @keyframes headerBreathe {
-    0%, 100% { opacity: 0.7; }
-    50%      { opacity: 1; }
-  }
-  .kicker, .pagenum {
-    animation: headerBreathe 3s ease-in-out infinite;
-  }
-
-  /* 6. Page break lines shimmer */
-  @keyframes ruleShimmer {
-    0%   { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
-  }
-  .page-break, hr {
-    background: linear-gradient(90deg,
-      transparent 0%,
-      rgba(0,255,136,0.3) 25%,
-      transparent 50%,
-      rgba(255,136,0,0.3) 75%,
-      transparent 100%
-    ) !important;
-    background-size: 200% 100% !important;
-    animation: ruleShimmer 4s linear infinite !important;
-  }
-
-  /* ---- stitching: vertical dashed thread down the left margin ---- */
+  /* ---- stitching: vertical dashed thread down the left margin (KEEP) ---- */
   body::before{
     content:"";
     position:fixed;
@@ -272,18 +50,6 @@
     left:var(--stitch-x);
     width:0;
     border-left:2px dashed var(--thread);
-    z-index:5;
-    pointer-events:none;
-  }
-  /* a faint companion stitch — reads as a sewn seam */
-  body::after{
-    content:"";
-    position:fixed;
-    top:0; bottom:0;
-    left:calc(var(--stitch-x) + 6px);
-    width:0;
-    border-left:1px dotted var(--thread);
-    opacity:.45;
     z-index:5;
     pointer-events:none;
   }
@@ -360,7 +126,7 @@
     max-width:60ch;
   }
 
-  /* ---- stats + links ---- */
+  /* ---- stats + links (cover) ---- */
   .stats{
     margin-top:3rem;
     display:flex;
@@ -393,8 +159,13 @@
   /* ---- marginalia (pencil-style side notes) ---- */
   .with-margin{ display:flex; gap:2.5rem; align-items:flex-start; flex-wrap:wrap; }
   .with-margin > .content{ flex:1 1 60ch; min-width:0; }
-  .marginalia{
+  .marginalia-stack{
     flex:0 0 220px;
+    display:flex;
+    flex-direction:column;
+    gap:1.25rem;
+  }
+  .marginalia{
     font-size:.8rem;
     line-height:1.5;
     color:var(--muted);
@@ -402,6 +173,12 @@
     padding:.25rem 0 .25rem .9rem;
   }
   .marginalia b{ color:var(--ink); display:block; margin-bottom:.3rem; letter-spacing:.1em; text-transform:uppercase; font-size:.7rem; }
+  .marginalia--full{
+    flex-basis:100%;
+    width:100%;
+    max-width:none;
+    margin-top:2rem;
+  }
 
   /* ---- section heading rule ---- */
   .section-head{
@@ -424,7 +201,18 @@
     color:var(--muted);
   }
 
-  /* ============ PAGE 03 — DAG ============ */
+  /* ---- prose stack (used on the "what is alethech" page) ---- */
+  .prose-stack{ display:flex; flex-direction:column; gap:1.5rem; max-width:72ch; }
+  .prose-stack p{ line-height:1.55; }
+  .prose-stack code{
+    background:var(--ink);
+    color:var(--bg);
+    padding:.05em .35em;
+    font-weight:500;
+    font-size:.92em;
+  }
+
+  /* ============ PAGE 04 — DAG ============ */
   .dag-wrap{ width:100%; }
   .dag{
     width:100%;
@@ -438,13 +226,19 @@
     stroke:var(--ink);
     stroke-width:2.5;
   }
-  .dag .node--cutoff rect{ fill:var(--valid); }
+  /* cutoff_head = SOLID BLACK FILL (was green) — still the visual anchor */
+  .dag .node--cutoff rect{ fill:var(--ink); stroke:var(--ink); stroke-width:2.5; }
+  .dag .node--cutoff .node-title{ fill:var(--bg); }
+  .dag .node--cutoff .node-key{ fill:var(--bg); opacity:.9; }
+  .dag .node--cutoff .node-tag{ fill:var(--bg); opacity:.85; }
   .dag .node--post rect{ stroke-width:4; }
+  /* rejected commit = dashed border (was orange) */
   .dag .node--reject rect{
     fill:var(--bg);
-    stroke:var(--reject);
+    stroke:var(--ink);
     stroke-width:2.5;
     stroke-dasharray:7 5;
+    opacity:.7;
   }
   .dag .node-title{
     font-family:'JetBrains Mono',monospace;
@@ -467,8 +261,8 @@
     letter-spacing:.08em;
     text-transform:uppercase;
   }
-  .dag .node-tag--reject{ fill:var(--reject); }
-  .dag .node-tag--cutoff{ fill:#0a0a0a; font-weight:700; }
+  .dag .node-tag--reject{ fill:var(--muted); }
+  .dag .node-tag--cutoff{ fill:var(--bg); font-weight:700; opacity:.95; }
 
   .dag .edge{
     stroke:var(--ink);
@@ -479,11 +273,13 @@
     transition:stroke-dashoffset .75s cubic-bezier(.4,0,.2,1);
   }
   .dag .edge.in{ stroke-dashoffset:0; }
+  /* rejected ancestry edge — dashed, neutral gray (was orange) */
   .dag .edge-reject{
-    stroke:var(--reject);
-    stroke-width:3;
+    stroke:var(--muted);
+    stroke-width:2.5;
     fill:none;
     stroke-dasharray:7 5;
+    opacity:.7;
   }
   .dag .boundary{
     stroke:var(--ink);
@@ -513,10 +309,47 @@
     width:18px; height:0;
     border-top:3px solid var(--ink);
   }
-  .legend i.dashed{ border-top:3px dashed var(--reject); border-color:var(--reject); }
-  .legend i.green{ width:14px; height:14px; border:0; background:var(--valid); border:2px solid var(--ink); }
+  .legend i.dashed{ border-top:3px dashed var(--muted); border-color:var(--muted); opacity:.7; }
+  .legend i.cutoff{ width:14px; height:14px; border:0; background:var(--ink); border:2px solid var(--ink); }
 
-  /* ============ PAGE 04 — equations ============ */
+  /* ============ PAGE 05 — how it works (steps) ============ */
+  .steps{
+    list-style:none;
+    counter-reset:step;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+  }
+  .steps li{
+    counter-increment:step;
+    padding:1.4rem 0;
+    border-bottom:1px dashed var(--thread);
+    display:flex;
+    align-items:baseline;
+    gap:1.25rem;
+    font-size:clamp(1rem,1.6vw,1.25rem);
+    line-height:1.4;
+  }
+  .steps li:first-child{ border-top:2px solid var(--ink); }
+  .steps li::before{
+    content:counter(step,decimal-leading-zero);
+    flex:0 0 auto;
+    font-weight:800;
+    color:var(--ink);
+    font-size:.95rem;
+    letter-spacing:.04em;
+    min-width:2.5rem;
+  }
+  .steps code{
+    background:var(--ink);
+    color:var(--bg);
+    padding:.1em .45em;
+    font-weight:500;
+    font-size:.9em;
+    white-space:nowrap;
+  }
+
+  /* ============ PAGE 06 — equations ============ */
   .eqs{ display:flex; flex-direction:column; gap:2.4rem; }
   .eq{ border-left:3px solid var(--ink); padding-left:1.2rem; }
   .eq code{
@@ -531,11 +364,12 @@
   .eq .explain{ margin-top:.6rem; font-size:.95rem; color:var(--muted); }
   .eq .explain b{ color:var(--ink); }
 
-  /* ============ PAGE 05 — verdicts ============ */
+  /* ============ PAGE 07 — verdicts (NO color; weight + strike distinguish) ============ */
   .verdicts{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:1.5rem;
+    position:relative;
   }
   .verdict{
     border:2px solid var(--ink);
@@ -543,14 +377,28 @@
     display:flex;
     flex-direction:column;
     gap:1rem;
+    background:var(--bg);
   }
-  .verdict--valid{ background:var(--valid); }
-  .verdict--reject{ background:var(--reject); }
+  /* valid verdict = THICK border, BOLD name */
+  .verdict--valid{ border-width:4px; }
+  .verdict--valid .v-name{ font-weight:800; }
+  /* reject verdict = DASHED border, faded, STRIKETHROUGH name */
+  .verdict--reject{
+    border-style:dashed;
+    opacity:.85;
+  }
+  .verdict--reject .v-name{
+    font-weight:500;
+    text-decoration:line-through;
+    text-decoration-thickness:2px;
+    color:var(--muted);
+  }
   .verdict .v-tag{
     font-size:.78rem;
     letter-spacing:.18em;
     text-transform:uppercase;
     font-weight:700;
+    color:var(--muted);
   }
   .verdict .v-name{
     font-size:clamp(1.1rem,2.1vw,1.55rem);
@@ -572,7 +420,35 @@
   }
   .verdict-note b{ text-transform:uppercase; letter-spacing:.08em; }
 
-  /* ============ PAGE 06 — key rotation ============ */
+  /* ============ PAGE 08 — guarantees checklist ============ */
+  .guarantees{
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+  }
+  .guarantees li{
+    padding:1rem 0;
+    border-bottom:1px dashed var(--thread);
+    font-size:clamp(1rem,1.6vw,1.2rem);
+    line-height:1.4;
+    display:flex;
+    align-items:baseline;
+    gap:1rem;
+  }
+  .guarantees li:first-child{ border-top:2px solid var(--ink); }
+  .guarantees .mark{
+    flex:0 0 auto;
+    font-weight:800;
+    font-size:1.1em;
+    min-width:1.5rem;
+    text-align:center;
+  }
+  .guarantees .ok .mark{ color:var(--ink); }
+  .guarantees .no .mark{ color:var(--muted); }
+  .guarantees .no{ color:var(--muted); }
+  .guarantees .no b{ color:var(--ink); font-weight:700; }
+
+  /* ============ PAGE 09 — key rotation ============ */
   .rotate-diagram{
     display:flex;
     align-items:center;
@@ -587,22 +463,25 @@
     display:flex;
     flex-direction:column;
     gap:.4rem;
+    background:var(--bg);
   }
   .kbox--revoked{ position:relative; }
+  /* strikethrough on revoked key — now uses ink, not orange */
   .kbox--revoked::after{
     content:"";
     position:absolute;
     left:8%; right:8%; top:50%;
-    border-top:2px solid var(--reject);
+    border-top:2px solid var(--ink);
     transform: rotate(-4deg) scaleX(0);
     transform-origin: left center;
     transition: transform .55s cubic-bezier(.4,0,.2,1);
   }
   .kbox--revoked.strike::after{ transform: rotate(-4deg) scaleX(1); }
-  .kbox--active{ background:var(--valid); }
+  /* active key = thick border (was green fill) */
+  .kbox--active{ border-width:4px; }
   .kbox .k-label{ font-size:1.5rem; font-weight:800; }
-  .kbox .k-state{ font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; }
-  .kbox--revoked .k-state{ color:var(--reject); }
+  .kbox .k-state{ font-size:.78rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+  .kbox--revoked .k-state{ color:var(--muted); }
   .karrow{
     display:flex;
     flex-direction:column;
@@ -619,7 +498,7 @@
     color:var(--muted);
   }
 
-  /* ============ PAGE 07 — anti rollback ============ */
+  /* ============ PAGE 10 — anti rollback ============ */
   .seq-row{
     display:flex;
     flex-wrap:wrap;
@@ -634,8 +513,15 @@
     font-size:1.15rem;
     min-width:3.2rem;
     text-align:center;
+    background:var(--bg);
   }
-  .seqbox--reject{ border-color:var(--reject); color:var(--reject); }
+  /* rejected seqbox = dashed border + strikethrough (was orange) */
+  .seqbox--reject{
+    border-style:dashed;
+    color:var(--muted);
+    text-decoration:line-through;
+    text-decoration-thickness:2px;
+  }
   .seqarrow{ color:var(--muted); }
   .seq-tag{
     font-size:.78rem;
@@ -644,9 +530,9 @@
     margin-left:.6rem;
   }
   .seq-tag--ok{ color:var(--ink); font-weight:700; }
-  .seq-tag--no{ color:var(--reject); font-weight:700; }
+  .seq-tag--no{ color:var(--muted); font-weight:700; text-decoration:line-through; }
 
-  /* ============ PAGE 08 — terminal ============ */
+  /* ============ PAGE 11 — terminal (CLI demo) ============ */
   .term{
     background:#0a0a0a;
     color:#fafafa;
@@ -661,7 +547,8 @@
     overflow-x:auto;
   }
   .term .prompt{ color:#9a9a9a; }
-  .term .ok{ color:var(--valid); font-weight:700; }
+  /* OK = bold bright white (was green) — distinguished by weight only */
+  .term .ok{ color:#fafafa; font-weight:800; }
   .term .cursor{
     display:inline-block;
     width:.6ch;
@@ -669,9 +556,8 @@
     color:#0a0a0a;
     animation:blink 1.05s steps(2) infinite;
   }
-  @keyframes blink{ 50%{ opacity:0; } }
 
-  /* ============ PAGE 09 — honesty ============ */
+  /* ============ PAGE 12 — honesty ============ */
   .honesty{ list-style:none; display:flex; flex-direction:column; gap:0; }
   .honesty li{
     padding:1.15rem 0;
@@ -683,10 +569,42 @@
     gap:1rem;
   }
   .honesty li:first-child{ border-top:2px solid var(--ink); }
-  .honesty .not{ font-weight:800; color:var(--reject); letter-spacing:.04em; }
+  /* NOT = bold ink (was orange) — still distinguished by weight */
+  .honesty .not{ font-weight:800; color:var(--ink); letter-spacing:.04em; }
   .honesty .x{ color:var(--muted); }
 
-  /* ============ PAGE 10 — colophon ============ */
+  /* ============ PAGE 13 — stats grid ============ */
+  .stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:0;
+    border-top:2px solid var(--ink);
+    border-left:2px solid var(--ink);
+  }
+  .stats-grid > div{
+    border-right:2px solid var(--ink);
+    border-bottom:2px solid var(--ink);
+    padding:1.5rem 1.25rem;
+    display:flex;
+    flex-direction:column;
+    gap:.35rem;
+    background:var(--bg);
+  }
+  .stats-grid dt{
+    font-size:clamp(1.8rem,4vw,2.6rem);
+    font-weight:800;
+    letter-spacing:-.02em;
+    line-height:1;
+    color:var(--ink);
+  }
+  .stats-grid dd{
+    font-size:.82rem;
+    color:var(--muted);
+    letter-spacing:.04em;
+    line-height:1.4;
+  }
+
+  /* ============ PAGE 14 — colophon ============ */
   .motto{
     font-size:clamp(1.6rem,4vw,2.6rem);
     font-weight:700;
@@ -731,13 +649,13 @@
   }
   .giant--type.done .caret{ display: none; }
 
-  /* ============ PAGE 03 — DAG node glow + reject shake ============ */
+  /* ============ PAGE 04 — DAG node glow + reject shake (scroll-triggered) ============ */
   .dag .node rect{ transition: filter .25s linear; }
   .dag .node.lit rect{ animation: dagGlow .9s ease-out; }
   @keyframes dagGlow{
-    0%   { filter: drop-shadow(0 0 0 rgba(0,255,136,0)); }
-    35%  { filter: drop-shadow(0 0 10px var(--valid)) drop-shadow(0 0 4px var(--valid)); }
-    100% { filter: drop-shadow(0 0 0 rgba(0,255,136,0)); }
+    0%   { filter: drop-shadow(0 0 0 rgba(10,10,10,0)); }
+    35%  { filter: drop-shadow(0 0 6px rgba(10,10,10,0.9)) drop-shadow(0 0 2px rgba(10,10,10,0.6)); }
+    100% { filter: drop-shadow(0 0 0 rgba(10,10,10,0)); }
   }
   .dag .node--reject.shake{ animation: rejectJitter .45s ease-out; }
   @keyframes rejectJitter{
@@ -748,15 +666,15 @@
     80% { transform: translateX(3px); }
   }
 
-  /* ============ PAGE 04 — equation scanner ============ */
+  /* ============ PAGE 06 — equation scanner (black highlighter) ============ */
   .eq code .ch{
     color: var(--ink);
-    transition: color .14s linear;
+    transition: color .14s linear, background .14s linear;
   }
-  .eq code .ch.scan{ color: var(--valid); }
+  /* scanned char = inverted (black bg, white fg) — a black highlighter */
+  .eq code .ch.scan{ color: var(--bg); background: var(--ink); }
 
-  /* ============ PAGE 05 — verdicts slide-in + divider ============ */
-  .verdicts{ position: relative; }
+  /* ============ PAGE 07 — verdicts slide-in + divider ============ */
   .verdicts::before{
     content:"";
     position:absolute;
@@ -779,7 +697,7 @@
   .verdicts.in .verdict{ opacity:1; transform: translateX(0); }
   .verdicts.in .verdict--reject{ transition-delay:.12s; }
 
-  /* ============ PAGE 06 — rotate arrow draw + strikethrough ============ */
+  /* ============ PAGE 09 — rotate arrow draw + strikethrough ============ */
   .karrow-path{
     stroke: var(--ink);
     stroke-width: 2.5;
@@ -792,10 +710,10 @@
   }
   .karrow.in .karrow-path{ stroke-dashoffset: 0; }
 
-  /* ============ PAGE 07 — seqbox reject shake ============ */
+  /* ============ PAGE 10 — seqbox reject shake (scroll-triggered) ============ */
   .seqbox{ transition: color .2s; }
-  .seqbox--reject.shake-red{ animation: rejectShakeRed .45s ease-out; }
-  @keyframes rejectShakeRed{
+  .seqbox--reject.shake-red{ animation: rejectShake .45s ease-out; }
+  @keyframes rejectShake{
     0%, 100% { transform: translateX(0); }
     20% { transform: translateX(-5px); }
     40% { transform: translateX(5px); }
@@ -803,7 +721,7 @@
     80% { transform: translateX(3px); }
   }
 
-  /* ============ PAGE 09 — honesty slide-in ============ */
+  /* ============ PAGE 12 — honesty slide-in ============ */
   .honesty li{
     opacity: 0;
     transform: translateX(-30px);
@@ -817,7 +735,25 @@
   .honesty.in li:nth-child(5){ transition-delay: 200ms; }
   .honesty.in li:nth-child(6){ transition-delay: 250ms; }
 
-  /* ============ PAGE 10 — motto fade-in ============ */
+  /* ============ PAGE 13 — stats count-up reveal ============ */
+  .stats-grid > div{
+    opacity:0;
+    transform: translateY(12px);
+    transition: opacity .5s cubic-bezier(.4,0,.2,1), transform .5s cubic-bezier(.4,0,.2,1);
+  }
+  .stats-grid.in > div{ opacity:1; transform: translateY(0); }
+  .stats-grid.in > div:nth-child(1){ transition-delay:0ms; }
+  .stats-grid.in > div:nth-child(2){ transition-delay:50ms; }
+  .stats-grid.in > div:nth-child(3){ transition-delay:100ms; }
+  .stats-grid.in > div:nth-child(4){ transition-delay:150ms; }
+  .stats-grid.in > div:nth-child(5){ transition-delay:200ms; }
+  .stats-grid.in > div:nth-child(6){ transition-delay:250ms; }
+  .stats-grid.in > div:nth-child(7){ transition-delay:300ms; }
+  .stats-grid.in > div:nth-child(8){ transition-delay:350ms; }
+  .stats-grid.in > div:nth-child(9){ transition-delay:400ms; }
+  .stats-grid.in > div:nth-child(10){ transition-delay:450ms; }
+
+  /* ============ PAGE 14 — motto fade-in ============ */
   .motto{
     opacity: 0;
     transition: opacity 2s ease-in;
@@ -830,10 +766,11 @@
     .page{ padding:5rem 1.25rem 5rem 1.25rem; }
     .pagenum{ top:1.25rem; right:1.25rem; }
     .with-margin{ flex-direction:column; }
-    .with-margin > .marginalia{ flex-basis:auto; width:100%; }
+    .with-margin > .marginalia-stack{ flex-basis:auto; width:100%; }
     .verdicts{ grid-template-columns:1fr; }
     .dag .node-title{ font-size:15px; }
     .dag .node-key{ font-size:11px; }
+    .stats-grid{ grid-template-columns:1fr 1fr; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -843,10 +780,11 @@
     .giant--type{ min-height:auto !important; }
     .dag .node.lit rect{ animation:none !important; }
     .dag .node--reject.shake{ animation:none !important; }
-    .eq code .ch{ transition:none !important; color:var(--ink) !important; }
+    .eq code .ch{ transition:none !important; color:var(--ink) !important; background:transparent !important; }
     .verdict{ opacity:1 !important; transform:none !important; }
     .verdicts::before{ transform: translateX(-50%) scaleY(1) !important; }
     .honesty li{ opacity:1 !important; transform:none !important; }
+    .stats-grid > div{ opacity:1 !important; transform:none !important; }
     .motto{ opacity:1 !important; }
     .karrow-path{ stroke-dashoffset:0 !important; }
     .kbox--revoked::after{ transform: rotate(-4deg) scaleX(1) !important; }
@@ -859,7 +797,7 @@
 
 <!-- ============ PAGE 01 — COVER ============ -->
 <section class="page" id="cover">
-  <div class="pagenum"><b>01</b> / 10 &nbsp;·&nbsp; COVER</div>
+  <div class="pagenum"><b>01</b> / 14 &nbsp;·&nbsp; COVER</div>
   <div class="page__inner">
     <div class="eyebrow">ἀλήθεια</div>
     <h1 class="mega">alethech</h1>
@@ -881,17 +819,52 @@
 
 <!-- ============ PAGE 02 — THE PROPERTY ============ -->
 <section class="page" id="property">
-  <div class="pagenum"><b>02</b> / 10 &nbsp;·&nbsp; THE PROPERTY</div>
+  <div class="pagenum"><b>02</b> / 14 &nbsp;·&nbsp; THE PROPERTY</div>
   <div class="page__inner">
     <p class="giant giant--type" id="property-giant" data-text="this memory set forms part of a cryptographically verifiable history associated with a determined identity"></p>
     <p class="lede" style="margin-top:2.5rem;">the protocol does <b style="color:var(--ink)">NOT</b> prove claims are true — only that they were signed.</p>
+
+    <aside class="marginalia marginalia--full" style="max-width:60ch; margin-top:2.5rem;">
+      <b>plain reading</b>
+      The protocol's claim is narrow on purpose: a memory set, signed under an identity, is provably part of that identity's verifiable history. Verifiability is about authorship + integrity — not epistemic truth.
+    </aside>
   </div>
 </section>
 <noscript><style>.giant--type::before{ content: attr(data-text); white-space: pre-wrap; }</style></noscript>
 
-<!-- ============ PAGE 03 — THE ARCHITECTURE ============ -->
+<!-- ============ PAGE 03 — WHAT IS ALETHECH (NEW) ============ -->
+<section class="page" id="what">
+  <div class="pagenum"><b>03</b> / 14 &nbsp;·&nbsp; WHAT IS ALETHECH</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">what is alethech</span>
+      <h2>definition</h2>
+    </div>
+
+    <div class="with-margin">
+      <div class="content prose-stack">
+        <p class="big">alethech is a Python package that provides cryptographically verifiable memory continuity for AI agents.</p>
+        <p class="body">It lets an agent sign its memory commits with <code>Ed25519</code>, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.</p>
+        <p class="body" style="color:var(--muted);">The protocol does <b style="color:var(--ink)">NOT</b> prove that the agent's claims are true — only that they were signed by the identity that claims them.</p>
+      </div>
+
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>scope</b>
+          The unit of verification is the commit. Identity is the key. The DAG is the proof.
+        </aside>
+        <aside class="marginalia">
+          <b>audience</b>
+          Any third party that needs to decide whether to trust an agent's reported memory: an auditor, a downstream agent, a human reviewer.
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 04 — THE ARCHITECTURE (DAG) ============ -->
 <section class="page" id="architecture">
-  <div class="pagenum"><b>03</b> / 10 &nbsp;·&nbsp; ARCHITECTURE</div>
+  <div class="pagenum"><b>04</b> / 14 &nbsp;·&nbsp; ARCHITECTURE</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the protagonist</span>
@@ -907,7 +880,7 @@
               <path d="M0,0 L10,4 L0,8 Z" fill="#0a0a0a"/>
             </marker>
             <marker id="arrow-reject" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M0,0 L10,4 L0,8 Z" fill="#ff8800"/>
+              <path d="M0,0 L10,4 L0,8 Z" fill="#6b6b6b"/>
             </marker>
           </defs>
 
@@ -923,7 +896,7 @@
           <line class="edge" style="transition-delay:.75s"
                 x1="535" y1="220" x2="612" y2="220" marker-end="url(#arrow)" pathLength="1"/>
 
-          <!-- rejected edge (static, dashed, orange) -->
+          <!-- rejected edge (static, dashed, neutral gray) -->
           <line class="edge-reject" x1="470" y1="258" x2="470" y2="342" marker-end="url(#arrow-reject)"/>
 
           <!-- nodes -->
@@ -960,21 +933,62 @@
         <div class="legend">
           <span><i></i> provenance edge</span>
           <span><i class="dashed"></i> rejected ancestry</span>
-          <span><i class="green"></i> cutoff_head</span>
+          <span><i class="cutoff"></i> cutoff_head</span>
         </div>
       </div>
 
-      <aside class="marginalia">
-        <b>read the graph</b>
-        D dangles off C2 but sits past the cutoff — its ancestry is not proven, so it is rejected. C3 is signed under key-002 and still reaches back through the cutoff_head, so it is valid.
-      </aside>
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>read the graph</b>
+          D dangles off C2 but sits past the cutoff — its ancestry is not proven, so it is rejected. C3 is signed under key-002 and still reaches back through the cutoff_head, so it is valid.
+        </aside>
+        <aside class="marginalia">
+          <b>cutoff_head</b>
+          The causal frontier at the moment of key rotation — not a timestamp. It is a commit hash, not a wall-clock reading.
+        </aside>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ============ PAGE 04 — THE FOUR EQUATIONS ============ -->
+<!-- ============ PAGE 05 — HOW IT WORKS (NEW) ============ -->
+<section class="page" id="how">
+  <div class="pagenum"><b>05</b> / 14 &nbsp;·&nbsp; HOW IT WORKS</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">how it works</span>
+      <h2>six steps</h2>
+    </div>
+
+    <div class="with-margin">
+      <div class="content">
+        <ol class="steps">
+          <li><span><code>alethech init</code> generates an Ed25519 keypair + identity derived from public key</span></li>
+          <li><span><code>alethech commit --content memory.json</code> signs the content + links to DAG parent</span></li>
+          <li><span><code>alethech verify</code> checks signatures, DAG integrity, identity binding, reachability</span></li>
+          <li><span><code>alethech key rotate</code> revokes old key with cutoff_head, grants new key, both signed by root</span></li>
+          <li><span><code>alethech export --output dir/</code> creates portable signed bundle</span></li>
+          <li><span><code>alethech import --input dir/</code> verifies bundle + writes atomically (target untouched on failure)</span></li>
+        </ol>
+      </div>
+
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>workflow</b>
+          Init once. Commit per memory delta. Verify on demand. Rotate when a key is compromised or aged out.
+        </aside>
+        <aside class="marginalia">
+          <b>atomicity</b>
+          Import verifies the entire bundle before writing a single byte to the target store. Failure leaves the target untouched.
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 06 — THE FOUR EQUATIONS ============ -->
 <section class="page" id="equations">
-  <div class="pagenum"><b>04</b> / 10 &nbsp;·&nbsp; EQUATIONS</div>
+  <div class="pagenum"><b>06</b> / 14 &nbsp;·&nbsp; EQUATIONS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the four equations</span>
@@ -1000,16 +1014,16 @@
       </div>
     </div>
 
-    <aside class="marginalia" style="margin-top:2rem;">
+    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
       <b>note</b>
-      JCS = RFC 8785 canonical JSON. Same bytes in, same hash out — every time, on every machine.
+      JCS = RFC 8785 canonical JSON. Same bytes in, same hash out — every time, on every machine. Without canonicalization, two semantically-equal JSON objects could hash differently and break content addressing entirely.
     </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 05 — THE TWO VERDICTS ============ -->
+<!-- ============ PAGE 07 — THE TWO VERDICTS ============ -->
 <section class="page" id="verdicts">
-  <div class="pagenum"><b>05</b> / 10 &nbsp;·&nbsp; VERDICTS</div>
+  <div class="pagenum"><b>07</b> / 14 &nbsp;·&nbsp; VERDICTS</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">the two verdicts</span>
@@ -1029,15 +1043,64 @@
       </div>
     </div>
 
-    <div class="verdict-note">
-      <b>critical:</b> the verifier does NOT claim to prove WHEN the commit was created — only that it is reachable from a verified head.
+    <div class="with-margin" style="margin-top:2rem; align-items:flex-start;">
+      <div class="verdict-note" style="flex:1 1 40ch; min-width:0;">
+        <b>critical:</b> the verifier does NOT claim to prove WHEN the commit was created — only that it is reachable from a verified head.
+      </div>
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>membership, not timing</b>
+          The verifier checks ancestry membership. It does not check wall-clock creation time. A commit proven to be in ancestry was made before the cutoff — that is the only timing claim.
+        </aside>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ============ PAGE 06 — KEY ROTATION ============ -->
+<!-- ============ PAGE 08 — THE GUARANTEES (NEW) ============ -->
+<section class="page" id="guarantees">
+  <div class="pagenum"><b>08</b> / 14 &nbsp;·&nbsp; GUARANTEES</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">the guarantees</span>
+      <h2>what it does and does not</h2>
+    </div>
+
+    <div class="with-margin">
+      <div class="content">
+        <ul class="guarantees">
+          <li class="ok"><span class="mark">✓</span><span>signature verifies against declared public key</span></li>
+          <li class="ok"><span class="mark">✓</span><span>commit_id matches SHA-256 of canonical JSON</span></li>
+          <li class="ok"><span class="mark">✓</span><span>agent_id derives from public key (not declared)</span></li>
+          <li class="ok"><span class="mark">✓</span><span>key rotation preserves identity (root-bound)</span></li>
+          <li class="ok"><span class="mark">✓</span><span>revoked key commits checked against ancestry(cutoff_head)</span></li>
+          <li class="ok"><span class="mark">✓</span><span>checkpoint head must be ancestor of current HEAD</span></li>
+          <li class="ok"><span class="mark">✓</span><span>import is atomic (verify-then-write, target untouched on failure)</span></li>
+          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> prove content truth</span></li>
+          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> encrypt at rest</span></li>
+          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> detect rollback without external checkpoint</span></li>
+          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> delegate permissions between agents</span></li>
+          <li class="no"><span class="mark">✗</span><span><b>does NOT</b> call any LLM</span></li>
+        </ul>
+      </div>
+
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>read carefully</b>
+          The ✓ items are properties the verifier checks. The ✗ items are properties no signature-based verifier can check from bytes alone.
+        </aside>
+        <aside class="marginalia">
+          <b>no LLM</b>
+          alethech is a pure cryptographic protocol. It does not infer, summarize, or judge — it signs, hashes, and verifies.
+        </aside>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE 09 — KEY ROTATION ============ -->
 <section class="page" id="rotation">
-  <div class="pagenum"><b>06</b> / 10 &nbsp;·&nbsp; KEY ROTATION</div>
+  <div class="pagenum"><b>09</b> / 14 &nbsp;·&nbsp; KEY ROTATION</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">key rotation</span>
@@ -1064,12 +1127,17 @@
     <p class="body" style="margin-top:2.5rem; max-width:60ch;">
       <b>agent_id derives from the root, not the operational key.</b> Keys can be revoked and replaced; the identity they attest to does not move. Reachability through the cutoff_head is what carries continuity across the rotation.
     </p>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:60ch;">
+      <b>why strike-through</b>
+      Revocation is permanent and visible. A struck key still exists in the DAG as a historical signer — but no post-cutoff commit signed by it is accepted.
+    </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 07 — ANTI-ROLLBACK ============ -->
+<!-- ============ PAGE 10 — ANTI-ROLLBACK ============ -->
 <section class="page" id="rollback">
-  <div class="pagenum"><b>07</b> / 10 &nbsp;·&nbsp; ANTI-ROLLBACK</div>
+  <div class="pagenum"><b>10</b> / 14 &nbsp;·&nbsp; ANTI-ROLLBACK</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">anti-rollback</span>
@@ -1093,15 +1161,23 @@
       <span class="seq-tag seq-tag--no">[ REJECTED — rollback ]</span>
     </div>
 
-    <p class="body" style="margin-top:2.5rem; max-width:60ch;">
-      <b>the system clock is NOT the authority — sequence is.</b> Time lies; monotonic counters cannot be wound back without breaking the chain.
-    </p>
+    <div class="with-margin" style="margin-top:2.5rem; align-items:flex-start;">
+      <p class="body" style="flex:1 1 40ch; min-width:0; max-width:60ch;">
+        <b>the system clock is NOT the authority — sequence is.</b> Time lies; monotonic counters cannot be wound back without breaking the chain.
+      </p>
+      <div class="marginalia-stack">
+        <aside class="marginalia">
+          <b>monotonic, not temporal</b>
+          The sequence is monotonic — the system clock is NOT the authority. Two commits cannot share a sequence number; the counter only moves forward.
+        </aside>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ============ PAGE 08 — CLI DEMO ============ -->
+<!-- ============ PAGE 11 — CLI DEMO ============ -->
 <section class="page" id="cli">
-  <div class="pagenum"><b>08</b> / 10 &nbsp;·&nbsp; CLI DEMO</div>
+  <div class="pagenum"><b>11</b> / 14 &nbsp;·&nbsp; CLI DEMO</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">cli demo</span>
@@ -1115,12 +1191,17 @@ $ alethech verify
 result: OK"></pre>
 
     <p class="small" style="margin-top:1.25rem;">typed live when this page enters the viewport — the only typewriter on the site.</p>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
+      <b>the loop</b>
+      init → commit → (rotate, if needed) → verify. Four commands cover the entire lifecycle of a signed memory chain.
+    </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 09 — HONESTY ============ -->
+<!-- ============ PAGE 12 — HONESTY ============ -->
 <section class="page" id="honesty">
-  <div class="pagenum"><b>09</b> / 10 &nbsp;·&nbsp; HONESTY</div>
+  <div class="pagenum"><b>12</b> / 14 &nbsp;·&nbsp; HONESTY</div>
   <div class="page__inner">
     <div class="section-head">
       <span class="kicker">honesty</span>
@@ -1135,12 +1216,46 @@ result: OK"></pre>
       <li><span class="not">NOT</span> <span class="x">·</span> call any LLM</li>
       <li><span class="not">NOT</span> <span class="x">·</span> prove physical time</li>
     </ul>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
+      <b>by design</b>
+      Every NOT here is a deliberate non-goal. alethech is a narrow tool — its strength is what it refuses to promise.
+    </aside>
   </div>
 </section>
 
-<!-- ============ PAGE 10 — COLOPHON ============ -->
+<!-- ============ PAGE 13 — STATS (NEW) ============ -->
+<section class="page" id="stats">
+  <div class="pagenum"><b>13</b> / 14 &nbsp;·&nbsp; STATS</div>
+  <div class="page__inner">
+    <div class="section-head">
+      <span class="kicker">stats</span>
+      <h2>by the numbers</h2>
+    </div>
+
+    <dl class="stats-grid" id="stats-grid">
+      <div><dt>230</dt><dd>tests passing</dd></div>
+      <div><dt>8</dt><dd>mutation-guard paths</dd></div>
+      <div><dt>56</dt><dd>JCS conformance vectors</dd></div>
+      <div><dt>15</dt><dd>adversarial conformance vectors</dd></div>
+      <div><dt>9</dt><dd>CLI commands</dd></div>
+      <div><dt>4</dt><dd>cryptographic primitives (Ed25519, SHA-256, JCS, base32)</dd></div>
+      <div><dt>0</dt><dd>open issues</dd></div>
+      <div><dt>1</dt><dd>branch (main)</dd></div>
+      <div><dt>MIT</dt><dd>license</dd></div>
+      <div><dt>0.7.0</dt><dd>current version</dd></div>
+    </dl>
+
+    <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
+      <b>read the numbers</b>
+      The 0 open issues is a snapshot, not a promise. The 4 primitives are the entire cryptographic surface — nothing else is trusted.
+    </aside>
+  </div>
+</section>
+
+<!-- ============ PAGE 14 — COLOPHON ============ -->
 <footer class="page page--footer" id="colophon">
-  <div class="pagenum"><b>10</b> / 10 &nbsp;·&nbsp; COLOPHON</div>
+  <div class="pagenum"><b>14</b> / 14 &nbsp;·&nbsp; COLOPHON</div>
   <div class="page__inner">
     <p class="motto">τέχνη ἀληθείας</p>
 
@@ -1194,11 +1309,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     1. PAGE 03 — DAG: edges draw + node glow sequence + reject shake
-     Purpose: edges draw to show provenance flow; nodes pulse in sequence
-     to show the genesis→C1→C2→C3 chain; rejected commit D shakes to show
-     rejection. Node glow is staggered AFTER edges finish drawing (1.5s total).
-     Pin: threshold 0.35, fires once, unobserves + disconnects.
+     1. PAGE 04 — DAG: edges draw + node glow sequence + reject shake
      ===================================================================== */
   var dag = document.querySelector('.dag');
   if(dag){
@@ -1214,11 +1325,7 @@ result: OK"></pre>
       if(rejectNode) rejectNode.setAttribute('data-animated','true');
     } else {
       observeOnce(dag, 0.35, function(){
-        /* Step 1: draw edges immediately (CSS transition + delays handle stagger) */
         edges.forEach(function(e){ e.classList.add('in'); });
-
-        /* Step 2: after edges finish drawing (last delay .75s + transition .75s = 1.5s),
-           pulse nodes in sequence — 200ms stagger — to show the flow genesis→C1→C2→C3 */
         setTimeout(function(){
           nodeIds.forEach(function(id, i){
             setTimeout(function(){
@@ -1227,9 +1334,6 @@ result: OK"></pre>
             }, i * 200);
           });
         }, 1500);
-
-        /* Step 3: shake the rejected commit D shortly after C2 lights up
-           (C2 is its parent — D's ancestry is rejected). Shows rejection visually. */
         if(rejectNode){
           setTimeout(function(){
             rejectNode.classList.add('shake');
@@ -1245,9 +1349,6 @@ result: OK"></pre>
 
   /* =====================================================================
      2. PAGE 02 — Giant typewriter on THE core claim
-     Purpose: forces the reader to read it word by word; emphasizes it's
-     THE core claim of the project. 32ms/char, fires once.
-     Pin: threshold 0.5.
      ===================================================================== */
   var giant = document.getElementById('property-giant');
   if(giant){
@@ -1272,9 +1373,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     3. PAGE 08 — CLI typewriter (existing — kept + verified)
-     Purpose: show actual usage. 42ms/char, fires once, OK shown in green.
-     Pin: threshold 0.4.
+     3. PAGE 11 — CLI typewriter (OK shown in bold white, not color)
      ===================================================================== */
   var term = document.getElementById('term');
   if(term){
@@ -1309,10 +1408,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     4. PAGE 04 — Equation scanner (each equation independent)
-     Purpose: shows the equations are computational, not just text —
-     a green scanner reads each formula left to right.
-     Pin: each <code> gets its own observer, threshold 0.6, fires independently.
+     4. PAGE 06 — Equation scanner (black highlighter, no color)
      ===================================================================== */
   var eqs = document.querySelectorAll('.eq code');
   eqs.forEach(function(code){
@@ -1329,7 +1425,6 @@ result: OK"></pre>
           eqObs.unobserve(code);
           eqObs.disconnect();
           code.setAttribute('data-animated','true');
-          /* Wrap each char (except spaces) in a span */
           var html = '';
           for(var i=0; i<raw.length; i++){
             var c = raw.charAt(i);
@@ -1340,7 +1435,6 @@ result: OK"></pre>
             }
           }
           code.innerHTML = html;
-          /* Scan: highlight each char green for 240ms, 30ms stagger between chars */
           var chars = code.querySelectorAll('.ch');
           chars.forEach(function(ch, idx){
             setTimeout(function(){
@@ -1357,10 +1451,7 @@ result: OK"></pre>
   });
 
   /* =====================================================================
-     5. PAGE 05 — Two verdicts slide in from opposite sides + divider draws
-     Purpose: VALID_HISTORICAL from left, NOT_IN_PROVEN from right — shows they
-     are opposing verdicts. Divider line draws vertically between them.
-     Pin: threshold 0.4, both cards animate together, fire once.
+     5. PAGE 07 — Two verdicts slide in from opposite sides + divider draws
      ===================================================================== */
   var verdicts = document.getElementById('verdicts-grid');
   if(verdicts){
@@ -1370,10 +1461,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     6. PAGE 06 — Key rotation: arrow draws + strikethrough on revoked key
-     Purpose: arrow draw shows the rotation flow; strikethrough on key-001
-     (drawn AFTER the arrow completes) shows revocation happens as part of rotation.
-     Pin: threshold 0.5.
+     6. PAGE 09 — Key rotation: arrow draws + strikethrough on revoked key
      ===================================================================== */
   var rotateArrow = document.getElementById('rotate-arrow');
   var revokedKey  = document.querySelector('.kbox--revoked');
@@ -1385,9 +1473,7 @@ result: OK"></pre>
       revokedKey.setAttribute('data-animated','true');
     } else {
       observeOnce(rotateArrow, 0.5, function(){
-        /* Step 1: arrow draws (CSS transition .65s) */
         rotateArrow.classList.add('in');
-        /* Step 2: after arrow completes, draw the strikethrough */
         setTimeout(function(){
           revokedKey.classList.add('strike');
           revokedKey.setAttribute('data-animated','true');
@@ -1397,10 +1483,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     7. PAGE 07 — Sequence count up + rejected (5) shakes red
-     Purpose: numbers 10→15 count up rapidly to show monotonic progression;
-     the rejected sequence (5) shakes red briefly when it appears to show rejection.
-     Pin: threshold 0.5, fires once.
+     7. PAGE 10 — Sequence count up + rejected (5) shakes
      ===================================================================== */
   var seqAccepted = document.getElementById('seq-accepted');
   var seqRejectBox = document.getElementById('seqbox-reject');
@@ -1412,10 +1495,8 @@ result: OK"></pre>
       seqAccepted.setAttribute('data-animated','true');
       if(seqRejectBox) seqRejectBox.setAttribute('data-animated','true');
     } else {
-      /* Pre-hide the numbers (the page is below the fold on load, so user won't see this) */
       seqBoxes.forEach(function(b){ b.textContent = '0'; });
       observeOnce(seqAccepted, 0.5, function(){
-        /* Count up each box from 0 to its target, staggered 120ms between boxes */
         seqBoxes.forEach(function(b, i){
           setTimeout(function(){
             var v = 0;
@@ -1428,7 +1509,6 @@ result: OK"></pre>
             })();
           }, i * 120);
         });
-        /* After the count-up wave has rolled through, shake the rejected 5 red */
         var totalMs = (seqBoxes.length - 1) * 120 + seqTargets[seqTargets.length-1] * 28 + 120;
         if(seqRejectBox){
           setTimeout(function(){
@@ -1444,10 +1524,7 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     8. PAGE 09 — Honesty: NOT items slide in staggered from the left
-     Purpose: emphasizes each limitation individually rather than as a wall of text.
-     50ms stagger between each item via CSS transition-delay.
-     Pin: threshold 0.3.
+     8. PAGE 12 — Honesty: NOT items slide in staggered from the left
      ===================================================================== */
   var honesty = document.querySelector('.honesty');
   if(honesty){
@@ -1457,9 +1534,17 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-     9. PAGE 10 — Colophon: greek motto fades in slowly (2s)
-     Purpose: closing meditation feel — the project's motto appears gently.
-     Pin: threshold 0.5.
+     9. PAGE 13 — Stats grid: cells fade-in staggered
+     ===================================================================== */
+  var statsGrid = document.getElementById('stats-grid');
+  if(statsGrid){
+    observeOnce(statsGrid, 0.25, function(){
+      statsGrid.classList.add('in');
+    });
+  }
+
+  /* =====================================================================
+     10. PAGE 14 — Colophon: greek motto fades in slowly (2s)
      ===================================================================== */
   var motto = document.querySelector('.motto');
   if(motto){
@@ -1468,73 +1553,7 @@ result: OK"></pre>
     });
   }
 })();
-
 </script>
 
-<script>
-/* ============ CONTINUOUS LIFE — chalk cursor trail ============ */
-(function(){
-  "use strict";
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(reduce) return;
-  if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
-
-  // Create canvas overlay for chalk trail
-  var canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;';
-  document.body.appendChild(canvas);
-  var ctx = canvas.getContext('2d');
-
-  function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-  resize();
-  window.addEventListener('resize', resize);
-
-  var particles = [];
-  var mx = -100, my = -100;
-  var lastX = -100, lastY = -100;
-
-  window.addEventListener('mousemove', function(e){
-    mx = e.clientX; my = e.clientY;
-    // Spawn a few particles on move
-    var dx = mx - lastX, dy = my - lastY;
-    var dist = Math.sqrt(dx*dx + dy*dy);
-    if(dist > 3){
-      for(var i=0; i<2; i++){
-        particles.push({
-          x: mx + (Math.random()-0.5)*4,
-          y: my + (Math.random()-0.5)*4,
-          vx: (Math.random()-0.5)*0.5,
-          vy: (Math.random()-0.5)*0.5 - 0.2,
-          life: 1,
-          size: 1 + Math.random()*1.5
-        });
-      }
-      lastX = mx; lastY = my;
-    }
-  });
-
-  function animate(){
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for(var i = particles.length - 1; i >= 0; i--){
-      var p = particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.life -= 0.02;
-      if(p.life <= 0){ particles.splice(i, 1); continue; }
-      ctx.fillStyle = 'rgba(0, 255, 136, ' + (p.life * 0.5) + ')';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    requestAnimationFrame(animate);
-  }
-  animate();
-})();
-</script>
-
-<!-- AliceLabs fixed badge — visible on all pages -->
-<div style="position:fixed; bottom:12px; left:12px; z-index:9999; font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:rgba(10,10,10,0.45); letter-spacing:0.05em; pointer-events:none; user-select:none;">
-  © AliceLabs · Derechos Reservados
-</div>
 </body>
 </html>
