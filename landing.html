@@ -221,26 +221,84 @@
   .eyebrow { animation: greekFloat 4s ease-in-out infinite; display: inline-block; }
   .stat-num, .stats b { animation: statPulse 2.5s ease-in-out infinite; display: inline-block; }
 
-  /* Background symbols — STATIC pattern, not drifting (user said why move them) */
-  .ambient-symbols {
-    background-image:
-      radial-gradient(circle at 10% 20%, rgba(0,255,136,0.04) 0%, transparent 8%),
-      radial-gradient(circle at 80% 60%, rgba(255,136,0,0.04) 0%, transparent 8%),
-      radial-gradient(circle at 50% 80%, rgba(0,255,136,0.04) 0%, transparent 8%);
+  /* ============ 3D PARALLAX DEPTH — 3 layers create spatial illusion ============ */
+  /* Layer 1 (far): fixed background, NEVER moves with scroll.
+     Layer 2 (mid): moves SLOWLY with scroll (parallax 0.3x).
+     Layer 3 (near): moves FASTER than content (parallax 1.5x) — gives depth.
+     Content sits at z-index 1, normal scroll.
+
+     The combination creates a 3D feel: far things barely move,
+     near things move fast, like looking through a window. */
+
+  /* LAYER 1 — FAR BACKGROUND (z-index: -3, position: fixed, NO scroll movement) */
+  .layer-far {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: -3;
+    overflow: hidden;
   }
-  .ambient-symbols span {
+  .layer-far span {
     position: absolute;
     font-family: 'Cedarville Cursive', serif;
-    opacity: 0.12;
+    opacity: 0.08;
     user-select: none;
     font-weight: bold;
-    /* NO animation — symbols stay fixed as background pattern */
+    font-size: 80px;
   }
 
-  /* Removed drift animations — symbols are now static decoration */
-  .ambient-symbols span:nth-child(3n)   { color: #00ff88; animation: none !important; }
-  .ambient-symbols span:nth-child(3n+1) { color: #ff8800; animation: none !important; }
-  .ambient-symbols span:nth-child(3n+2) { color: #0a0a0a; animation: none !important; }
+  /* LAYER 2 — MID BACKGROUND (z-index: -2, parallax 0.3x via JS) */
+  .layer-mid {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+  }
+  .layer-mid span {
+    position: absolute;
+    font-family: 'Cedarville Cursive', serif;
+    opacity: 0.15;
+    user-select: none;
+    font-weight: bold;
+    font-size: 50px;
+  }
+
+  /* LAYER 3 — NEAR FOREGROUND (z-index: -1, parallax 1.4x via JS — moves faster) */
+  .layer-near {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    overflow: hidden;
+  }
+  .layer-near span {
+    position: absolute;
+    font-family: 'Cedarville Cursive', serif;
+    opacity: 0.22;
+    user-select: none;
+    font-weight: bold;
+    font-size: 32px;
+  }
+
+  /* Color assignment per layer */
+  .layer-far span:nth-child(4n)   { color: #00ff88; }
+  .layer-far span:nth-child(4n+1) { color: #ff8800; }
+  .layer-far span:nth-child(4n+2) { color: #0a0a0a; }
+  .layer-far span:nth-child(4n+3) { color: #00ff88; }
+
+  .layer-mid span:nth-child(4n)   { color: #ff8800; }
+  .layer-mid span:nth-child(4n+1) { color: #00ff88; }
+  .layer-mid span:nth-child(4n+2) { color: #0a0a0a; }
+  .layer-mid span:nth-child(4n+3) { color: #ff8800; }
+
+  .layer-near span:nth-child(4n)   { color: #0a0a0a; }
+  .layer-near span:nth-child(4n+1) { color: #ff8800; }
+  .layer-near span:nth-child(4n+2) { color: #00ff88; }
+  .layer-near span:nth-child(4n+3) { color: #0a0a0a; }
 
   /* Re-apply green glow to green elements */
   .verdict--valid, .verdict--valid *,
@@ -878,8 +936,10 @@
 </head>
 <body>
 
-<!-- ============ AMBIENT DRIFTING SYMBOLS — global, continuous ============ -->
-<div class="ambient-symbols" id="ambient-symbols"></div>
+<!-- ============ 3D PARALLAX LAYERS — far/mid/near ============ -->
+<div class="layer-far" id="layer-far"></div>
+<div class="layer-mid" id="layer-mid"></div>
+<div class="layer-near" id="layer-near"></div>
 
 <!-- ============ PAGE 01 — COVER ============ -->
 <section class="page" id="cover">
@@ -1493,33 +1553,71 @@ result: OK"></pre>
   }
 })();
 
-/* ============ CONTINUOUS LIFE — chalk cursor trail + ambient glow ============ */
-/* The page stays alive even without scrolling — a green chalk cursor follows
-   the mouse and leaves a fading trail. Combined with the continuous CSS
-   pulses above, the page never feels dead. */
+/* ============ 3D PARALLAX — 3 depth layers with scroll ============ */
+/* Far layer: stays put (0x scroll movement) — feels infinitely far
+   Mid layer: moves 0.3x of scroll — feels mid-distance
+   Near layer: moves 0.6x of scroll OPPOSITE direction — feels close
+
+   This creates the 3D depth illusion the user asked for:
+   "create another layer that goes up with scroll, to create 3D background sensation"
+*/
 (function(){
   "use strict";
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // ---- AMBIENT DRIFTING MATH SYMBOLS ----
-  // Generate ~30 math symbols that drift across the entire viewport continuously
   var symbols = ['∑','∫','∂','∇','∞','π','σ','Δ','∀','∃','∈','∉','⊆','⊕','⊗','√','λ','φ','ψ','Ω','α','β','γ','δ','ε','η','θ','κ','μ','ν','ρ','τ','χ','ω','ℵ','ℝ','ℤ','ℕ','≡','≠','≤','≥','⊂','⊃','∪','∩'];
-  var container = document.getElementById('ambient-symbols');
-  if(container && !reduce){
-    for(var i=0; i<30; i++){
+
+  function fillLayer(id, count, seedOffset){
+    var container = document.getElementById(id);
+    if(!container) return;
+    for(var i=0; i<count; i++){
       var span = document.createElement('span');
-      span.textContent = symbols[Math.floor(Math.random()*symbols.length)];
-      span.style.left = Math.random()*100 + '%';
-      span.style.top = Math.random()*100 + '%';
-      span.style.fontSize = (16 + Math.random()*40) + 'px';
-      span.style.animationDelay = (Math.random()*-20) + 's';
-      span.style.animationDuration = (15 + Math.random()*15) + 's';
+      span.textContent = symbols[(i + seedOffset) % symbols.length];
+      span.style.left = (Math.random()*100) + '%';
+      span.style.top = (Math.random()*100) + '%';
       container.appendChild(span);
     }
   }
 
-  if(reduce) return; // no cursor trail for reduced motion
-  if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return; // no cursor on touch
+  fillLayer('layer-far', 12, 0);
+  fillLayer('layer-mid', 16, 5);
+  fillLayer('layer-near', 20, 11);
+
+  if(reduce) return;
+
+  // Parallax on scroll — mid moves slow, near moves faster (opposite for depth)
+  var far = document.getElementById('layer-far');
+  var mid = document.getElementById('layer-mid');
+  var near = document.getElementById('layer-near');
+
+  var ticking = false;
+  function updateParallax(){
+    var sy = window.pageYOffset || document.documentElement.scrollTop;
+    // Far: 0x (no movement) — fixed background
+    // Mid: 0.25x of scroll (moves up slowly)
+    // Near: 0.5x of scroll OPPOSITE (moves down, creating parallax depth)
+    if(mid)  mid.style.transform  = 'translateY(' + (-sy * 0.25) + 'px)';
+    if(near) near.style.transform = 'translateY(' + (sy * 0.5) + 'px)';
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', function(){
+    if(!ticking){
+      window.requestAnimationFrame(updateParallax);
+      ticking = true;
+    }
+  }, { passive: true });
+
+  updateParallax();
+})();
+</script>
+
+<script>
+/* ============ CONTINUOUS LIFE — chalk cursor trail ============ */
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce) return;
+  if(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
 
   // Create canvas overlay for chalk trail
   var canvas = document.createElement('canvas');
