@@ -1,5 +1,12 @@
 # alethech
 
+[![PyPI version](https://img.shields.io/pypi/v/alethech.svg)](https://pypi.org/project/alethech/)
+[![Python](https://img.shields.io/pypi/pyversions/alethech.svg)](https://pypi.org/project/alethech/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-230%20passing-brightgreen)](https://github.com/eddyflores100-lang/alethech)
+[![CI](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml)
+[![Mutation paths](https://img.shields.io/badge/mutation%20paths-8-blue)](https://github.com/eddyflores100-lang/alethech)
+
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
 > The art of un-concealing transmission integrity.
 >
