@@ -48,7 +48,15 @@ def _hash_file(path: str) -> str:
 
 # ---------- CLI group ----------
 
-@click.group()
+@click.group(
+    epilog=(
+        "────────────────────────────────────────────────────\n"
+        "  © 2026 AliceLabs LLC.\n"
+        "  Todos los derechos reservados.\n"
+        "  MIT License — https://github.com/eddyflores100-lang/alethech/blob/main/LICENSE\n"
+        "────────────────────────────────────────────────────"
+    ),
+)
 @click.option(
     "--store",
     default=".alethech",

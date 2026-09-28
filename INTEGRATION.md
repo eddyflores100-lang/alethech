@@ -1,6 +1,8 @@
 # Integration: alethech + memex
 
 > Make every memex memory cryptographically verifiable — without changing memex.
+>
+> © 2026 AliceLabs LLC. Todos los derechos reservados.
 
 ## STATUS — read this first
 
@@ -239,3 +241,7 @@ Implementation: [`docs/implementacion-nucleo-minimo.md`](docs/implementacion-nuc
 ## license
 
 MIT.
+
+---
+
+© 2026 AliceLabs LLC. Todos los derechos reservados.

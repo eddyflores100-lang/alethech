@@ -2,6 +2,8 @@
 
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
 > The art of un-concealing transmission integrity.
+>
+> © 2026 AliceLabs LLC. Todos los derechos reservados.
 
 From Greek **ἀλήθεια** (aletheia, "truth as un-concealment") + **τέχνη** (techne, "art, craft").
 The art of revealing that a memory was not modified after being signed.
@@ -138,3 +140,7 @@ MIT.
 ## related repositories
 
 - [`eddyflores100-lang/memex-legacy`](https://github.com/eddyflores100-lang/memex-legacy) — Legacy Memex codebase (167 commits, AliceLabs Proprietary License). Python/ChromaDB memory system with MCP integration. Preserved for historical reference. NOT installed by `pip install alethech`.
+
+---
+
+© 2026 AliceLabs LLC. Todos los derechos reservados. · MIT License
