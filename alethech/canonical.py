@@ -40,7 +40,20 @@ def _escape_string(s: str) -> str:
 
 
 def _serialize_number(n: float | int) -> str:
-    """Serialize a number per RFC 8785 §3.2.2.3."""
+    """Serialize a number per RFC 8785 §3.2.2.3.
+
+    Uses Python's repr() for the shortest round-trip representation,
+    then fixes the divergences between Python's float repr and
+    ECMAScript Number.prototype.toString() (which is what JCS requires):
+
+    1. Python repr(1e+21) = '1e+21' → JCS wants '1e21' (no '+')
+    2. Python repr(1e-07) = '1e-07' → JCS wants '1e-7' (no leading zero)
+    3. Python repr(1.2345678901234568e+20) = '1.2345678901234568e+20' →
+       JCS wants '123456789012345680000' (decimal notation for |n| < 1e21)
+    4. Python repr(3.0) = '3.0' → JCS wants '3' (strip '.0' for integers)
+    5. Python repr(1.5e-05) = '1.5e-05' → JCS wants '0.000015' (decimal
+       for |n| >= 1e-6, even when Python uses scientific)
+    """
     if isinstance(n, bool):
         # bool is a subclass of int — handle before number conversion
         raise TypeError("booleans are not valid JCS values at top level")
@@ -60,15 +73,73 @@ def _serialize_number(n: float | int) -> str:
         # Preserve sign of zero per RFC 8785
         return "-0" if math.copysign(1.0, n) < 0 else "0"
 
-    # Integer-valued float (e.g. 3.0)
-    if n == int(n) and abs(n) < 1e21:
-        return str(int(n))
+    abs_n = abs(n)
 
-    # Use repr for shortest round-trippable representation, then strip
-    # any trailing exponent that Python adds unnecessarily.
+    # Python's repr gives the shortest round-trip representation
     s = repr(n)
-    # Python repr is fine for our purposes — it produces minimal round-trip
+
+    # Handle scientific notation
+    if 'e' in s or 'E' in s:
+        s_lower = s.lower()
+        e_pos = s_lower.index('e')
+        mantissa = s[:e_pos]
+        exp = int(s[e_pos + 1:])
+
+        # ECMAScript uses scientific notation for |n| >= 1e21 or |n| < 1e-6
+        # Otherwise, it uses decimal notation
+        if abs_n >= 1e21 or abs_n < 1e-6:
+            # Keep scientific notation, but fix the format:
+            # - No '+' for positive exponents
+            # - No leading zeros in exponent
+            return f"{mantissa}e{exp}"
+        else:
+            # Convert from scientific to decimal notation
+            return _scientific_to_decimal(mantissa, exp)
+
+    # Decimal notation from repr — strip trailing '.0' for integer-valued floats
+    if s.endswith('.0'):
+        return s[:-2]
+
     return s
+
+
+def _scientific_to_decimal(mantissa: str, exp: int) -> str:
+    """Convert a float from scientific notation (mantissa × 10^exp) to
+    decimal notation, matching ECMAScript Number.prototype.toString().
+
+    Examples:
+      _scientific_to_decimal('1.2345678901234568', 20) → '123456789012345680000'
+      _scientific_to_decimal('1.5', -5) → '0.000015'
+      _scientific_to_decimal('1', 20) → '100000000000000000000'
+    """
+    negative = mantissa.startswith('-')
+    if negative:
+        mantissa = mantissa[1:]
+
+    if '.' in mantissa:
+        int_part, frac_part = mantissa.split('.')
+    else:
+        int_part, frac_part = mantissa, ''
+
+    # All digits of the number, without the decimal point
+    digits = int_part + frac_part
+    # Where the decimal point should go (relative to start of digits)
+    decimal_pos = len(int_part) + exp
+
+    if decimal_pos <= 0:
+        # Need leading zeros: 0.000...digits
+        result = '0.' + '0' * (-decimal_pos) + digits
+    elif decimal_pos >= len(digits):
+        # Need trailing zeros: digits000...
+        result = digits + '0' * (decimal_pos - len(digits))
+    else:
+        # Decimal point in the middle
+        result = digits[:decimal_pos] + '.' + digits[decimal_pos:]
+
+    if negative:
+        result = '-' + result
+
+    return result
 
 
 def _serialize_value(v: Any) -> str:

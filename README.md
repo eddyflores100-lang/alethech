@@ -18,7 +18,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Implementation of rev 2 spec. 9 commands, 135 tests, 5 mutation-guard paths covering 3 code-level defeats and 2 data-level (recall-seam) defeats. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Implementation of rev 2 spec. 9 commands, 196 tests (incl. 56 RFC 8785 JCS conformance vectors), 8 mutation-guard paths covering 3 code-level defeats, 2 data-level (recall-seam) defeats, 1 checkpoint continuity defeat, and 2 root-binding defeats. JCS serializer verified against ECMAScript Number.prototype.toString() algorithm. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -76,20 +76,29 @@ It does NOT un-conceal whether the content is true — that's the agent's respon
 python -m pytest tests/
 ```
 
-135 tests covering:
+196 tests covering:
 - crypto primitives (Ed25519, SHA-256, base64url, base32)
-- JCS canonicalization (RFC 8785)
+- JCS canonicalization (RFC 8785) — 56 conformance vectors including:
+  - integer/float serialization per ECMAScript Number.prototype.toString()
+  - -0 sign preservation
+  - scientific notation format (no '+', no leading zeros in exponent)
+  - decimal vs scientific threshold (1e21 / 1e-6)
+  - UTF-16 key ordering with surrogate pairs
+  - string escaping (control chars, non-ASCII preservation)
+  - NaN/Infinity rejection
 - agent_id derivation (cryptographic binding to public_key)
 - MemoryCommit signing, tamper detection, wrong-key rejection
 - EvidenceCommit signing
 - all 9 CLI commands (init, commit, evidence, verify, export, import, migrate, key rotate, key revoke)
-- checkpoint emission + rollback detection
+- checkpoint emission + rollback detection + **causal continuity** (0.5.6)
 - identity_mismatch detection
 - export/import roundtrip preservation
 - tampered manifest rejection
 - key rotation with cutoff_head reachability guarantee
 - ancestry_check mutation guard (3 code-level defeats)
 - recall-seam defeats (2 data-level mutations: active-keys tampering, cutoff_head mutation)
+- **root_id binding** (RootAuthority ↔ IdentityRecord ↔ ControlEvent, 0.5.6)
+- **checkpoint continuity** (checkpoint HEAD must be ancestor of current HEAD, 0.5.6)
 
 ## license
 
