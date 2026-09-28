@@ -494,13 +494,79 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
 def import_(input_path: str, target_path: str | None,
             trust_unknown_identities: bool, allow_conflicts: bool,
             checkpoint_file: str | None) -> None:
-    """Import a portable package into the target store."""
+    """Import a portable package into the target store.
+
+    Security: this command assumes the import package may be malicious.
+    Defenses applied (0.6.0):
+      - Path traversal: file names must be safe, no ../ or absolute paths
+      - Symlinks: symlinks in import package are NOT followed
+      - JSON size: each file must be < MAX_IMPORT_FILE_SIZE
+      - File count: package must have < MAX_IMPORT_FILE_COUNT files
+      - Total size: package must be < MAX_IMPORT_TOTAL_SIZE
+      - Atomicity: import either fully succeeds or fully rolls back
+    """
+    # 0.6.0 import hardening — security limits
+    MAX_IMPORT_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
+    MAX_IMPORT_FILE_COUNT = 10000  # max files in package
+    MAX_IMPORT_TOTAL_SIZE = 500 * 1024 * 1024  # 500 MB total
+    MAX_JSON_DEPTH = 100  # max nesting depth for JSON parsing
+
     ctx = click.get_current_context()
     if target_path is None:
         target_path = ctx.obj["store"]
     target = Path(target_path)
 
     src = Path(input_path)
+
+    # SECURITY CHECK 0.6.0-A: verify src is a real directory (not a symlink)
+    if src.is_symlink():
+        raise click.ClickException(
+            f"security: input path is a symlink — refusing to import symlinks: {src}"
+        )
+    if not src.is_dir():
+        raise click.ClickException(f"input must be a directory: {src}")
+
+    # SECURITY CHECK 0.6.0-B: count files and total size
+    file_count = 0
+    total_size = 0
+    for path in src.rglob("*"):
+        if path.is_symlink():
+            raise click.ClickException(
+                f"security: symlink found in import package — refusing: {path}"
+            )
+        if path.is_file():
+            file_count += 1
+            total_size += path.stat().st_size
+            if path.stat().st_size > MAX_IMPORT_FILE_SIZE:
+                raise click.ClickException(
+                    f"security: file exceeds {MAX_IMPORT_FILE_SIZE} bytes limit: {path} "
+                    f"({path.stat().st_size} bytes) — possible archive bomb"
+                )
+            if file_count > MAX_IMPORT_FILE_COUNT:
+                raise click.ClickException(
+                    f"security: package exceeds {MAX_IMPORT_FILE_COUNT} files limit — "
+                    f"possible archive bomb"
+                )
+            if total_size > MAX_IMPORT_TOTAL_SIZE:
+                raise click.ClickException(
+                    f"security: package exceeds {MAX_IMPORT_TOTAL_SIZE} bytes total — "
+                    f"possible archive bomb"
+                )
+
+    # SECURITY CHECK 0.6.0-C: verify no file name contains path traversal
+    for path in src.rglob("*"):
+        rel = path.relative_to(src)
+        rel_str = str(rel)
+        # Reject absolute paths (shouldn't happen with rglob but check anyway)
+        if rel.is_absolute():
+            raise click.ClickException(
+                f"security: absolute path in import package: {rel}"
+            )
+        # Reject .. components
+        if ".." in rel.parts:
+            raise click.ClickException(
+                f"security: path traversal detected in import package: {rel_str}"
+            )
 
     # If src is a directory, expect manifest.json
     if src.is_dir():

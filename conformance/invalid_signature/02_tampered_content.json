@@ -1,0 +1,41 @@
+{
+  "description": "MemoryCommit where content was modified after signing",
+  "category": "invalid_signature",
+  "expected_result": "verify_fail",
+  "input": {
+    "type": "MemoryCommit",
+    "version": 1,
+    "identity": {
+      "type": "Identity",
+      "version": 1,
+      "agent_id": "did:alethech:zcrkrhpgnzgfoymf2hg2yser5q",
+      "public_key": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "iYs6XDh-1O3IwFqtmmoE2knHJW59n94jZGgTY9g-6rA"
+      },
+      "key_id": "key-001",
+      "created_at": "2026-09-28T01:33:21.811Z",
+      "recovery_root": ""
+    },
+    "commit": {
+      "type": "MemoryCommit",
+      "version": 1,
+      "agent_id": "did:alethech:zcrkrhpgnzgfoymf2hg2yser5q",
+      "key_id": "key-001",
+      "parents": [
+        ""
+      ],
+      "timestamp": "2026-09-28T01:33:21.812Z",
+      "session_id": "",
+      "memory_type": "semantic",
+      "content": {
+        "test": "TAMPERED_CONTENT"
+      },
+      "provenance": {},
+      "commit_id": "sha256:aec1b060ea10a94d4eabd0f41ecf3622441435acb461f87fb980686dafb3c419",
+      "signature": "ed25519:mtsDXeEvU28sUtQb9fVlFeDkhTkrsQcwiKD2k2WzjxnqA0LAE19x1A-2-6Goo6lA68SejvEiN-7OlM9pYJJTAA"
+    }
+  },
+  "notes": "Catches implementations that don't re-canonicalize content before verifying."
+}

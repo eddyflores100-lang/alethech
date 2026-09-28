@@ -1,0 +1,11 @@
+{
+  "description": "Number serialization: negative zero \u2014 RFC 8785 erratum says serialize as '0'",
+  "category": "numeric",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "JCSNumberTest",
+    "value": -0.0,
+    "expected_canonical": "0"
+  },
+  "notes": "RFC 8785 / ECMAScript Number::toString() requires '0' for input -0.0"
+}

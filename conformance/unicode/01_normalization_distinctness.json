@@ -1,0 +1,12 @@
+{
+  "description": "Two strings that look identical but have different code points",
+  "category": "unicode",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "UnicodeDistinctness",
+    "string_a": "caf\u00e9",
+    "string_b": "cafe\u0301",
+    "note": "These are visually identical but byte-different. JCS does NOT normalize \u2014 they produce different hashes."
+  },
+  "notes": "Catches implementations that 'normalize' unicode before hashing (which would break signature verification across implementations)."
+}

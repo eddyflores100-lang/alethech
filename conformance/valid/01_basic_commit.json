@@ -1,0 +1,42 @@
+{
+  "description": "A correctly signed MemoryCommit with valid Ed25519 signature",
+  "category": "valid",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "MemoryCommit",
+    "version": 1,
+    "identity": {
+      "type": "Identity",
+      "version": 1,
+      "agent_id": "did:alethech:ywzpxv5qm2p57pher2ex7vx4ym",
+      "public_key": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "ZZiHrLd0IZt5haYLjtS9M50D7ETy1O9w6kQqYmaxIzo"
+      },
+      "key_id": "key-001",
+      "created_at": "2026-09-28T01:33:21.811Z",
+      "recovery_root": ""
+    },
+    "commit": {
+      "type": "MemoryCommit",
+      "version": 1,
+      "agent_id": "did:alethech:ywzpxv5qm2p57pher2ex7vx4ym",
+      "key_id": "key-001",
+      "parents": [
+        ""
+      ],
+      "timestamp": "2026-09-28T01:33:21.811Z",
+      "session_id": "",
+      "memory_type": "semantic",
+      "content": {
+        "test": "valid_vector",
+        "value": 42
+      },
+      "provenance": {},
+      "commit_id": "sha256:e840634c9b08fece0964e620a5333735353887e33e1171cdb9ad8051898f8ebb",
+      "signature": "ed25519:IM3kvXtwwy6XcPRYTu1gSUw5bA-FFPhE7r066P6mzSm5Yraj1qUFMQJkRjnkpiJ3JLcYb-lnN0496cGIKK_dDA"
+    }
+  },
+  "notes": "Baseline valid case. Used to confirm the verifier accepts correct artifacts."
+}

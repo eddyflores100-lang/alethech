@@ -1,0 +1,23 @@
+{
+  "description": "Identity with kty='RSA' instead of 'OKP'",
+  "category": "invalid_key",
+  "expected_result": "verify_fail",
+  "input": {
+    "type": "Identity",
+    "version": 1,
+    "identity": {
+      "type": "Identity",
+      "version": 1,
+      "agent_id": "did:alethech:fakeagentid000000000",
+      "public_key": {
+        "kty": "RSA",
+        "n": "fake",
+        "e": "AQAB"
+      },
+      "key_id": "key-001",
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "recovery_root": ""
+    }
+  },
+  "notes": "Ed25519 requires kty=OKP, crv=Ed25519. RSA keys must be rejected."
+}

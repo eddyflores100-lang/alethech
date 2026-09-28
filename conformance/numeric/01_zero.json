@@ -1,0 +1,11 @@
+{
+  "description": "Number serialization: zero integer",
+  "category": "numeric",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "JCSNumberTest",
+    "value": 0,
+    "expected_canonical": "0"
+  },
+  "notes": "RFC 8785 / ECMAScript Number::toString() requires '0' for input 0"
+}

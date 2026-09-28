@@ -318,12 +318,29 @@ class Checkpoint(SignedObject):
     it cannot prove continuity (i.e. that the presented history is the
     most recent one). With a checkpoint, it can also prove that the
     presented history continues from that checkpoint.
+
+    0.6.0 ANTI-ROLLBACK: the `sequence` field provides monotonic anti-rollback.
+    A consumer that has previously seen a checkpoint with sequence=N must
+    reject any checkpoint with sequence < N. This is independent of
+    timestamps — the system clock is NOT the authority.
+
+    The sequence is set by the agent at checkpoint emission time and must
+    be strictly increasing. The verifier does NOT enforce that the
+    sequence matches any internal counter (the agent is the authority),
+    but a downstream consumer can use it to detect rollback:
+
+        if new_checkpoint.sequence <= last_known_sequence:
+            reject("rollback detected: sequence went backwards")
+
+    This closes the gap where a correctly-signed but old checkpoint
+    could be presented as current.
     """
 
     agent_id: str = ""
     head_commit_id: str = ""
     commit_count: int = 0
     evidence_count: int = 0
+    sequence: int = 0  # 0.6.0: monotonic anti-rollback counter
     created_at: str = field(default_factory=utc_now_iso)
 
     @staticmethod
@@ -338,6 +355,7 @@ class Checkpoint(SignedObject):
             "head_commit_id": self.head_commit_id,
             "commit_count": self.commit_count,
             "evidence_count": self.evidence_count,
+            "sequence": self.sequence,
             "created_at": self.created_at,
         }
 
@@ -356,6 +374,7 @@ class Checkpoint(SignedObject):
             head_commit_id=d.get("head_commit_id", ""),
             commit_count=d.get("commit_count", 0),
             evidence_count=d.get("evidence_count", 0),
+            sequence=d.get("sequence", 0),  # 0.6.0: backward-compat with old checkpoints
             created_at=d["created_at"],
             commit_id=d.get("checkpoint_id", d.get("commit_id", "")),
             signature=d.get("signature", ""),

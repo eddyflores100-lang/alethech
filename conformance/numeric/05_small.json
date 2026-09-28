@@ -1,0 +1,11 @@
+{
+  "description": "Number serialization: small number requiring scientific notation",
+  "category": "numeric",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "JCSNumberTest",
+    "value": 1e-07,
+    "expected_canonical": "1e-7"
+  },
+  "notes": "RFC 8785 / ECMAScript Number::toString() requires '1e-7' for input 1e-07"
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Number serialization: above 1e-6 \u2014 decimal notation",
+  "category": "numeric",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "JCSNumberTest",
+    "value": 0.005,
+    "expected_canonical": "0.005"
+  },
+  "notes": "RFC 8785 / ECMAScript Number::toString() requires '0.005' for input 0.005"
+}

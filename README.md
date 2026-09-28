@@ -8,6 +8,24 @@ The art of revealing that a memory was not modified after being signed.
 
 This is the reference implementation of the protocol specified in `docs/implementacion-nucleo-minimo.md` (rev 2).
 
+## what this is
+
+`alethech` is a Python package that provides **cryptographically verifiable memory continuity for AI agents**. It lets an agent sign its memory commits with Ed25519, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.
+
+**What this repo IS:**
+- A cryptographic protocol implementation (Ed25519 + SHA-256 + JCS RFC 8785)
+- 9 CLI commands (`init`, `commit`, `evidence`, `verify`, `export`, `import`, `migrate`, `key rotate`, `key revoke`)
+- A test suite with mutation-guard paths (each guarantee has a test that fails when the check is defeated)
+- MIT licensed, published on PyPI as `alethech`
+
+**What this repo is NOT:**
+- It is NOT a memory store or retrieval system
+- It is NOT the legacy `memex` project (Python/ChromaDB memory server)
+- It has no MCP server, no Docker, no auto-update, no LLM calls
+- It depends only on `cryptography` and `click` — no `mem0ai`, no `chromadb`, no `ollama`
+
+The legacy `memex` codebase (167 commits, AliceLabs Proprietary License) is preserved in a **separate repository**: [`eddyflores100-lang/memex-legacy`](https://github.com/eddyflores100-lang/memex-legacy). It is not part of this repo and not installed by `pip install alethech`.
+
 ## the property
 
 > **This memory set forms part of a cryptographically verifiable history associated with a determined identity, whose commits can be independently verified with respect to their integrity, cryptographic authorship, and provenance relations.**
@@ -18,7 +36,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Implementation of rev 2 spec. 9 commands, 196 tests (incl. 56 RFC 8785 JCS conformance vectors), 8 mutation-guard paths covering 3 code-level defeats, 2 data-level (recall-seam) defeats, 1 checkpoint continuity defeat, and 2 root-binding defeats. JCS serializer verified against ECMAScript Number.prototype.toString() algorithm. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Implementation of rev 2 spec. 9 commands, 225 tests (incl. 56 RFC 8785 JCS conformance vectors + 15 adversarial conformance vectors + 7 import-hardening tests + 6 anti-rollback tests), 8 mutation-guard paths covering 3 code-level defeats, 2 data-level (recall-seam) defeats, 1 checkpoint continuity defeat, and 2 root-binding defeats. JCS serializer verified against ECMAScript Number.prototype.toString() algorithm. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -80,8 +98,8 @@ python -m pytest tests/
 - crypto primitives (Ed25519, SHA-256, base64url, base32)
 - JCS canonicalization (RFC 8785) — 56 conformance vectors including:
   - integer/float serialization per ECMAScript Number.prototype.toString()
-  - -0 sign preservation
-  - scientific notation format (no '+', no leading zeros in exponent)
+  - -0 sign preservation (per RFC 8785 erratum)
+  - scientific notation format (positive exponents keep '+', negative strip leading zeros)
   - decimal vs scientific threshold (1e21 / 1e-6)
   - UTF-16 key ordering with surrogate pairs
   - string escaping (control chars, non-ASCII preservation)
@@ -100,10 +118,23 @@ python -m pytest tests/
 - **root_id binding** (RootAuthority ↔ IdentityRecord ↔ ControlEvent, 0.5.6)
 - **checkpoint continuity** (checkpoint HEAD must be ancestor of current HEAD, 0.5.6)
 
+## repository structure
+
+```
+alethech/                    # this repo — cryptographic protocol only
+├── alethech/                # source: crypto, objects, store, verify, cli, canonical
+├── tests/                   # 196 tests (incl. 56 JCS conformance + 8 mutation-guard paths)
+├── docs/                    # protocol specification
+├── INTEGRATION.md           # how to integrate with memex via MemexAlethechHook
+├── LICENSE                  # MIT
+├── README.md                # this file
+└── pyproject.toml           # alethech 0.5.8, deps: cryptography + click only
+```
+
 ## license
 
 MIT.
 
 ## related repositories
 
-- The companion project `memex` (Python/ChromaDB memory system) is a separate layer that handles retrieval, MCP, and graph memory. `alethech` is the cryptographic protocol layer that can sign every memex write via `MemexAlethechHook` to make its memory verifiable. The memex legacy codebase is preserved on the `legacy/memex` branch of this repo (167 commits, untouched).
+- [`eddyflores100-lang/memex-legacy`](https://github.com/eddyflores100-lang/memex-legacy) — Legacy Memex codebase (167 commits, AliceLabs Proprietary License). Python/ChromaDB memory system with MCP integration. Preserved for historical reference. NOT installed by `pip install alethech`.

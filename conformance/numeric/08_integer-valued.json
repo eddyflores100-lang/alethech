@@ -1,0 +1,11 @@
+{
+  "description": "Number serialization: integer-valued float \u2014 strip .0",
+  "category": "numeric",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "JCSNumberTest",
+    "value": 3.0,
+    "expected_canonical": "3"
+  },
+  "notes": "RFC 8785 / ECMAScript Number::toString() requires '3' for input 3.0"
+}
