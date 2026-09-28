@@ -18,7 +18,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Implementation of rev 2 spec. Six commands. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Implementation of rev 2 spec. 9 commands, 135 tests, 5 mutation-guard paths covering 3 code-level defeats and 2 data-level (recall-seam) defeats. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -31,8 +31,7 @@ For development:
 ```bash
 git clone https://github.com/eddyflores100-lang/alethech.git
 cd alethech
-git checkout protocol-rev2
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ## usage
@@ -77,17 +76,20 @@ It does NOT un-conceal whether the content is true — that's the agent's respon
 python -m pytest tests/
 ```
 
-34 tests covering:
+135 tests covering:
 - crypto primitives (Ed25519, SHA-256, base64url, base32)
 - JCS canonicalization (RFC 8785)
 - agent_id derivation (cryptographic binding to public_key)
 - MemoryCommit signing, tamper detection, wrong-key rejection
 - EvidenceCommit signing
-- all 6 CLI commands
+- all 9 CLI commands (init, commit, evidence, verify, export, import, migrate, key rotate, key revoke)
 - checkpoint emission + rollback detection
 - identity_mismatch detection
 - export/import roundtrip preservation
 - tampered manifest rejection
+- key rotation with cutoff_head reachability guarantee
+- ancestry_check mutation guard (3 code-level defeats)
+- recall-seam defeats (2 data-level mutations: active-keys tampering, cutoff_head mutation)
 
 ## license
 
@@ -95,4 +97,4 @@ MIT.
 
 ## related repositories
 
-- The companion project `memex` (Python/ChromaDB memory system) is a separate layer that handles retrieval, MCP, and graph memory. `alethech` is the cryptographic protocol layer that lives on top of `memex` to make its memory verifiable. The two will eventually converge via a write-hook integration.
+- The companion project `memex` (Python/ChromaDB memory system) is a separate layer that handles retrieval, MCP, and graph memory. `alethech` is the cryptographic protocol layer that can sign every memex write via `MemexAlethechHook` to make its memory verifiable. The memex legacy codebase is preserved on the `legacy/memex` branch of this repo (167 commits, untouched).
