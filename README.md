@@ -64,7 +64,7 @@ alethech import --input <dir>              # import external memory
 So alethech = "the art of un-concealing". The protocol un-conceals:
 - whether a memory was modified after being signed
 - who signed it
-- when it was signed
+- what signed timestamp was recorded (NOT physical signing time — only the timestamp recorded in the artifact)
 - what its provenance is
 - whether the chain of custody is intact
 

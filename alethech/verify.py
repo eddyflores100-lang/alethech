@@ -280,7 +280,21 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
     except Exception as e:
         report.errors.append(f"identity_layer_verification_failed: {e}")
 
-    # 9. Continuity against external checkpoint (corrección 2)
+    # 9. Continuity against external checkpoint (corrección 2 + 0.5.6 fix)
+    #
+    # PRE-0.5.6 BUG: the check only verified that checkpoint.head_commit_id
+    # was PRESENT in commits, plus a count match. That allowed a 'dark gap':
+    #
+    #   genesis ─── A (checkpoint head, count=3)
+    #        └──── B ─── HEAD (current, count=3)
+    #
+    # Both A and HEAD present, counts match, but HEAD does NOT descend from A.
+    # The protocol would report continuity_verified = True without proving
+    # that the presented history causally continues from the checkpoint.
+    #
+    # 0.5.6 FIX: checkpoint.head_commit_id must be an ANCESTOR of the
+    # current HEAD. I.e., ancestry_check(checkpoint.head_commit_id,
+    # current_head, commits) must return True. This closes the dark gap.
     if checkpoint is not None:
         cp_ident = identities.get(checkpoint.agent_id)
         if cp_ident is None:
@@ -298,7 +312,25 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
                 f"checkpoint_count_mismatch: checkpoint says {checkpoint.evidence_count} evidence, store has {len(evidence)}"
             )
         else:
-            report.continuity_verified = True
+            # 0.5.6: verify causal continuity. The current HEAD must descend
+            # from the checkpoint's head_commit_id. Equivalently:
+            # checkpoint.head_commit_id ∈ ancestry(current_HEAD).
+            current_head = store.read_head()
+            if current_head is None:
+                report.errors.append(
+                    "checkpoint_continuity_failed: store has no HEAD — cannot prove continuity"
+                )
+            elif current_head == checkpoint.head_commit_id:
+                # Trivial case: store hasn't advanced past checkpoint. Still OK.
+                report.continuity_verified = True
+            elif not ancestry_check(checkpoint.head_commit_id, current_head, commits):
+                report.errors.append(
+                    f"checkpoint_continuity_failed: checkpoint head {checkpoint.head_commit_id} "
+                    f"is NOT an ancestor of current HEAD {current_head} — the presented history "
+                    f"does not causally continue from the checkpoint (dark gap detected)"
+                )
+            else:
+                report.continuity_verified = True
 
     return report
 
@@ -375,6 +407,32 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
         if not ident.verify_self():
             report.errors.append(f"identity_v2_mismatch: {agent_id} does not derive from root_public_key")
 
+    # 0.5.6 BLOQUEANTE #2: explicit root_id binding.
+    #
+    # IdentityRecord.verify_self() proves that agent_id derives from
+    # root_public_key. But it does NOT prove that root_public_key is
+    # THE RootAuthority this store presents as canonical. An attacker
+    # who controls a different root keypair could forge an IdentityRecord
+    # whose agent_id happens to derive from their (different) root, and
+    # the current checks would pass.
+    #
+    # We must verify explicitly:
+    #   IdentityRecord.root_id           == RootAuthority.root_id
+    #   IdentityRecord.root_public_key   == RootAuthority.root_public_key
+    for agent_id, ident in identities_v2.items():
+        if ident.root_id != root.root_id:
+            report.errors.append(
+                f"identity_root_binding_failed: IdentityRecord {agent_id} declares "
+                f"root_id={ident.root_id} but RootAuthority.root_id={root.root_id} — "
+                f"identity is not bound to this store's canonical root authority"
+            )
+        if ident.root_public_key != root.root_public_key:
+            report.errors.append(
+                f"identity_root_binding_failed: IdentityRecord {agent_id} declares a "
+                f"different root_public_key than RootAuthority — identity may be forged "
+                f"against a different root"
+            )
+
     # Load control events
     try:
         events = store.load_control_events()
@@ -387,6 +445,21 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
         for eid, ev in events.items():
             if not ev.verify(root.root_public_key):
                 report.errors.append(f"control_event_signature_invalid: {eid}")
+
+        # 0.5.6 BLOQUEANTE #2: explicit root_id binding for ControlEvents.
+        #
+        # Same logic as for IdentityRecord: a valid signature against
+        # root.root_public_key is necessary but not sufficient. The event
+        # must declare the SAME root_id as the store's canonical
+        # RootAuthority. Otherwise an attacker could substitute a different
+        # root authority (with its own valid signature) and inject events.
+        for eid, ev in events.items():
+            if ev.root_id != root.root_id:
+                report.errors.append(
+                    f"control_event_root_binding_failed: ControlEvent {eid} declares "
+                    f"root_id={ev.root_id} but RootAuthority.root_id={root.root_id} — "
+                    f"event is not bound to this store's canonical root authority"
+                )
 
         # Verify chain monotonicity and hash-linking
         sorted_events = sorted(events.values(), key=lambda e: e.sequence)
