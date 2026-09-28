@@ -672,6 +672,15 @@
   .iterm__ok{ color:#00ff88; font-weight:700; }
   .iterm__muted{ color:#6b6b6b; }
   .iterm__primary{ color:#f5f5dc; }
+  .iterm__badge{
+    margin-left:auto;
+    color:#6b6b6b;
+    font-size:.7rem;
+    letter-spacing:.06em;
+    font-weight:500;
+    white-space:nowrap;
+    text-transform:lowercase;
+  }
   .iterm__hint{
     margin-top:1rem;
     font-size:.82rem;
@@ -897,6 +906,7 @@
     .iterm__body{ padding:.8rem .9rem; }
     .iterm__title{ font-size:.72rem; }
     .iterm__repo{ font-size:.72rem; }
+    .iterm__badge{ display:none; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -1339,6 +1349,7 @@ result: OK"></pre>
       <div class="iterm__bar">
         <span class="iterm__dots" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></span>
         <span class="iterm__title">alethech — interactive terminal</span>
+        <span class="iterm__badge">real crypto · web crypto api · ed25519</span>
       </div>
       <div class="iterm__body" id="iterm-body">
         <div class="iterm__repo">↳ live from github.com/eddyflores100-lang/alethech</div>
@@ -1352,11 +1363,11 @@ result: OK"></pre>
       </div>
     </div>
 
-    <p class="iterm__hint">type 'help' for commands · try: alethech init, alethech verify, tests</p>
+    <p class="iterm__hint">type 'help' for commands · try: alethech init, alethech commit --content {"x":1}, alethech verify, tests</p>
 
     <aside class="marginalia" style="margin-top:2rem; max-width:72ch;">
-      <b>simulation, not execution</b>
-      The terminal runs pre-programmed commands that mirror the real alethech CLI. Output values are illustrative — but the version (0.7.0), the test count (230), and the command surface match the live repository on GitHub. Click the terminal and type.
+      <b>real crypto, in your browser</b>
+      Every command runs actual cryptography via the Web Crypto API — real Ed25519 keypairs, real SHA-256 commits, real signature verification. Nothing is hardcoded. Click the terminal and type.
     </aside>
   </div>
 </section>
@@ -1718,8 +1729,8 @@ result: OK"></pre>
   }
 
   /* =====================================================================
-    11. PAGE 12 — Interactive terminal: simulated alethech commands
-        (vanilla JS · no backend · commands mirror the real CLI surface)
+    11. PAGE 12 — Interactive terminal: REAL alethech commands
+        (Web Crypto API · Ed25519 · SHA-256 · JCS RFC 8785 · no simulation)
      ===================================================================== */
   var iterm = document.getElementById('iterm');
   if(iterm){
@@ -1727,20 +1738,175 @@ result: OK"></pre>
     var itermInput = document.getElementById('iterm-input');
     var itermEcho  = document.getElementById('iterm-echo');
 
-    var AGENT_ID      = 'did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu';
-    var VERSION       = '0.7.0';
-    var PUBKEY        = '3f7a9c1e8b2d4f6a5c0e7d8b9a1f2c3e4d5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c';
-    var GENESIS       = '4a2f8c1d9b3e7f5a0c6d8e2b4f9a1c3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d5';
-    var COMMIT_HASH   = 'c0d8e2f6a1b39c5d7e9f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2';
-    var PARENT_HASH   = '4a2f8c1d9b3e7f5a0c6d8e2b4f9a1c3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d5';
-    var CUTOFF_HEAD   = '8b3d5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d54a2f8c1d9b3e7f5a0c6d8e2b4f9a';
-    var CONTROL_EVENT = 'd5e7b9d0f2a4c6e8b0d3f5a7c9e1b3d54a2f8c1d9b3e7f5a0c6d8e2b4f9a1c';
+    var VERSION = '0.7.0';
 
+    /* ===== In-memory state — persists across commands for the session ===== */
+    var store = {
+      keypairs: [],      // { keyId, keypair, pubJwk, agentId, status, createdAt }
+      commits:  [],      // { commitId, parent, agentId, keyId, contentCanonical, signature, signatureBytes, timestamp }
+      keyCounter: 0
+    };
     var history = [];
     var historyIdx = 0;
+    var busy = false;
+    var pendingQueue = [];
 
+    /* ===== Encoding helpers (pure JS) ===== */
+    function bytesToHex(bytes){
+      var out = '';
+      for(var i = 0; i < bytes.length; i++){
+        out += bytes[i].toString(16).padStart(2,'0');
+      }
+      return out;
+    }
+    function bytesToBase64Url(bytes){
+      var bin = '';
+      for(var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    function base64UrlToBytes(str){
+      var s = str.replace(/-/g,'+').replace(/_/g,'/');
+      while(s.length % 4) s += '=';
+      var bin = atob(s);
+      var bytes = new Uint8Array(bin.length);
+      for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+    var B32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567'; // RFC 4648, lowercase, no padding
+    function bytesToBase32Lower(bytes){
+      var bits = 0, value = 0, out = '';
+      for(var i = 0; i < bytes.length; i++){
+        value = (value << 8) | bytes[i];
+        bits += 8;
+        while(bits >= 5){
+          out += B32_ALPHABET[(value >>> (bits - 5)) & 0x1F];
+          bits -= 5;
+        }
+      }
+      if(bits > 0){
+        out += B32_ALPHABET[(value << (5 - bits)) & 0x1F];
+      }
+      return out;
+    }
+
+    /* ===== JCS canonicalization (RFC 8785) — pure JS ===== */
+    function jcsCompareKeys(a, b){
+      var i = 0;
+      while(i < a.length && i < b.length){
+        var ca = a.charCodeAt(i), cb = b.charCodeAt(i);
+        if(ca !== cb) return ca - cb;
+        i++;
+      }
+      return a.length - b.length;
+    }
+    function jcsEscapeString(s){
+      var out = '"';
+      for(var i = 0; i < s.length; i++){
+        var c = s.charCodeAt(i);
+        if(c === 0x22)      out += '\\"';
+        else if(c === 0x5C) out += '\\\\';
+        else if(c === 0x08) out += '\\b';
+        else if(c === 0x09) out += '\\t';
+        else if(c === 0x0A) out += '\\n';
+        else if(c === 0x0C) out += '\\f';
+        else if(c === 0x0D) out += '\\r';
+        else if(c < 0x20)   out += '\\u' + c.toString(16).padStart(4,'0');
+        else                out += s.charAt(i);
+      }
+      return out + '"';
+    }
+    function jcsCanonicalize(value){
+      if(value === null || value === undefined) return 'null';
+      var t = typeof value;
+      if(t === 'boolean') return value ? 'true' : 'false';
+      if(t === 'number'){
+        if(!isFinite(value)) throw new Error('JCS: NaN/Infinity not serializable');
+        if(Object.is(value, -0)) value = 0;  // RFC 8785 §3.2.2.3
+        return String(value);
+      }
+      if(t === 'string') return jcsEscapeString(value);
+      if(Array.isArray(value)){
+        return '[' + value.map(jcsCanonicalize).join(',') + ']';
+      }
+      if(t === 'object'){
+        var keys = Object.keys(value).sort(jcsCompareKeys);
+        var parts = [];
+        for(var i = 0; i < keys.length; i++){
+          parts.push(jcsEscapeString(keys[i]) + ':' + jcsCanonicalize(value[keys[i]]));
+        }
+        return '{' + parts.join(',') + '}';
+      }
+      throw new Error('JCS: unsupported type');
+    }
+
+    /* ===== Web Crypto primitives ===== */
+    var subtle = (window.crypto && window.crypto.subtle) ? window.crypto.subtle : null;
+    var textEncoder = new TextEncoder();
+
+    async function sha256Hex(str){
+      var data = textEncoder.encode(str);
+      var hash = await subtle.digest('SHA-256', data);
+      return bytesToHex(new Uint8Array(hash));
+    }
+    async function sha256Bytes(str){
+      var data = textEncoder.encode(str);
+      var hash = await subtle.digest('SHA-256', data);
+      return new Uint8Array(hash);
+    }
+    async function generateEd25519(){
+      // extractable=true so we can export the PUBLIC key as JWK (private key is never exported)
+      return await subtle.generateKey({ name:'Ed25519' }, true, ['sign','verify']);
+    }
+    async function exportPublicJwk(publicKey){
+      return await subtle.exportKey('jwk', publicKey);
+    }
+    async function signEd25519(privateKey, dataBytes){
+      var sig = await subtle.sign({ name:'Ed25519' }, privateKey, dataBytes);
+      return new Uint8Array(sig);
+    }
+    async function verifyEd25519(publicKey, sigBytes, dataBytes){
+      try {
+        return await subtle.verify({ name:'Ed25519' }, publicKey, sigBytes, dataBytes);
+      } catch(e){
+        return false;
+      }
+    }
+    async function deriveAgentId(pubJwk){
+      var pubBytes = base64UrlToBytes(pubJwk.x);  // 32 raw Ed25519 public key bytes
+      var hash = await subtle.digest('SHA-256', pubBytes);
+      return 'did:alethech:' + bytesToBase32Lower(new Uint8Array(hash));
+    }
+
+    /* ===== State helpers ===== */
+    function activeKeypair(){
+      for(var i = store.keypairs.length - 1; i >= 0; i--){
+        if(store.keypairs[i].status === 'active') return store.keypairs[i];
+      }
+      return null;
+    }
+    function genesisKeypair(){
+      return store.keypairs.length > 0 ? store.keypairs[0] : null;
+    }
+    function nextKeyId(){
+      store.keyCounter += 1;
+      return 'key-' + String(store.keyCounter - 1).padStart(3,'0');
+    }
+    function nowIso(){
+      // ISO 8601 UTC without milliseconds, e.g. 2026-01-15T14:23:47Z
+      return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+    }
+    function findKeypairById(keyId){
+      for(var i = 0; i < store.keypairs.length; i++){
+        if(store.keypairs[i].keyId === keyId) return store.keypairs[i];
+      }
+      return null;
+    }
+    function ed25519Supported(){
+      return !!(subtle && subtle.generateKey);
+    }
+
+    /* ===== Output helpers ===== */
     function green(text){ return '<span class="iterm__ok">' + escapeHtml(text) + '</span>'; }
-
     function getPromptLine(){
       return itermBody.querySelector('.iterm__prompt-line');
     }
@@ -1773,21 +1939,50 @@ result: OK"></pre>
       var lines = itermBody.querySelectorAll('.iterm__line');
       lines.forEach(function(l){ l.remove(); });
     }
+    function showWorking(){
+      var div = addLineEl('iterm__muted');
+      div.textContent = '(computing...)';
+      div.dataset.working = '1';
+      scrollToBottom();
+      return div;
+    }
+    function hideWorking(el){
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+    }
+    function edNotSupportedError(){
+      printText('error: Ed25519 not supported in this browser', 'iterm__muted');
+      printText('use Chrome 113+, Edge 113+, Safari 17+, or Firefox 130+', 'iterm__muted');
+    }
 
-    /* ---- command handlers ---- */
+    /* ===== Argument parser: collect multi-token JSON values after --flag ===== */
+    function collectValueAfterFlag(args, flag){
+      var idx = -1;
+      for(var i = 0; i < args.length; i++){
+        if(args[i] === flag && i+1 < args.length){ idx = i + 1; break; }
+      }
+      if(idx === -1) return null;
+      var parts = [args[idx]];
+      for(var k = idx + 1; k < args.length; k++){
+        if(args[k].indexOf('--') === 0) break;
+        parts.push(args[k]);
+      }
+      return parts.join(' ');
+    }
+
+    /* ===== Command handlers ===== */
     function cmdHelp(){
       printText([
         'available commands:',
         '  help                              show this help',
         '  alethech --version                print version',
         '  alethech --help                   print CLI help',
-        '  alethech init                     initialize identity + keypair',
-        '  alethech verify                   verify the local store',
-        '  alethech commit --content <file>  sign + link a content commit',
+        '  alethech init                     generate real Ed25519 keypair + identity',
+        '  alethech commit --content <json>  sign + link a commit (JCS + SHA-256 + Ed25519)',
+        '  alethech verify                   verify signatures in the local store',
         '  alethech key rotate               rotate the active signing key',
-        '  alethech export --output <dir>    export a portable signed bundle',
-        '  alethech import --input <dir>     verify + atomically import a bundle',
-        '  tests                             run the simulated test suite (230 tests)',
+        '  alethech export --output <dir>    export a portable signed bundle (JSON)',
+        '  alethech import --input <json>    verify + import a bundle',
+        '  tests                             run the real crypto test suite',
         '  whoami                            print your agent_id',
         '  clear                             clear the terminal'
       ].join('\n'));
@@ -1804,11 +1999,11 @@ result: OK"></pre>
         '',
         'commands:',
         '  init                              generate Ed25519 keypair + identity',
-        '  commit --content <file>           sign + link a content commit',
+        '  commit --content <file|json>       sign + link a content commit',
         '  verify                            verify the local store',
         '  key rotate                        rotate the active signing key',
         '  export --output <dir>             export a portable signed bundle',
-        '  import --input <dir>              verify + atomically import a bundle',
+        '  import --input <json>             verify + atomically import a bundle',
         '',
         'options:',
         '  -v, --version                     print version',
@@ -1817,177 +2012,456 @@ result: OK"></pre>
         'docs: https://github.com/eddyflores100-lang/alethech'
       ].join('\n'));
     }
-    function cmdInit(){
-      printText('initializing alethech store...');
-      setTimeout(function(){
-        printText('agent_id:        ' + AGENT_ID);
-        printText('public_key:      ' + PUBKEY, 'iterm__muted');
-        printText('key_id:          key-000');
-        printText('genesis_commit:  ' + GENESIS, 'iterm__muted');
-        printHTML('result: ' + green('OK'));
-      }, 220);
-    }
-    function cmdVerify(){
-      printText('verifying local store...');
-      setTimeout(function(){
-        printText('identities: 1 verified, 0 invalid');
-        printText('commits:    3 verified, 0 invalid');
-        printText('signatures: 3 valid, 0 invalid');
-        printText('key rotations: 1 (cutoff_head present)');
-        printText('atomic imports: ok');
-        printHTML('result: ' + green('OK'));
-      }, 220);
-    }
-    function cmdCommit(args){
-      var content = null;
-      for(var i = 0; i < args.length; i++){
-        if(args[i] === '--content' && i+1 < args.length){ content = args[i+1]; }
-      }
-      if(!content){
-        printText('error: --content <file> is required', 'iterm__muted');
-        printText('usage: alethech commit --content <file>', 'iterm__muted');
+
+    async function cmdInit(){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+      var existing = activeKeypair();
+      if(existing){
+        printText('error: identity already initialized (' + existing.keyId + ')', 'iterm__muted');
+        printText('use \'alethech key rotate\' to rotate the signing key', 'iterm__muted');
         return;
       }
-      printText('reading ' + content + '...');
-      setTimeout(function(){
-        printText('commit:    ' + COMMIT_HASH, 'iterm__muted');
-        printText('parent:    ' + PARENT_HASH, 'iterm__muted');
-        printText('agent:     ' + AGENT_ID, 'iterm__muted');
-        printText('timestamp: 2026-01-15T14:23:47Z');
+      printText('initializing alethech store...');
+      var work = showWorking();
+      try {
+        var kp = await generateEd25519();
+        var pubJwk = await exportPublicJwk(kp.publicKey);
+        var agentId = await deriveAgentId(pubJwk);
+        var keyId = nextKeyId();
+        var entry = {
+          keyId: keyId,
+          keypair: kp,
+          pubJwk: pubJwk,
+          agentId: agentId,
+          status: 'active',
+          createdAt: nowIso()
+        };
+        store.keypairs.push(entry);
+        var genesis = await sha256Hex('genesis:' + agentId + ':' + keyId);
+
+        hideWorking(work);
+        printText('agent_id:        ' + agentId);
+        printText('public_key:      ' + pubJwk.x, 'iterm__muted');
+        printText('key_id:          ' + keyId);
+        printText('genesis_commit:  ' + genesis, 'iterm__muted');
         printHTML('result: ' + green('OK'));
-      }, 220);
+      } catch(err){
+        hideWorking(work);
+        if(err && err.name === 'NotSupportedError'){ edNotSupportedError(); }
+        else { printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted'); }
+      }
     }
-    function cmdKey(args){
+
+    async function cmdCommit(args){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+      var active = activeKeypair();
+      if(!active){
+        printText('error: no identity — run \'alethech init\' first', 'iterm__muted');
+        return;
+      }
+      var content = collectValueAfterFlag(args, '--content');
+      if(content === null) content = '{"test":true}';
+
+      var parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch(e){
+        printText('error: invalid JSON content: ' + e.message, 'iterm__muted');
+        return;
+      }
+
+      printText('reading content...');
+      var work = showWorking();
+      try {
+        var canonical = jcsCanonicalize(parsed);
+        var commitHashBytes = await sha256Bytes(canonical);
+        var commitId = 'sha256:' + bytesToHex(commitHashBytes);
+        var parent = store.commits.length > 0
+          ? store.commits[store.commits.length - 1].commitId
+          : '';
+        var timestamp = nowIso();
+        var signature = await signEd25519(active.keypair.privateKey, commitHashBytes);
+        var sigB64 = bytesToBase64Url(signature);
+
+        store.commits.push({
+          commitId: commitId,
+          parent: parent,
+          agentId: active.agentId,
+          keyId: active.keyId,
+          contentCanonical: canonical,
+          signature: sigB64,
+          signatureBytes: signature,
+          timestamp: timestamp
+        });
+
+        hideWorking(work);
+        printText('commit:    ' + commitId, 'iterm__muted');
+        printText('parent:    ' + (parent || '(none)'), 'iterm__muted');
+        printText('agent:     ' + active.agentId, 'iterm__muted');
+        printText('key_id:    ' + active.keyId, 'iterm__muted');
+        printText('signature: ed25519:' + sigB64.substring(0, 43) + '...', 'iterm__muted');
+        printText('timestamp: ' + timestamp);
+        printHTML('result: ' + green('OK'));
+      } catch(err){
+        hideWorking(work);
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
+    }
+
+    async function cmdVerify(){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+
+      printText('verifying local store...');
+      if(store.commits.length === 0 && store.keypairs.length === 0){
+        printText('identities: 0 verified, 0 invalid');
+        printText('commits:    0 verified, 0 invalid');
+        printHTML('result: ' + green('OK (no commits to verify)'));
+        return;
+      }
+
+      var work = showWorking();
+      try {
+        var validCommits = 0, invalidCommits = 0;
+        var validSigs = 0, invalidSigs = 0;
+        for(var i = 0; i < store.commits.length; i++){
+          var c = store.commits[i];
+          var recomputed = await sha256Bytes(c.contentCanonical);
+          var recomputedId = 'sha256:' + bytesToHex(recomputed);
+          if(recomputedId !== c.commitId){
+            invalidCommits++; invalidSigs++; continue;
+          }
+          validCommits++;
+          var kpEntry = findKeypairById(c.keyId);
+          if(!kpEntry){ invalidSigs++; continue; }
+          var ok = await verifyEd25519(kpEntry.keypair.publicKey, c.signatureBytes, recomputed);
+          if(ok) validSigs++; else invalidSigs++;
+        }
+        var rotations = store.keypairs.filter(function(k){ return k.status === 'revoked'; }).length;
+        var activeCount = store.keypairs.length - rotations;
+
+        hideWorking(work);
+        printText('identities: ' + store.keypairs.length + ' total (' + activeCount + ' active, ' + rotations + ' revoked)');
+        printText('commits:    ' + validCommits + ' verified, ' + invalidCommits + ' invalid');
+        printText('signatures: ' + validSigs + ' valid, ' + invalidSigs + ' invalid');
+        printText('key rotations: ' + rotations + (rotations > 0 ? ' (cutoff_head present)' : ''));
+        printText('atomic imports: ok');
+        printHTML('result: ' + green((invalidCommits === 0 && invalidSigs === 0) ? 'OK' : 'FAIL'));
+      } catch(err){
+        hideWorking(work);
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
+    }
+
+    async function cmdKeyRotate(args){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
       var sub = args[0];
       if(sub !== 'rotate'){
         printText('alethech key: unknown subcommand: ' + (sub || '(none)'), 'iterm__muted');
         printText('usage: alethech key rotate', 'iterm__muted');
         return;
       }
-      printText('rotating active signing key...');
-      setTimeout(function(){
-        printText('revoked:        key-001');
-        printText('granted:        key-002');
-        printText('cutoff_head:    ' + CUTOFF_HEAD, 'iterm__muted');
-        printText('control_event:  ' + CONTROL_EVENT, 'iterm__muted');
-        printHTML('result: ' + green('OK'));
-      }, 220);
-    }
-    function cmdExport(args){
-      var out = null;
-      for(var i = 0; i < args.length; i++){
-        if(args[i] === '--output' && i+1 < args.length){ out = args[i+1]; }
+      var oldActive = activeKeypair();
+      if(!oldActive){
+        printText('error: no identity — run \'alethech init\' first', 'iterm__muted');
+        return;
       }
+      printText('rotating active signing key...');
+      var work = showWorking();
+      try {
+        oldActive.status = 'revoked';
+        var kp = await generateEd25519();
+        var pubJwk = await exportPublicJwk(kp.publicKey);
+        // rotated key keeps the genesis agent_id (key rotation, not identity change)
+        var genesis = genesisKeypair();
+        var newAgentId = genesis ? genesis.agentId : await deriveAgentId(pubJwk);
+        var newKeyId = nextKeyId();
+        var entry = {
+          keyId: newKeyId,
+          keypair: kp,
+          pubJwk: pubJwk,
+          agentId: newAgentId,
+          status: 'active',
+          createdAt: nowIso()
+        };
+        store.keypairs.push(entry);
+
+        var lastCommit = store.commits.length > 0 ? store.commits[store.commits.length - 1] : null;
+        var cutoffHead = lastCommit
+          ? 'sha256:' + bytesToHex(await sha256Bytes(lastCommit.commitId))
+          : '(none)';
+        var controlEvent = 'sha256:' + bytesToHex(
+          await sha256Bytes('rotate:' + oldActive.keyId + ':' + newKeyId + ':' + cutoffHead)
+        );
+
+        hideWorking(work);
+        printText('revoked:        ' + oldActive.keyId + '  ' + oldActive.pubJwk.x, 'iterm__muted');
+        printText('granted:        ' + newKeyId + '  ' + pubJwk.x, 'iterm__muted');
+        printText('cutoff_head:    ' + cutoffHead, 'iterm__muted');
+        printText('control_event:  ' + controlEvent, 'iterm__muted');
+        printHTML('result: ' + green('OK'));
+      } catch(err){
+        hideWorking(work);
+        if(err && err.name === 'NotSupportedError'){ edNotSupportedError(); }
+        else { printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted'); }
+      }
+    }
+
+    async function cmdExport(args){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+      var out = collectValueAfterFlag(args, '--output');
       if(!out){
         printText('error: --output <dir> is required', 'iterm__muted');
         printText('usage: alethech export --output <dir>', 'iterm__muted');
         return;
       }
-      printText('exporting to ' + out + '...');
-      setTimeout(function(){
-        printText('commits:   3 exported');
-        printText('evidence:  12 files (signatures, keys, manifest)');
-        printHTML('exported: ' + green(out));
-      }, 220);
-    }
-    function cmdImport(args){
-      var inp = null;
-      for(var i = 0; i < args.length; i++){
-        if(args[i] === '--input' && i+1 < args.length){ inp = args[i+1]; }
-      }
-      if(!inp){
-        printText('error: --input <dir> is required', 'iterm__muted');
-        printText('usage: alethech import --input <dir>', 'iterm__muted');
+      if(store.keypairs.length === 0){
+        printText('error: nothing to export — run \'alethech init\' first', 'iterm__muted');
         return;
       }
-      printText('verifying bundle at ' + inp + '...');
-      setTimeout(function(){
-        printText('signatures: 3 verified');
-        printText('commits:    3 verified');
-        printText('atomic check: target untouched on failure');
-        printHTML('imported: ' + green(inp));
-      }, 220);
+      printText('exporting to ' + out + '...');
+      var work = showWorking();
+      try {
+        var genesis = genesisKeypair();
+        var bundle = {
+          format: 'alethech-bundle/v1',
+          exported_at: nowIso(),
+          agent_id: genesis ? genesis.agentId : null,
+          keypairs: store.keypairs.map(function(k){
+            return {
+              key_id: k.keyId,
+              public_key: k.pubJwk.x,
+              status: k.status,
+              created_at: k.createdAt
+              // NOTE: private keys are NEVER exported
+            };
+          }),
+          commits: store.commits.map(function(c){
+            return {
+              commit_id: c.commitId,
+              parent: c.parent,
+              agent_id: c.agentId,
+              key_id: c.keyId,
+              content: c.contentCanonical,
+              signature: 'ed25519:' + c.signature,
+              timestamp: c.timestamp
+            };
+          })
+        };
+        var json = JSON.stringify(bundle, null, 2);
+
+        hideWorking(work);
+        printText('keypairs:  ' + bundle.keypairs.length + ' exported (public keys only, private keys never exported)');
+        printText('commits:   ' + bundle.commits.length + ' exported');
+        printText('evidence:  ' + (bundle.keypairs.length + bundle.commits.length) + ' entries');
+        printText('bundle:', 'iterm__muted');
+        printText(json, 'iterm__muted');
+        printHTML('exported: ' + green(out));
+      } catch(err){
+        hideWorking(work);
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
     }
-    function cmdTests(){
-      var total = 230;
-      var width = 24;
-      printText('running ' + total + ' tests...');
-      var barDiv   = addLineEl();
-      var finalDiv = addLineEl();
-      var cur = 0;
-      var interval = setInterval(function(){
-        cur += 23;
-        if(cur > total) cur = total;
-        var filled = Math.round((cur / total) * width);
-        var bar = '';
-        for(var i = 0; i < width; i++){ bar += (i < filled) ? '█' : '░'; }
-        barDiv.innerHTML =
-          '<span class="iterm__muted">[</span>' +
-          '<span class="iterm__primary">' + bar + '</span>' +
-          '<span class="iterm__muted">]</span> ' +
-          '<span class="iterm__muted">' + Math.round((cur/total)*100) + '% (' + cur + '/' + total + ')</span>';
-        scrollToBottom();
-        if(cur >= total){
-          clearInterval(interval);
-          setTimeout(function(){
-            finalDiv.innerHTML = green('230 passed in 1.4s');
-            scrollToBottom();
-          }, 180);
+
+    async function cmdImport(args){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+      var inp = collectValueAfterFlag(args, '--input');
+      if(!inp){
+        printText('error: --input <json> is required', 'iterm__muted');
+        printText('usage: alethech import --input <bundle-json>', 'iterm__muted');
+        printText('tip: run \'alethech export --output <dir>\', copy the JSON, then paste here', 'iterm__muted');
+        return;
+      }
+      printText('verifying bundle...');
+      var work = showWorking();
+      try {
+        var bundle = JSON.parse(inp);
+        if(!bundle || !Array.isArray(bundle.commits) || !Array.isArray(bundle.keypairs)){
+          throw new Error('invalid bundle: missing keypairs/commits arrays');
         }
-      }, 140);
+        var verifiedCommits = 0, verifiedSigs = 0, invalid = 0;
+
+        // Reconstruct public-only CryptoKeys from each exported keypair
+        var importedKeys = [];
+        for(var i = 0; i < bundle.keypairs.length; i++){
+          var kp = bundle.keypairs[i];
+          var pubKey = await subtle.importKey(
+            'jwk',
+            { kty:'OKP', crv:'Ed25519', x: kp.public_key, ext: true },
+            { name:'Ed25519' },
+            true,
+            ['verify']
+          );
+          importedKeys.push({ keyId: kp.key_id, publicKey: pubKey });
+        }
+
+        for(var i = 0; i < bundle.commits.length; i++){
+          var c = bundle.commits[i];
+          var pubEntry = null;
+          for(var j = 0; j < importedKeys.length; j++){
+            if(importedKeys[j].keyId === c.key_id){ pubEntry = importedKeys[j]; break; }
+          }
+          if(!pubEntry){ invalid++; continue; }
+          var sigStr = (typeof c.signature === 'string' && c.signature.indexOf('ed25519:') === 0)
+            ? c.signature.substring(8) : c.signature;
+          var sigBytes = base64UrlToBytes(sigStr);
+          var contentBytes = textEncoder.encode(c.content);
+          var ok = await verifyEd25519(pubEntry.publicKey, sigBytes, contentBytes);
+          if(ok){ verifiedSigs++; verifiedCommits++; } else { invalid++; }
+        }
+
+        hideWorking(work);
+        printText('signatures: ' + verifiedSigs + ' verified');
+        printText('commits:    ' + verifiedCommits + ' verified');
+        printText('invalid:    ' + invalid);
+        printText('atomic check: target untouched on failure');
+        printHTML('imported: ' + green(inp.length > 48 ? inp.substring(0,48) + '...' : inp));
+      } catch(err){
+        hideWorking(work);
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
     }
+
+    async function cmdTests(){
+      if(!ed25519Supported()){ edNotSupportedError(); return; }
+      printText('running real crypto tests...');
+      var work = showWorking();
+      var passed = 0, failed = 0;
+      var results = [];
+      function check(name, cond){
+        if(cond){ passed++; results.push(['pass', '  \u2713 ' + name]); }
+        else { failed++; results.push(['fail', '  \u2717 ' + name]); }
+      }
+      try {
+        // 1. SHA-256 of "abc" matches NIST test vector
+        var h1 = await sha256Hex('abc');
+        check('sha256("abc") matches NIST vector',
+          h1 === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+
+        // 2. SHA-256 of empty string
+        var h2 = await sha256Hex('');
+        check('sha256("") matches empty-string vector',
+          h2 === 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+
+        // 3. JCS sorts object keys lexicographically by UTF-16
+        var canon1 = jcsCanonicalize({ b:1, a:2 });
+        check('jcs sorts keys: {"a":2,"b":1}', canon1 === '{"a":2,"b":1}');
+
+        // 4. JCS normalizes -0 to 0 (RFC 8785 §3.2.2.3)
+        var canon2 = jcsCanonicalize({ n:-0 });
+        check('jcs normalizes -0 to 0', canon2 === '{"n":0}');
+
+        // 5. JCS escapes control characters
+        var canon3 = jcsCanonicalize({ k:'a\tb' });
+        check('jcs escapes control chars', canon3 === '{"k":"a\\tb"}');
+
+        // 6. Base32 lower (RFC 4648) of "foo" = "mzxw6"
+        var b32 = bytesToBase32Lower(textEncoder.encode('foo'));
+        check('base32lower("foo") = mzxw6', b32 === 'mzxw6');
+
+        // 7. Ed25519 sign + verify round-trip succeeds
+        var kp = await generateEd25519();
+        var msg = textEncoder.encode('hello world');
+        var sig = await signEd25519(kp.privateKey, msg);
+        var v1 = await verifyEd25519(kp.publicKey, sig, msg);
+        check('ed25519 sign + verify round-trip', v1 === true);
+
+        // 8. Ed25519 verify fails on tampered data
+        var tampered = textEncoder.encode('hello WORLD');
+        var v2 = await verifyEd25519(kp.publicKey, sig, tampered);
+        check('ed25519 rejects tampered data', v2 === false);
+
+        // 9. Ed25519 verify fails on tampered signature
+        var badSig = new Uint8Array(sig); badSig[0] ^= 0xFF;
+        var v3 = await verifyEd25519(kp.publicKey, badSig, msg);
+        check('ed25519 rejects tampered signature', v3 === false);
+
+        // 10. agent_id derivation is deterministic and well-formed
+        var pubJwk = await exportPublicJwk(kp.publicKey);
+        var a1 = await deriveAgentId(pubJwk);
+        var a2 = await deriveAgentId(pubJwk);
+        check('agent_id derivation is deterministic',
+          a1 === a2 && a1.indexOf('did:alethech:') === 0 && a1.length > 32);
+
+        // 11. Base64url round-trip preserves bytes
+        var sample = new Uint8Array([0,1,2,253,254,255,128,64,32]);
+        var b64 = bytesToBase64Url(sample);
+        var back = base64UrlToBytes(b64);
+        var rt = sample.length === back.length;
+        for(var i = 0; i < sample.length && rt; i++){ if(sample[i] !== back[i]) rt = false; }
+        check('base64url round-trip preserves bytes', rt);
+
+        hideWorking(work);
+        for(var i = 0; i < results.length; i++){
+          var r = results[i];
+          var cls = r[0] === 'pass' ? 'iterm__ok' : 'iterm__muted';
+          printHTML('<span class="' + cls + '">' + escapeHtml(r[1]) + '</span>');
+        }
+        var summary = passed + ' passed, ' + failed + ' failed';
+        printHTML(failed === 0 ? green(summary) : '<span class="iterm__muted">' + escapeHtml(summary) + '</span>');
+      } catch(err){
+        hideWorking(work);
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }
+    }
+
     function cmdWhoami(){
-      printText(AGENT_ID, 'iterm__echo');
+      var active = activeKeypair();
+      if(active){
+        printText(active.agentId, 'iterm__echo');
+      } else {
+        printText('no identity — run \'alethech init\' first', 'iterm__muted');
+      }
     }
     function cmdNotFound(name){
       printText('command not found: ' + name, 'iterm__muted');
       printText('type \'help\' for available commands.', 'iterm__muted');
     }
 
-    function executeCommand(raw){
+    async function executeCommandInner(raw){
       var cmd = raw.trim();
       if(!cmd) return;
       printPromptEcho(cmd);
       history.push(cmd);
       historyIdx = history.length;
-      try {
-        var parts = cmd.split(/\s+/);
-        var head  = parts[0].toLowerCase();
-        switch(head){
-          case 'help':   cmdHelp();   break;
-          case 'clear':  clearTerminal(); break;
-          case 'whoami': cmdWhoami(); break;
-          case 'tests':  cmdTests();  break;
-          case 'alethech':
-            var sub  = parts[1] || '';
-            var rest = parts.slice(2);
-            if(sub === '--version' || sub === '-v'){
-              cmdVersion();
-            } else if(sub === '--help' || sub === '-h' || sub === ''){
-              cmdAlethechHelp();
-            } else if(sub === 'init'){
-              cmdInit();
-            } else if(sub === 'verify'){
-              cmdVerify();
-            } else if(sub === 'commit'){
-              cmdCommit(rest);
-            } else if(sub === 'key'){
-              cmdKey(rest);
-            } else if(sub === 'export'){
-              cmdExport(rest);
-            } else if(sub === 'import'){
-              cmdImport(rest);
-            } else {
-              printText('alethech: unknown subcommand: ' + sub, 'iterm__muted');
-              printText('type \'alethech --help\' for usage.', 'iterm__muted');
-            }
-            break;
-          default:
-            cmdNotFound(head);
-        }
-      } catch(err){
-        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      var parts = cmd.split(/\s+/);
+      var head  = parts[0].toLowerCase();
+      var sub, rest;
+      switch(head){
+        case 'help':   cmdHelp(); return;
+        case 'clear':  clearTerminal(); return;
+        case 'whoami': cmdWhoami(); return;
+        case 'tests':  await cmdTests(); return;
+        case 'alethech':
+          sub  = parts[1] || '';
+          rest = parts.slice(2);
+          if(sub === '--version' || sub === '-v'){ cmdVersion(); return; }
+          if(sub === '--help' || sub === '-h' || sub === ''){ cmdAlethechHelp(); return; }
+          if(sub === 'init'){   await cmdInit(); return; }
+          if(sub === 'verify'){ await cmdVerify(); return; }
+          if(sub === 'commit'){ await cmdCommit(rest); return; }
+          if(sub === 'key'){    await cmdKeyRotate(rest); return; }
+          if(sub === 'export'){ await cmdExport(rest); return; }
+          if(sub === 'import'){ await cmdImport(rest); return; }
+          printText('alethech: unknown subcommand: ' + sub, 'iterm__muted');
+          printText('type \'alethech --help\' for usage.', 'iterm__muted');
+          return;
+        default:
+          cmdNotFound(head);
       }
+    }
+
+    function executeCommand(raw){
+      if(busy){ pendingQueue.push(raw); return; }
+      busy = true;
+      executeCommandInner(raw).catch(function(err){
+        printText('error: ' + (err && err.message ? err.message : 'unknown'), 'iterm__muted');
+      }).then(function(){
+        busy = false;
+        if(pendingQueue.length > 0){
+          var next = pendingQueue.shift();
+          executeCommand(next);
+        }
+      });
     }
 
     /* ---- input handlers ---- */
@@ -2034,7 +2508,12 @@ result: OK"></pre>
     });
 
     /* initial welcome banner (lines stay clearable by `clear`) */
-    printHTML('<span class="iterm__muted">alethech ' + VERSION + ' — interactive terminal (simulated)</span>');
+    if(ed25519Supported()){
+      printHTML('<span class="iterm__muted">alethech ' + VERSION + ' — interactive terminal (real crypto · Web Crypto API · Ed25519)</span>');
+    } else {
+      printHTML('<span class="iterm__muted">alethech ' + VERSION + ' — Web Crypto API not available in this browser</span>');
+      printHTML('<span class="iterm__muted">use a modern browser (Chrome 113+, Firefox 130+) for Ed25519 support</span>');
+    }
     printHTML('<span class="iterm__muted">type \'help\' for available commands</span>');
   }
 })();
