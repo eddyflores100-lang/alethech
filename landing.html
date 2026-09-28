@@ -3,1489 +3,1379 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>alethech — chalkboard of the un-concealing</title>
+<title>alethech — the art of un-concealing</title>
+<meta name="description" content="Verifiable agent continuity protocol. Ed25519 + SHA-256 + JCS RFC 8785. The art of un-concealing transmission integrity.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Permanent+Marker&family=Shadows+Into+Light&family=Cedarville+Cursive&family=Gloria+Hallelujah&family=Reenie+Beanie&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Permanent+Marker&family=Shadows+Into+Light&family=Cedarville+Cursive&family=Reenie+Beanie&family=Gloria+Hallelujah&display=swap" rel="stylesheet">
+
+<!-- ============ SVG CHALK FILTERS (shared defs) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="chalky" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="chalky-strong" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="chalk-dust" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="1.5" numOctaves="1" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="1.4"/>
+      <feGaussianBlur stdDeviation="0.3"/>
+    </filter>
+    <filter id="rough">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" seed="2"/>
+      <feDisplacementMap in="SourceGraphic" scale="6"/>
+    </filter>
+  </defs>
+</svg>
+
 <style>
-/* ============================================
-   ALETHECH CHALKBOARD
-   real black chalkboard, colored chalk, retro
-   ============================================ */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+/* ============================================================
+   ALETHECH — NON-LINEAR CHALKBOARD
+   black chalkboard · colored chalk · hand-drawn via SVG filters
+   ============================================================ */
 
-html { scroll-behavior: smooth; }
-
-body {
-  background: #0a0a0a;
-  background-image:
-    radial-gradient(ellipse at top, #1a1a1a 0%, #0a0a0a 60%),
-    radial-gradient(ellipse at bottom, #0f0f0f 0%, #050505 80%);
-  color: #f5f5dc;
-  font-family: 'Caveat', cursive;
-  overflow-x: hidden;
-  min-height: 100vh;
+:root{
+  --bg:#0a0a0a;
+  --bg-2:#0f0f0f;
+  --chalk:#f5f5dc;          /* white-ish chalk */
+  --chalk-yellow:#fff44f;
+  --chalk-pink:#ff69b4;
+  --chalk-blue:#4fc3f7;
+  --chalk-green:#69f0ae;
+  --chalk-orange:#ffb74d;
+  --chalk-purple:#ba68c8;
+  --chalk-red:#ff5252;
+  --accent:var(--chalk-green);
 }
 
-/* Chalkboard texture — noise + scratches */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-image:
-    repeating-linear-gradient(90deg, transparent 0, transparent 3px, rgba(255,255,255,0.004) 3px, rgba(255,255,255,0.004) 4px),
-    repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(255,255,255,0.003) 3px, rgba(255,255,255,0.003) 4px);
-  pointer-events: none;
-  z-index: 1;
+*{margin:0;padding:0;box-sizing:border-box;}
+
+html{scroll-behavior:auto;}
+
+body{
+  background:var(--bg);
+  color:var(--chalk);
+  font-family:'Caveat',cursive;
+  overflow-x:hidden;
+  cursor:none;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
 }
 
-/* Chalk dust particles canvas */
-#chalk-dust {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0.6;
-}
-
-/* SVG filter for chalk roughness */
-.chalk-text {
-  filter: url(#chalk-filter);
-  position: relative;
-  display: inline-block;
-}
-
-/* Chalk colors */
-.chalk-white { color: #f5f5dc; text-shadow: 0 0 1px #f5f5dc, 0 0 3px rgba(245,245,220,0.3); }
-.chalk-yellow { color: #fff44f; text-shadow: 0 0 1px #fff44f, 0 0 4px rgba(255,244,79,0.4); }
-.chalk-pink { color: #ff69b4; text-shadow: 0 0 1px #ff69b4, 0 0 4px rgba(255,105,180,0.4); }
-.chalk-blue { color: #4fc3f7; text-shadow: 0 0 1px #4fc3f7, 0 0 4px rgba(79,195,247,0.4); }
-.chalk-green { color: #69f0ae; text-shadow: 0 0 1px #69f0ae, 0 0 4px rgba(105,240,174,0.4); }
-.chalk-orange { color: #ffb74d; text-shadow: 0 0 1px #ffb74d, 0 0 4px rgba(255,183,77,0.4); }
-.chalk-purple { color: #ba68c8; text-shadow: 0 0 1px #ba68c8, 0 0 4px rgba(186,104,200,0.4); }
-.chalk-red { color: #ff5252; text-shadow: 0 0 1px #ff5252, 0 0 4px rgba(255,82,82,0.4); }
-
-/* ============================================
-   HERO — the chalkboard opens
-   ============================================ */
-.hero {
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  z-index: 3;
-}
-
-.hero-frame {
-  width: 100%;
-  max-width: 900px;
-  border: 12px solid #2a1a0a;
-  border-radius: 4px;
-  padding: 3rem 2rem;
-  background: rgba(10,10,10,0.6);
-  box-shadow:
-    inset 0 0 60px rgba(0,0,0,0.8),
-    0 0 40px rgba(0,0,0,0.5);
-  position: relative;
-}
-
-/* Wooden frame texture */
-.hero-frame::before {
-  content: '';
-  position: absolute;
-  top: -12px; left: -12px; right: -12px; bottom: -12px;
+/* chalkboard grain + faint vignette */
+body::before{
+  content:'';
+  position:fixed;inset:0;
   background:
-    repeating-linear-gradient(90deg, #3a2a1a 0, #2a1a0a 4px, #3a2a1a 8px, #2a1a0a 12px);
-  z-index: -1;
-  border-radius: 4px;
-}
-
-.hero-eyebrow {
-  font-family: 'Reenie Beanie', cursive;
-  font-size: 1.5rem;
-  text-align: center;
-  margin-bottom: 1rem;
-  letter-spacing: 0.1em;
-}
-
-.hero-greek {
-  font-family: 'Cedarville Cursive', cursive;
-  font-size: clamp(3rem, 8vw, 6rem);
-  text-align: center;
-  line-height: 1;
-  margin-bottom: 0.5rem;
-}
-
-.hero-title {
-  font-family: 'Permanent Marker', cursive;
-  font-size: clamp(4rem, 14vw, 10rem);
-  text-align: center;
-  line-height: 0.9;
-  letter-spacing: -0.02em;
-  margin-bottom: 1rem;
-}
-
-.hero-subtitle {
-  font-family: 'Shadows Into Light', cursive;
-  font-size: clamp(1rem, 2.5vw, 1.6rem);
-  text-align: center;
-  max-width: 600px;
-  margin: 0 auto 2rem;
-  line-height: 1.4;
-}
-
-/* Continuous formula writing area */
-.formula-writer {
-  margin: 2rem 0;
-  min-height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Caveat', cursive;
-  font-size: 1.4rem;
-  text-align: center;
-  padding: 1rem;
-  border: 2px dashed rgba(245,245,220,0.2);
-  border-radius: 4px;
-  position: relative;
-  overflow: hidden;
-}
-
-.formula-writer::before {
-  content: '✐';
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  font-size: 1.2rem;
-  opacity: 0.4;
-}
-
-#formula-text {
-  display: inline-block;
-  min-height: 1.4em;
-}
-
-.cursor-chalk {
-  display: inline-block;
-  width: 2px;
-  height: 1.2em;
-  background: #f5f5dc;
-  animation: blink-chalk 0.8s infinite;
-  vertical-align: middle;
-  margin-left: 2px;
-}
-
-@keyframes blink-chalk {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
-
-.hero-stats {
-  display: flex;
-  gap: 2rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 2rem;
-  font-family: 'Caveat', cursive;
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-num {
-  font-family: 'Permanent Marker', cursive;
-  font-size: 2.5rem;
-}
-
-.stat-lbl {
-  font-size: 1rem;
-  opacity: 0.7;
-}
-
-.hero-cta {
-  margin-top: 2rem;
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.chalk-btn {
-  font-family: 'Permanent Marker', cursive;
-  font-size: 1.1rem;
-  padding: 0.8rem 1.8rem;
-  text-decoration: none;
-  border: 2px solid;
-  border-radius: 4px;
-  transition: all 0.3s;
-  display: inline-block;
-  position: relative;
-}
-
-.chalk-btn:hover {
-  transform: rotate(-1deg) scale(1.05);
-}
-
-.btn-cyan { color: #4fc3f7; border-color: #4fc3f7; background: rgba(79,195,247,0.05); }
-.btn-cyan:hover { background: rgba(79,195,247,0.15); box-shadow: 0 0 20px rgba(79,195,247,0.3); }
-
-.btn-pink { color: #ff69b4; border-color: #ff69b4; background: rgba(255,105,180,0.05); }
-.btn-pink:hover { background: rgba(255,105,180,0.15); box-shadow: 0 0 20px rgba(255,105,180,0.3); }
-
-/* ============================================
-   SECTIONS — different "boards"
-   ============================================ */
-.board {
-  position: relative;
-  z-index: 3;
-  padding: 4rem 2rem;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.board-label {
-  font-family: 'Reenie Beanie', cursive;
-  font-size: 1.4rem;
-  letter-spacing: 0.2em;
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.board-label::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.3;
-}
-
-.board-title {
-  font-family: 'Permanent Marker', cursive;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  margin-bottom: 2rem;
-  line-height: 1.1;
-}
-
-.board-text {
-  font-family: 'Caveat', cursive;
-  font-size: 1.4rem;
-  line-height: 1.6;
-  max-width: 700px;
-  margin-bottom: 1rem;
-}
-
-/* ============================================
-   DA VINCI SKETCHES
-   ============================================ */
-.sketch-container {
-  margin: 3rem 0;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 2rem;
-}
-
-.sketch {
-  position: relative;
-  width: 280px;
-  height: 320px;
-}
-
-.sketch svg {
-  width: 100%;
-  height: 100%;
-  filter: url(#chalk-filter);
-}
-
-.sketch-caption {
-  font-family: 'Shadows Into Light', cursive;
-  font-size: 1rem;
-  text-align: center;
-  margin-top: 0.5rem;
-  opacity: 0.7;
-}
-
-/* ============================================
-   FORMULA BLACKBOARD — continuous writing
-   ============================================ */
-.formula-board {
-  margin: 3rem 0;
-  border: 8px solid #2a1a0a;
-  border-radius: 4px;
-  padding: 2rem;
-  background: rgba(5,5,5,0.6);
-  position: relative;
-  min-height: 400px;
-}
-
-.formula-board::before {
-  content: '';
-  position: absolute;
-  top: -8px; left: -8px; right: -8px; bottom: -8px;
-  background: repeating-linear-gradient(90deg, #3a2a1a 0, #2a1a0a 4px, #3a2a1a 8px);
-  z-index: -1;
-  border-radius: 4px;
-}
-
-#formula-canvas {
-  width: 100%;
-  height: 100%;
-  min-height: 350px;
-}
-
-/* ============================================
-   ANIMATED DAG — chalk-drawn
-   ============================================ */
-.dag-board {
-  margin: 3rem 0;
-  padding: 2rem;
-  text-align: center;
-}
-
-.dag-svg-chalk {
-  width: 100%;
-  max-width: 800px;
-  height: 400px;
-  filter: url(#chalk-filter);
-}
-
-.dag-svg-chalk .node-circle {
-  fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.dag-svg-chalk .edge {
-  fill: none;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-  animation: draw-line 2s ease-out forwards;
-}
-
-@keyframes draw-line {
-  to { stroke-dashoffset: 0; }
-}
-
-.dag-svg-chalk .node-label {
-  font-family: 'Caveat', cursive;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.dag-svg-chalk .node-sub {
-  font-family: 'Reenie Beanie', cursive;
-  font-size: 13px;
-  opacity: 0.7;
-}
-
-/* ============================================
-   VERDICTS — chalk cards
-   ============================================ */
-.verdict-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin: 3rem 0;
-}
-
-@media (max-width: 768px) {
-  .verdict-row { grid-template-columns: 1fr; }
-}
-
-.verdict-box {
-  border: 3px dashed;
-  border-radius: 8px;
-  padding: 2rem;
-  position: relative;
-  background: rgba(255,255,255,0.02);
-}
-
-.verdict-box::before {
-  content: '';
-  position: absolute;
-  top: -3px; left: 20px;
-  width: 60px; height: 6px;
-  background: #0a0a0a;
-  border-bottom: 3px solid currentColor;
-}
-
-.verdict-good {
-  border-color: #69f0ae;
-  color: #69f0ae;
-  transform: rotate(-0.5deg);
-}
-
-.verdict-bad {
-  border-color: #ffb74d;
-  color: #ffb74d;
-  transform: rotate(0.5deg);
-}
-
-.verdict-name {
-  font-family: 'Permanent Marker', cursive;
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
-}
-
-.verdict-formula {
-  font-family: 'Caveat', cursive;
-  font-size: 1.8rem;
-  text-align: center;
-  margin: 1.5rem 0;
-  padding: 1rem;
-  border-top: 1px dashed currentColor;
-  border-bottom: 1px dashed currentColor;
-}
-
-.verdict-desc {
-  font-family: 'Caveat', cursive;
-  font-size: 1.2rem;
-  line-height: 1.5;
-  color: #f5f5dc;
-}
-
-/* ============================================
-   KEY ROTATION VISUAL
-   ============================================ */
-.rotation-viz {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
-  flex-wrap: wrap;
-  margin: 3rem 0;
-}
-
-.key-card {
-  border: 3px solid;
-  border-radius: 8px;
-  padding: 1.5rem;
-  text-align: center;
-  min-width: 180px;
-  position: relative;
-  font-family: 'Caveat', cursive;
-}
-
-.key-active {
-  border-color: #69f0ae;
-  background: rgba(105,240,174,0.05);
-}
-
-.key-revoked {
-  border-color: #ff5252;
-  background: rgba(255,82,82,0.05);
-  opacity: 0.7;
-}
-
-.key-id {
-  font-family: 'Permanent Marker', cursive;
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.key-status {
-  font-size: 1rem;
-  opacity: 0.8;
-}
-
-.arrow-rotate {
-  font-size: 2rem;
-  color: #fff44f;
-  animation: pulse-arrow 1.5s infinite;
-}
-
-@keyframes pulse-arrow {
-  0%, 100% { opacity: 0.5; transform: translateX(0); }
-  50% { opacity: 1; transform: translateX(5px); }
-}
-
-/* ============================================
-   CLI TERMINAL — chalk style
-   ============================================ */
-.chalk-terminal {
-  margin: 3rem 0;
-  border: 3px solid rgba(245,245,220,0.3);
-  border-radius: 8px;
-  background: rgba(0,0,0,0.7);
-  overflow: hidden;
-}
-
-.terminal-header {
-  background: rgba(245,245,220,0.05);
-  padding: 0.5rem 1rem;
-  border-bottom: 1px dashed rgba(245,245,220,0.2);
-  font-family: 'Reenie Beanie', cursive;
-  font-size: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.terminal-dots {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.tdot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  border: 1px solid;
-}
-
-.tdot.r { border-color: #ff5252; }
-.tdot.y { border-color: #fff44f; }
-.tdot.g { border-color: #69f0ae; }
-
-.terminal-body {
-  padding: 1.5rem;
-  font-family: 'Caveat', cursive;
-  font-size: 1.1rem;
-  min-height: 350px;
-  line-height: 1.7;
-}
-
-.term-line { margin-bottom: 0.3rem; }
-.term-prompt { color: #69f0ae; }
-.term-cmd { color: #f5f5dc; }
-.term-out { color: rgba(245,245,220,0.6); }
-.term-ok { color: #69f0ae; }
-.term-warn { color: #ffb74d; }
-.term-info { color: #4fc3f7; }
-
-/* ============================================
-   EINSTEIN DOODLES — hand-drawn SVGs
-   ============================================ */
-.einstein-doodle {
-  position: fixed;
-  width: 120px;
-  height: 120px;
-  opacity: 0.5;
-  z-index: 4;
-  pointer-events: none;
-  filter: url(#chalk-filter);
-}
-
-.einstein-doodle svg {
-  width: 100%;
-  height: 100%;
-}
-
-.einstein-tl { top: 20px; left: 20px; }
-.einstein-br { bottom: 20px; right: 20px; transform: rotate(180deg); }
-
-/* ============================================
-   FOOTER
-   ============================================ */
-.footer-board {
-  position: relative;
-  z-index: 3;
-  padding: 4rem 2rem 2rem;
-  text-align: center;
-  border-top: 3px dashed rgba(245,245,220,0.2);
-  margin-top: 4rem;
-}
-
-.footer-greek {
-  font-family: 'Cedarville Cursive', cursive;
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.footer-text {
-  font-family: 'Caveat', cursive;
-  font-size: 1.2rem;
-  opacity: 0.7;
-  margin-bottom: 1.5rem;
-}
-
-.footer-links {
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
-  flex-wrap: wrap;
-  font-family: 'Shadows Into Light', cursive;
-}
-
-.footer-links a {
-  color: #4fc3f7;
-  text-decoration: none;
-  font-size: 1.1rem;
-  border-bottom: 1px dashed transparent;
-  transition: border-color 0.3s;
-}
-
-.footer-links a:hover {
-  border-bottom-color: #4fc3f7;
-}
-
-.footer-sig {
-  margin-top: 2rem;
-  font-family: 'Cedarville Cursive', cursive;
-  font-size: 1rem;
-  opacity: 0.4;
-}
-
-/* ============================================
-   SCROLL REVEALS
-   ============================================ */
-.reveal {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 1s, transform 1s;
-}
-
-.reveal.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ============================================
-   ANTI-ROLLBACK TOWER
-   ============================================ */
-.tower-viz {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 3rem;
-  margin: 3rem 0;
-  flex-wrap: wrap;
-}
-
-.tower {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.tower-block {
-  padding: 1rem 1.5rem;
-  border: 2px solid;
-  border-radius: 4px;
-  font-family: 'Caveat', cursive;
-  font-size: 1.1rem;
-  text-align: center;
-  min-width: 180px;
-  position: relative;
-}
-
-.tb-good { border-color: #69f0ae; background: rgba(105,240,174,0.08); color: #69f0ae; }
-.tb-bad { border-color: #ff5252; background: rgba(255,82,82,0.08); color: #ff5252; text-decoration: line-through; }
-
-.tower-seq {
-  font-size: 0.85rem;
-  opacity: 0.6;
-  margin-top: 0.25rem;
-  font-family: 'Reenie Beanie', cursive;
-}
-
-.tower-arrow {
-  font-size: 1.5rem;
-  text-align: center;
-  color: #fff44f;
-}
-
-/* Mobile */
-@media (max-width: 768px) {
-  .hero-frame { padding: 2rem 1rem; }
-  .board { padding: 3rem 1rem; }
-  .formula-board { padding: 1.5rem; }
-  .terminal-body { font-size: 0.95rem; }
-  .einstein-doodle { display: none; }
+    radial-gradient(ellipse at 50% 0%, #161616 0%, #0a0a0a 55%),
+    radial-gradient(ellipse at 50% 100%, #0c0c0c 0%, #050505 80%);
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    repeating-linear-gradient(90deg,transparent 0,transparent 3px,rgba(245,245,220,.012) 3px,rgba(245,245,220,.012) 4px),
+    repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(245,245,220,.008) 3px,rgba(245,245,220,.008) 4px);
+  pointer-events:none;z-index:1;
+  mix-blend-mode:screen;
+}
+
+/* per-section tint that ScrollTrigger will fade */
+#tint{
+  position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(ellipse at 30% 40%,rgba(79,195,247,.05),transparent 60%);
+  transition:background .2s linear;
+}
+
+/* particle canvas (chalk dust) */
+#particles{
+  position:fixed;inset:0;
+  pointer-events:none;z-index:3;
+}
+
+/* drawing canvas (interactive formula draw) */
+#draw-canvas{
+  position:fixed;inset:0;
+  pointer-events:none;z-index:60;
+}
+
+/* ============ CUSTOM CHALK CURSOR ============ */
+#cursor{
+  position:fixed;top:0;left:0;
+  width:26px;height:26px;
+  pointer-events:none;z-index:9999;
+  transform:translate3d(-50%,-50%,0);
+  will-change:transform;
+}
+#cursor svg{display:block;filter:url(#chalky);}
+.cursor-dot{
+  position:fixed;width:6px;height:6px;border-radius:50%;
+  background:var(--chalk);pointer-events:none;z-index:9998;
+  transform:translate3d(-50%,-50%,0);
+  mix-blend-mode:screen;
+}
+.cursor-trail{
+  position:fixed;width:5px;height:5px;border-radius:50%;
+  pointer-events:none;z-index:9997;
+  transform:translate3d(-50%,-50%,0);
+  mix-blend-mode:screen;
+}
+body.no-cursor #cursor,body.no-cursor .cursor-dot,body.no-cursor .cursor-trail{display:none!important;}
+body.no-cursor{cursor:auto;}
+
+/* ============ SCROLL PROGRESS ============ */
+#progress{
+  position:fixed;top:0;left:0;height:4px;width:0%;
+  background:linear-gradient(90deg,var(--chalk-blue),var(--chalk-green),var(--chalk-yellow));
+  z-index:9000;box-shadow:0 0 14px rgba(105,240,174,.6);
+  filter:url(#chalky);
+}
+#progress-rail{
+  position:fixed;right:30px;top:50%;transform:translateY(-50%);
+  width:2px;height:46vh;z-index:9000;
+  background:rgba(245,245,220,.12);
+}
+#progress-fill{
+  position:absolute;top:0;left:0;width:100%;height:0%;
+  background:linear-gradient(180deg,var(--chalk-blue),var(--chalk-pink),var(--chalk-yellow));
+  filter:url(#chalky);
+}
+.progress-tick{
+  position:absolute;right:-7px;width:16px;height:2px;
+  background:var(--chalk);opacity:.3;
+  filter:url(#chalky);
+}
+.progress-tick.active{opacity:.9;width:22px;right:-10px;background:var(--chalk-green);}
+.progress-label{
+  position:absolute;right:24px;transform:translateY(-50%);
+  font-family:'Reenie Beanie',cursive;font-size:14px;color:var(--chalk);
+  opacity:0;transition:opacity .25s;white-space:nowrap;
+}
+.progress-tick.active .progress-label{opacity:.9;}
+
+/* ============ NAV ============ */
+#nav{
+  position:fixed;top:18px;left:50%;transform:translateX(-50%);
+  z-index:8000;display:flex;gap:6px;align-items:center;
+  font-family:'Shadows Into Light',cursive;font-size:15px;
+  background:rgba(10,10,10,.5);backdrop-filter:blur(6px);
+  padding:7px 14px;border-radius:30px;
+  border:1px solid rgba(245,245,220,.12);
+}
+#nav a{
+  color:var(--chalk);text-decoration:none;padding:4px 9px;border-radius:14px;
+  opacity:.6;transition:.25s;position:relative;
+}
+#nav a:hover{opacity:1;color:var(--chalk-green);}
+#nav a.active{opacity:1;color:var(--chalk-yellow);}
+#nav .brand{font-family:'Permanent Marker',cursive;color:var(--chalk-green);font-size:16px;}
+
+/* ============ GENERIC SECTION ============ */
+section{
+  position:relative;z-index:5;
+  width:100%;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:90px 6vw;overflow:hidden;
+}
+.chalk-tag{
+  font-family:'Shadows Into Light',cursive;
+  font-size:clamp(13px,1.4vw,17px);
+  letter-spacing:.32em;text-transform:uppercase;
+  color:var(--chalk-blue);opacity:.85;
+}
+.chalk-title{
+  font-family:'Permanent Marker',cursive;
+  font-size:clamp(40px,7vw,96px);
+  line-height:.95;color:var(--chalk);
+  filter:url(#chalky);
+}
+.chalk-sub{font-family:'Caveat',cursive;font-size:clamp(20px,2.4vw,32px);color:var(--chalk);opacity:.85;}
+
+/* staggered reveal */
+.reveal{opacity:0;will-change:transform,opacity;}
+
+/* ============ HERO ============ */
+#hero{flex-direction:column;text-align:center;}
+.hero-greek{
+  font-family:'Cedarville Cursive',cursive;
+  font-size:clamp(70px,15vw,200px);line-height:1;
+  color:var(--chalk);filter:url(#chalky-strong);
+  text-shadow:0 0 40px rgba(245,245,220,.15);
+}
+.hero-greek .eta{color:var(--chalk-yellow);}
+.hero-greek .theta{color:var(--chalk-pink);}
+.hero-greek .iota{color:var(--chalk-blue);}
+.hero-word{
+  font-family:'Permanent Marker',cursive;
+  font-size:clamp(48px,9vw,130px);letter-spacing:-.02em;
+  filter:url(#chalky);color:var(--chalk-green);
+}
+.hero-word .a{color:var(--chalk);}
+.hero-word .t{color:var(--chalk-yellow);}
+.hero-word .e2{color:var(--chalk-pink);}
+.hero-word .c{color:var(--chalk-blue);}
+.hero-word .h{color:var(--chalk-orange);}
+.hero-typewriter{
+  font-family:'Shadows Into Light',cursive;
+  font-size:clamp(15px,1.8vw,22px);
+  color:var(--chalk);min-height:2.4em;opacity:.85;
+  margin-top:14px;
+}
+.caret{display:inline-block;width:9px;height:1.1em;background:var(--chalk-green);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0;}}
+.scroll-hint{
+  position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+  font-family:'Reenie Beanie',cursive;font-size:22px;color:var(--chalk);opacity:.6;
+}
+.scroll-hint .arrow{display:block;width:18px;height:18px;margin:6px auto 0;border-right:2px solid var(--chalk);border-bottom:2px solid var(--chalk);transform:rotate(45deg);animation:bob 1.6s ease-in-out infinite;}
+@keyframes bob{50%{transform:rotate(45deg) translate(4px,4px);}}
+
+/* ============ PROPERTY (pinned 3D card) ============ */
+#property{perspective:1600px;}
+.property-card{
+  position:relative;max-width:900px;padding:60px 50px;
+  background:rgba(20,20,20,.55);border:2px solid rgba(245,245,220,.18);
+  border-radius:18px;backdrop-filter:blur(4px);
+  transform-style:preserve-3d;will-change:transform;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 60px rgba(0,0,0,.4);
+}
+.property-card .corner{position:absolute;width:50px;height:50px;border:2px solid var(--chalk-yellow);filter:url(#chalky);}
+.property-card .corner.tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-top-left-radius:18px;}
+.property-card .corner.tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-top-right-radius:18px;border-color:var(--chalk-pink);}
+.property-card .corner.bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-bottom-left-radius:18px;border-color:var(--chalk-blue);}
+.property-card .corner.br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:18px;border-color:var(--chalk-green);}
+.property-quote{
+  font-family:'Caveat',cursive;font-size:clamp(22px,2.6vw,34px);
+  line-height:1.45;color:var(--chalk);
+}
+.property-quote .hl-y{color:var(--chalk-yellow);}
+.property-quote .hl-g{color:var(--chalk-green);}
+.property-quote .hl-b{color:var(--chalk-blue);}
+.property-quote .hl-p{color:var(--chalk-pink);}
+.property-meta{margin-top:30px;display:flex;gap:30px;flex-wrap:wrap;font-family:'Shadows Into Light',cursive;font-size:14px;opacity:.7;}
+.property-meta b{color:var(--chalk-yellow);}
+
+/* ============ HORIZONTAL: FOUR EQUATIONS ============ */
+#eq-pin{
+  height:100vh;display:flex;align-items:center;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,#121212,#070707);
+}
+.eq-track{
+  display:flex;gap:6vw;padding:0 10vw;height:80vh;align-items:center;
+  will-change:transform;
+}
+.eq-panel{
+  flex:0 0 auto;width:min(78vw,720px);
+  height:100%;display:flex;flex-direction:column;justify-content:center;
+  position:relative;padding:40px;
+}
+.eq-num{
+  font-family:'Permanent Marker',cursive;font-size:clamp(60px,9vw,120px);
+  color:var(--chalk);opacity:.12;line-height:.8;
+  position:absolute;top:10px;left:20px;filter:url(#chalky);
+}
+.eq-label{font-family:'Shadows Into Light',cursive;font-size:16px;letter-spacing:.3em;text-transform:uppercase;color:var(--chalk-blue);}
+.eq-formula{
+  font-family:'Cedarville Cursive',cursive;
+  font-size:clamp(22px,3.4vw,42px);line-height:1.5;
+  color:var(--chalk);margin:24px 0;word-break:break-word;
+}
+.eq-formula .k{color:var(--chalk-yellow);}
+.eq-formula .f{color:var(--chalk-green);}
+.eq-formula .s{color:var(--chalk-pink);}
+.eq-formula .h{color:var(--chalk-blue);}
+.eq-formula .neg{color:var(--chalk-red);}
+.eq-desc{font-family:'Caveat',cursive;font-size:clamp(17px,1.9vw,23px);opacity:.8;max-width:560px;}
+.eq-draw-hint{
+  margin-top:26px;font-family:'Reenie Beanie',cursive;font-size:20px;color:var(--chalk-green);opacity:.7;
+}
+.eq-canvas{
+  position:absolute;inset:0;pointer-events:none;
+}
+.eq-panel.drawing .eq-canvas{pointer-events:auto;cursor:none;}
+.eq-panel:hover .eq-formula{text-shadow:0 0 18px rgba(105,240,174,.25);}
+
+/* ============ MERKLE DAG ============ */
+#dag{flex-direction:column;}
+.dag-wrap{position:relative;width:min(1100px,94vw);height:min(70vh,620px);margin-top:30px;}
+.dag-svg{width:100%;height:100%;overflow:visible;}
+.dag-node circle{fill:#141414;stroke:var(--chalk);stroke-width:2.2;filter:url(#chalky);}
+.dag-node text{font-family:'Cedarville Cursive',cursive;font-size:15px;fill:var(--chalk);}
+.dag-node.bad circle{stroke:var(--chalk-red);}
+.dag-node.bad text{fill:var(--chalk-red);}
+.dag-edge{stroke:var(--chalk);stroke-width:2;fill:none;stroke-dasharray:1200;stroke-dashoffset:1200;filter:url(#chalky);}
+.dag-edge.bad{stroke:var(--chalk-red);}
+.dag-node.shake{animation:shake .5s;}
+@keyframes shake{0%,100%{transform:translate(0,0);}20%{transform:translate(-6px,3px);}40%{transform:translate(6px,-3px);}60%{transform:translate(-5px,-2px);}80%{transform:translate(4px,2px);}}
+.dag-legend{display:flex;gap:30px;flex-wrap:wrap;margin-top:24px;font-family:'Shadows Into Light',cursive;font-size:14px;opacity:.8;}
+.dag-legend .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px;}
+
+/* ============ TWO VERDICTS (3D flip) ============ */
+#verdicts{flex-direction:column;gap:40px;}
+.verdict-grid{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;perspective:1600px;}
+.flip-card{flex:0 1 420px;min-height:300px;position:relative;cursor:none;}
+.flip-inner{
+  position:relative;width:100%;height:100%;
+  transform-style:preserve-3d;transition:transform .9s cubic-bezier(.5,.1,.2,1);
+  will-change:transform;
+}
+.flip-card.flipped .flip-inner{transform:rotateY(180deg);}
+.flip-face{
+  position:absolute;inset:0;backface-visibility:hidden;
+  border:2px solid;border-radius:18px;padding:36px;
+  display:flex;flex-direction:column;justify-content:center;
+  background:rgba(18,18,18,.7);backdrop-filter:blur(4px);
+  filter:url(#chalky);
+}
+.flip-front.valid{border-color:var(--chalk-green);box-shadow:0 0 50px rgba(105,240,174,.18);}
+.flip-front.invalid{border-color:var(--chalk-red);box-shadow:0 0 50px rgba(255,82,82,.18);}
+.flip-back{transform:rotateY(180deg);border-color:var(--chalk-yellow);}
+.flip-face h3{font-family:'Permanent Marker',cursive;font-size:30px;margin-bottom:14px;}
+.flip-front.valid h3{color:var(--chalk-green);}
+.flip-front.invalid h3{color:var(--chalk-red);}
+.flip-back h3{color:var(--chalk-yellow);}
+.flip-face p{font-family:'Caveat',cursive;font-size:21px;line-height:1.4;opacity:.9;}
+.flip-face .code{font-family:'Cedarville Cursive',cursive;font-size:18px;margin-top:14px;opacity:.85;}
+.flip-hint{position:absolute;bottom:14px;right:18px;font-family:'Reenie Beanie',cursive;font-size:18px;opacity:.5;}
+
+/* ============ KEY ROTATION ============ */
+#rotation{flex-direction:column;}
+.rot-stage{position:relative;width:min(900px,94vw);height:min(48vh,420px);margin-top:30px;}
+.rot-key{position:absolute;top:50%;transform:translateY(-50%);text-align:center;will-change:transform,opacity;}
+.rot-key .key-label{font-family:'Permanent Marker',cursive;font-size:clamp(26px,3.4vw,40px);filter:url(#chalky);}
+.rot-key .key-id{font-family:'Cedarville Cursive',cursive;font-size:18px;opacity:.7;margin-top:6px;}
+.rot-key.a{left:8%;color:var(--chalk-blue);}
+.rot-key.b{right:8%;color:var(--chalk-green);}
+.rot-arrow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:50%;height:4px;}
+.rot-arrow svg{width:100%;height:80px;overflow:visible;}
+.rot-arrow path{stroke:var(--chalk-yellow);stroke-width:2.4;fill:none;stroke-dasharray:1400;stroke-dashoffset:1400;filter:url(#chalky);}
+.rot-cutoff{
+  position:absolute;top:8%;left:50%;transform:translateX(-50%);
+  font-family:'Shadows Into Light',cursive;font-size:15px;color:var(--chalk-pink);text-align:center;
+}
+.rot-cutoff .head{font-family:'Cedarville Cursive',cursive;font-size:20px;color:var(--chalk-pink);}
+.rot-note{margin-top:30px;font-family:'Caveat',cursive;font-size:22px;opacity:.8;text-align:center;max-width:700px;}
+
+/* ============ ANTI-ROLLBACK TOWER ============ */
+#tower{flex-direction:column;}
+.tower-stage{position:relative;display:flex;gap:60px;align-items:flex-end;margin-top:40px;}
+.tower{position:relative;width:120px;height:480px;}
+.tower-block{
+  position:absolute;left:50%;transform:translateX(-50%);
+  width:110px;height:54px;border:2px solid var(--chalk-blue);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cedarville Cursive',cursive;font-size:15px;color:var(--chalk);
+  background:rgba(20,30,40,.5);
+  opacity:0;will-change:transform,opacity;filter:url(#chalky);
+}
+.tower-block.bad{border-color:var(--chalk-red);background:rgba(40,10,10,.6);color:var(--chalk-red);}
+.tower-checkpoint{
+  position:absolute;left:50%;transform:translateX(-50%);
+  font-family:'Shadows Into Light',cursive;font-size:14px;color:var(--chalk-yellow);text-align:center;
+}
+.tower-explain{flex:1;max-width:460px;font-family:'Caveat',cursive;font-size:22px;line-height:1.5;opacity:.9;}
+.tower-explain b{color:var(--chalk-yellow);}
+.tower-explain .bad{color:var(--chalk-red);}
+
+/* ============ CLI DEMO ============ */
+#cli{flex-direction:column;}
+.terminal{
+  width:min(820px,94vw);background:rgba(8,8,8,.85);
+  border:2px solid rgba(245,245,220,.2);border-radius:14px;
+  overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);filter:url(#chalky);
+  font-family:'Cedarville Cursive',monospace;
+}
+.terminal-bar{display:flex;gap:8px;padding:10px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(245,245,220,.1);}
+.terminal-bar .dot{width:12px;height:12px;border-radius:50%;}
+.terminal-bar .r{background:var(--chalk-red);}
+.terminal-bar .y{background:var(--chalk-yellow);}
+.terminal-bar .g{background:var(--chalk-green);}
+.terminal-body{padding:24px;font-size:clamp(14px,1.5vw,18px);line-height:1.7;min-height:340px;color:var(--chalk);}
+.terminal .cmd{color:var(--chalk-green);}
+.terminal .out{color:var(--chalk);opacity:.85;}
+.terminal .ok{color:var(--chalk-green);}
+.terminal .warn{color:var(--chalk-yellow);}
+.terminal .err{color:var(--chalk-red);}
+.terminal .pmt{color:var(--chalk-blue);}
+.terminal .cur{display:inline-block;width:9px;height:1.05em;background:var(--chalk-green);vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+
+/* ============ HONESTY (6 flip cards) ============ */
+#honesty{flex-direction:column;}
+.honesty-grid{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:36px;perspective:1400px;}
+.h-card{flex:0 1 280px;min-height:230px;position:relative;cursor:none;}
+.h-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .8s cubic-bezier(.5,.1,.2,1);will-change:transform;}
+.h-card.flipped .h-inner{transform:rotateY(180deg);}
+.h-face{position:absolute;inset:0;backface-visibility:hidden;border:2px solid;border-radius:14px;padding:22px;display:flex;flex-direction:column;justify-content:center;background:rgba(18,18,18,.7);filter:url(#chalky);}
+.h-front{border-color:var(--chalk-red);}
+.h-back{transform:rotateY(180deg);border-color:var(--chalk-yellow);}
+.h-num{font-family:'Permanent Marker',cursive;font-size:34px;color:var(--chalk-red);}
+.h-front p{font-family:'Caveat',cursive;font-size:22px;margin-top:10px;}
+.h-back p{font-family:'Caveat',cursive;font-size:19px;color:var(--chalk);}
+.h-back .tag{font-family:'Shadows Into Light',cursive;font-size:13px;color:var(--chalk-yellow);letter-spacing:.2em;text-transform:uppercase;margin-bottom:8px;}
+
+/* ============ FOOTER ============ */
+#footer{flex-direction:column;gap:24px;padding:120px 6vw 60px;text-align:center;}
+.footer-greek{font-family:'Cedarville Cursive',cursive;font-size:clamp(28px,3.4vw,46px);color:var(--chalk-yellow);filter:url(#chalky-strong);}
+.footer-trans{font-family:'Caveat',cursive;font-size:22px;opacity:.7;margin-top:8px;}
+.footer-links{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:20px;}
+.footer-links a{font-family:'Shadows Into Light',cursive;color:var(--chalk);text-decoration:none;border-bottom:1px dashed rgba(245,245,220,.3);padding:4px 8px;transition:.25s;}
+.footer-links a:hover{color:var(--chalk-green);border-color:var(--chalk-green);}
+.footer-id{font-family:'Cedarville Cursive',cursive;font-size:16px;opacity:.5;margin-top:24px;word-break:break-all;}
+
+/* ============ MAGNETIC BUTTONS ============ */
+.mag-btn{
+  position:relative;display:inline-block;cursor:none;
+  font-family:'Permanent Marker',cursive;font-size:clamp(18px,1.8vw,24px);
+  color:var(--chalk);padding:14px 28px;border:2px solid var(--chalk-green);
+  border-radius:30px;text-decoration:none;will-change:transform;filter:url(#chalky);
+  transition:color .25s,border-color .25s,box-shadow .25s;
+}
+.mag-btn:hover{color:var(--chalk-green);box-shadow:0 0 26px rgba(105,240,174,.35);}
+.mag-btn.alt{border-color:var(--chalk-yellow);}
+.mag-btn.alt:hover{color:var(--chalk-yellow);box-shadow:0 0 26px rgba(255,244,79,.3);}
+.mag-btn span{display:inline-block;will-change:transform;}
+
+/* ============ UTILS ============ */
+.parallax-bg{position:absolute;inset:0;z-index:-1;pointer-events:none;will-change:transform;}
+.chalk-divider{width:min(600px,80vw);height:2px;margin:30px auto;background:linear-gradient(90deg,transparent,var(--chalk),transparent);filter:url(#chalky);opacity:.4;}
+
+/* mobile */
+@media (max-width:760px){
+  #progress-rail{display:none;}
+  #nav{font-size:11px;gap:2px;padding:5px 8px;}
+  #nav a{padding:3px 5px;}
+  body{cursor:auto;}
+  #cursor,.cursor-dot,.cursor-trail{display:none;}
+  .eq-track{flex-direction:column;gap:30px;padding:0 6vw;}
+  #eq-pin{height:auto;}
+  .verdict-grid,.honesty-grid{gap:14px;}
+  .tower-stage{flex-direction:column;align-items:center;gap:30px;}
+  .tower{height:360px;}
 }
 </style>
 </head>
 <body>
 
-<!-- SVG filter for chalk texture -->
-<svg width="0" height="0" style="position:absolute">
-  <defs>
-    <filter id="chalk-filter">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="noise"/>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G"/>
-      <feGaussianBlur stdDeviation="0.3"/>
-    </filter>
-  </defs>
-</svg>
-
-<!-- Chalk dust canvas -->
-<canvas id="chalk-dust"></canvas>
-
-<!-- Einstein doodles (corners) -->
-<div class="einstein-doodle einstein-tl">
-  <svg viewBox="0 0 100 100">
-    <!-- Wild hair -->
-    <path d="M15,35 Q10,15 30,12 Q45,5 55,12 Q75,8 80,25 Q88,22 85,35 Q82,30 78,38 Q72,30 68,38 Q62,28 58,36 Q50,25 45,33 Q38,28 33,35 Q28,30 22,38 Q18,32 15,35 Z" fill="none" stroke="#f5f5dc" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Face -->
-    <ellipse cx="50" cy="55" rx="20" ry="25" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-    <!-- Glasses -->
-    <circle cx="42" cy="52" r="5" fill="none" stroke="#4fc3f7" stroke-width="1"/>
-    <circle cx="58" cy="52" r="5" fill="none" stroke="#4fc3f7" stroke-width="1"/>
-    <line x1="47" y1="52" x2="53" y2="52" stroke="#4fc3f7" stroke-width="1"/>
-    <!-- Mustache -->
-    <path d="M38,68 Q42,72 50,69 Q58,72 62,68 Q58,74 50,73 Q42,74 38,68 Z" fill="#f5f5dc"/>
-    <!-- Nose -->
-    <path d="M50,58 L47,65 L53,65 Z" fill="none" stroke="#f5f5dc" stroke-width="1"/>
-    <!-- E=mc² -->
-    <text x="50" y="95" text-anchor="middle" fill="#fff44f" font-size="9" font-family="serif" font-style="italic">E=mc²</text>
+<!-- fixed layers -->
+<canvas id="particles"></canvas>
+<div id="tint"></div>
+<canvas id="draw-canvas"></canvas>
+<div id="progress"></div>
+<div id="progress-rail"><div id="progress-fill"></div></div>
+<div id="cursor">
+  <svg viewBox="0 0 26 26" width="26" height="26">
+    <g filter="url(#chalky)">
+      <polygon points="3,4 8,2 12,3 9,9 6,11 2,8" fill="#f5f5dc" opacity=".95"/>
+      <polygon points="3,4 8,2 12,3 9,9 6,11 2,8" fill="none" stroke="#fff" stroke-width=".5"/>
+    </g>
   </svg>
 </div>
 
-<div class="einstein-doodle einstein-br">
-  <svg viewBox="0 0 100 100">
-    <!-- Lightbulb idea -->
-    <circle cx="50" cy="40" r="22" fill="none" stroke="#fff44f" stroke-width="1.5" stroke-dasharray="2 2"/>
-    <path d="M42,55 L42,62 L58,62 L58,55" fill="none" stroke="#fff44f" stroke-width="1.5"/>
-    <path d="M44,62 L44,66 L56,66 L56,62" fill="none" stroke="#fff44f" stroke-width="1.5"/>
-    <!-- Filament -->
-    <path d="M45,40 Q50,30 55,40" fill="none" stroke="#fff44f" stroke-width="1"/>
-    <!-- Rays -->
-    <line x1="50" y1="10" x2="50" y2="15" stroke="#fff44f" stroke-width="1.5"/>
-    <line x1="25" y1="25" x2="29" y2="29" stroke="#fff44f" stroke-width="1.5"/>
-    <line x1="75" y1="25" x2="71" y2="29" stroke="#fff44f" stroke-width="1.5"/>
-    <line x1="15" y1="40" x2="20" y2="40" stroke="#fff44f" stroke-width="1.5"/>
-    <line x1="85" y1="40" x2="80" y2="40" stroke="#fff44f" stroke-width="1.5"/>
-    <!-- Text -->
-    <text x="50" y="88" text-anchor="middle" fill="#69f0ae" font-size="8" font-family="serif" font-style="italic">idea!</text>
-  </svg>
-</div>
+<!-- nav -->
+<nav id="nav">
+  <span class="brand">alethech</span>
+  <a href="#hero" data-sec="hero">truth</a>
+  <a href="#property" data-sec="property">property</a>
+  <a href="#equations" data-sec="equations">equations</a>
+  <a href="#dag" data-sec="dag">dag</a>
+  <a href="#verdicts" data-sec="verdicts">verdict</a>
+  <a href="#rotation" data-sec="rotation">rotation</a>
+  <a href="#tower" data-sec="tower">tower</a>
+  <a href="#cli" data-sec="cli">cli</a>
+  <a href="#honesty" data-sec="honesty">honesty</a>
+</nav>
 
-<!-- ============================================
-     HERO
-     ============================================ -->
-<section class="hero">
-  <div class="hero-frame reveal">
-    <div class="hero-eyebrow chalk-yellow chalk-text">— a chalkboard meditation —</div>
-
-    <div class="hero-greek chalk-text chalk-white">ἀλήθεια</div>
-
-    <h1 class="hero-title chalk-text chalk-white">alethech</h1>
-
-    <p class="hero-subtitle chalk-text chalk-blue">
-      the art of <em style="color:#fff44f">un-concealing</em> transmission integrity<br>
-      <span style="font-size:0.85em;opacity:0.7">ἀλήθεια (aletheia, truth as un-concealment) + τέχνη (techne, art, craft)</span>
-    </p>
-
-    <!-- Continuous formula writer -->
-    <div class="formula-writer">
-      <span id="formula-text" class="chalk-text chalk-green"></span><span class="cursor-chalk"></span>
-    </div>
-
-    <div class="hero-stats">
-      <div class="stat-item chalk-text">
-        <div class="stat-num chalk-yellow">230</div>
-        <div class="stat-lbl chalk-white">tests</div>
-      </div>
-      <div class="stat-item chalk-text">
-        <div class="stat-num chalk-pink">8</div>
-        <div class="stat-lbl chalk-white">mutation paths</div>
-      </div>
-      <div class="stat-item chalk-text">
-        <div class="stat-num chalk-blue">0.7.0</div>
-        <div class="stat-lbl chalk-white">version</div>
-      </div>
-      <div class="stat-item chalk-text">
-        <div class="stat-num chalk-green">MIT</div>
-        <div class="stat-lbl chalk-white">license</div>
-      </div>
-    </div>
-
-    <div class="hero-cta">
-      <a href="https://github.com/eddyflores100-lang/alethech" target="_blank" class="chalk-btn btn-cyan chalk-text">→ source</a>
-      <a href="https://pypi.org/project/alethech/" target="_blank" class="chalk-btn btn-pink chalk-text">→ pip install</a>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================
-     THE PROPERTY
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-yellow chalk-text">§ I — the property</div>
-  <h2 class="board-title chalk-text chalk-white">what does it mean to <span class="chalk-pink">un-conceal</span>?</h2>
-
-  <div style="border: 3px dashed #69f0ae; border-radius: 8px; padding: 2rem; margin: 2rem 0; background: rgba(105,240,174,0.03); transform: rotate(-0.3deg);">
-    <p class="board-text chalk-text chalk-white" style="font-size: 1.5rem;">
-      this memory set forms part of a <span class="chalk-green">cryptographically verifiable history</span><br>
-      associated with a determined identity,<br>
-      whose commits can be <span class="chalk-yellow">independently verified</span><br>
-      with respect to their integrity, cryptographic authorship,<br>
-      and provenance relations.
-    </p>
-    <p class="board-text chalk-text chalk-blue" style="margin-top: 1.5rem;">
-      when a reference checkpoint exists,<br>
-      it can additionally be verified that the presented history<br>
-      <span class="chalk-pink">continues from that checkpoint.</span>
-    </p>
-  </div>
-
-  <p class="board-text chalk-text chalk-orange" style="margin-top: 2rem;">
-    ✗ the protocol does <strong>NOT</strong> prove that the agent's claims are <em>true</em><br>
-    ✓ only that they were <em>signed</em> by the identity that claims them<br><br>
-    the truth being un-concealed is the truth about<br>
-    <span class="chalk-yellow" style="font-size:1.6em">transmission integrity</span>, not about content.
-  </p>
-</section>
-
-<!-- ============================================
-     DA VINCI SKETCHES
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-blue chalk-text">§ II — sketches</div>
-  <h2 class="board-title chalk-text chalk-white">da vinci meets <span class="chalk-yellow">cryptography</span></h2>
-
-  <div class="sketch-container">
-    <!-- Vitruvian Agent -->
-    <div class="sketch">
-      <svg viewBox="0 0 200 220">
-        <!-- Circle -->
-        <circle cx="100" cy="110" r="80" fill="none" stroke="#f5f5dc" stroke-width="1.5" stroke-dasharray="3 2"/>
-        <!-- Square -->
-        <rect x="40" y="50" width="120" height="120" fill="none" stroke="#f5f5dc" stroke-width="1.5" stroke-dasharray="3 2"/>
-        <!-- Body (Vitruvian style) -->
-        <circle cx="100" cy="70" r="12" fill="none" stroke="#fff44f" stroke-width="2"/>
-        <!-- Arms outstretched -->
-        <line x1="100" y1="82" x2="40" y2="110" stroke="#fff44f" stroke-width="2"/>
-        <line x1="100" y1="82" x2="160" y2="110" stroke="#fff44f" stroke-width="2"/>
-        <!-- Arms up -->
-        <line x1="100" y1="82" x2="60" y2="60" stroke="#fff44f" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <line x1="100" y1="82" x2="140" y2="60" stroke="#fff44f" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <!-- Torso -->
-        <line x1="100" y1="82" x2="100" y2="130" stroke="#fff44f" stroke-width="2"/>
-        <!-- Legs together -->
-        <line x1="100" y1="130" x2="100" y2="170" stroke="#fff44f" stroke-width="2"/>
-        <!-- Legs spread -->
-        <line x1="100" y1="130" x2="70" y2="170" stroke="#fff44f" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <line x1="100" y1="130" x2="130" y2="170" stroke="#fff44f" stroke-width="1.5" stroke-dasharray="2 2"/>
-        <!-- Ed25519 text -->
-        <text x="100" y="20" text-anchor="middle" fill="#ff69b4" font-size="12" font-family="serif" font-style="italic">agent</text>
-        <text x="100" y="200" text-anchor="middle" fill="#4fc3f7" font-size="10" font-family="serif">Ed25519</text>
-        <text x="100" y="215" text-anchor="middle" fill="#f5f5dc" font-size="8" font-family="serif" font-style="italic">— did:alethech: —</text>
-      </svg>
-      <div class="sketch-caption chalk-blue chalk-text">the vitruvian agent</div>
-    </div>
-
-    <!-- Memory DAG -->
-    <div class="sketch">
-      <svg viewBox="0 0 200 220">
-        <!-- DAG nodes -->
-        <circle cx="40" cy="110" r="15" fill="none" stroke="#69f0ae" stroke-width="2"/>
-        <text x="40" y="115" text-anchor="middle" fill="#69f0ae" font-size="10" font-family="serif">G</text>
-
-        <circle cx="100" cy="70" r="15" fill="none" stroke="#fff44f" stroke-width="2"/>
-        <text x="100" y="75" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">C₁</text>
-
-        <circle cx="100" cy="150" r="15" fill="none" stroke="#fff44f" stroke-width="2"/>
-        <text x="100" y="155" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">C₂</text>
-
-        <circle cx="160" cy="110" r="15" fill="none" stroke="#ff69b4" stroke-width="2"/>
-        <text x="160" y="115" text-anchor="middle" fill="#ff69b4" font-size="10" font-family="serif">H</text>
-
-        <!-- Edges -->
-        <path d="M 55 105 Q 75 85 85 75" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-        <path d="M 55 115 Q 75 135 85 145" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-        <path d="M 115 75 Q 135 90 145 105" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-        <path d="M 115 145 Q 135 130 145 115" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-
-        <!-- Annotations -->
-        <text x="100" y="20" text-anchor="middle" fill="#f5f5dc" font-size="11" font-family="serif" font-style="italic">memory DAG</text>
-        <text x="100" y="200" text-anchor="middle" fill="#4fc3f7" font-size="9" font-family="serif">sha256 linked</text>
-        <text x="100" y="215" text-anchor="middle" fill="#f5f5dc" font-size="8" font-family="serif" font-style="italic">— merkle structure —</text>
-      </svg>
-      <div class="sketch-caption chalk-yellow chalk-text">the memory tree</div>
-    </div>
-
-    <!-- Key Rotation Clock -->
-    <div class="sketch">
-      <svg viewBox="0 0 200 220">
-        <!-- Clock circle -->
-        <circle cx="100" cy="110" r="70" fill="none" stroke="#f5f5dc" stroke-width="1.5"/>
-        <!-- Hour marks -->
-        <g stroke="#f5f5dc" stroke-width="1">
-          <line x1="100" y1="45" x2="100" y2="52"/>
-          <line x1="165" y1="110" x2="158" y2="110"/>
-          <line x1="100" y1="175" x2="100" y2="168"/>
-          <line x1="35" y1="110" x2="42" y2="110"/>
-        </g>
-        <!-- Numbers -->
-        <text x="100" y="40" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">12</text>
-        <text x="175" y="115" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">3</text>
-        <text x="100" y="190" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">6</text>
-        <text x="25" y="115" text-anchor="middle" fill="#fff44f" font-size="10" font-family="serif">9</text>
-        <!-- Hands -->
-        <line x1="100" y1="110" x2="100" y2="60" stroke="#69f0ae" stroke-width="2.5"/>
-        <line x1="100" y1="110" x2="140" y2="110" stroke="#ff69b4" stroke-width="2.5"/>
-        <circle cx="100" cy="110" r="4" fill="#fff44f"/>
-        <!-- Text -->
-        <text x="100" y="20" text-anchor="middle" fill="#f5f5dc" font-size="11" font-family="serif" font-style="italic">sequence</text>
-        <text x="100" y="200" text-anchor="middle" fill="#ff5252" font-size="9" font-family="serif">NOT clock time</text>
-        <text x="100" y="215" text-anchor="middle" fill="#f5f5dc" font-size="8" font-family="serif" font-style="italic">— monotonic —</text>
-      </svg>
-      <div class="sketch-caption chalk-pink chalk-text">the anti-rollback</div>
-    </div>
-  </div>
-</section>
-
-<!-- ============================================
-     FORMULA BLACKBOARD — continuous writing
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-pink chalk-text">§ III — the equations</div>
-  <h2 class="board-title chalk-text chalk-white">four equations, <span class="chalk-green">one guarantee</span></h2>
-
-  <div class="formula-board">
-    <canvas id="formula-canvas"></canvas>
-  </div>
-
-  <p class="board-text chalk-text chalk-white" style="margin-top: 2rem;">
-    <span class="chalk-yellow">commit_id</span> is the SHA-256 of the canonical JSON (RFC 8785),
-    excluding the commit_id and signature fields.<br>
-    change one byte → change the hash → the identity is broken.<br><br>
-    <span class="chalk-pink">signature</span> authenticates the object <em>plus</em> its commit_id.<br>
-    tamper with content → hash breaks. tamper with hash → signature breaks.<br><br>
-    <span class="chalk-blue">agent_id</span> is derived from the public key, not declared.<br>
-    you cannot claim an identity without controlling the private key.<br><br>
-    <span class="chalk-green">reachability</span>: a revoked key's commit must be in ancestry(cutoff_head).<br>
-    if not → <span class="chalk-orange">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</span>.
-  </p>
-</section>
-
-<!-- ============================================
-     ANIMATED DAG
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-green chalk-text">§ IV — the architecture</div>
-  <h2 class="board-title chalk-text chalk-white">a <span class="chalk-blue">merkle DAG</span> of signed memory</h2>
-
-  <div class="dag-board">
-    <svg class="dag-svg-chalk" viewBox="0 0 800 400">
-      <!-- Genesis -->
-      <g>
-        <circle class="node-circle" cx="100" cy="200" r="28" stroke="#4fc3f7"/>
-        <text class="node-label" x="100" y="206" text-anchor="middle" fill="#4fc3f7">G</text>
-        <text class="node-sub" x="100" y="245" text-anchor="middle" fill="#f5f5dc">genesis</text>
-      </g>
-
-      <!-- C1 -->
-      <g>
-        <circle class="node-circle" cx="280" cy="120" r="26" stroke="#69f0ae"/>
-        <text class="node-label" x="280" y="126" text-anchor="middle" fill="#69f0ae">C₁</text>
-        <text class="node-sub" x="280" y="160" text-anchor="middle" fill="#f5f5dc">key-001</text>
-      </g>
-
-      <!-- C2 (cutoff_head) -->
-      <g>
-        <circle class="node-circle" cx="460" cy="120" r="30" stroke="#fff44f" stroke-width="4"/>
-        <text class="node-label" x="460" y="126" text-anchor="middle" fill="#fff44f">C₂</text>
-        <text class="node-sub" x="460" y="165" text-anchor="middle" fill="#fff44f">cutoff_head</text>
-      </g>
-
-      <!-- C3 (post-rotation) -->
-      <g>
-        <circle class="node-circle" cx="640" cy="120" r="26" stroke="#ff69b4"/>
-        <text class="node-label" x="640" y="126" text-anchor="middle" fill="#ff69b4">C₃</text>
-        <text class="node-sub" x="640" y="160" text-anchor="middle" fill="#f5f5dc">key-002</text>
-      </g>
-
-      <!-- D (dark commit) -->
-      <g>
-        <circle class="node-circle" cx="640" cy="280" r="26" stroke="#ff5252" stroke-dasharray="4 3"/>
-        <text class="node-label" x="640" y="286" text-anchor="middle" fill="#ff5252">D</text>
-        <text class="node-sub" x="640" y="320" text-anchor="middle" fill="#ff5252">dark ✗</text>
-      </g>
-
-      <!-- Edges -->
-      <path class="edge" d="M 128 200 Q 200 160 254 120" fill="none" stroke="#f5f5dc"/>
-      <path class="edge" d="M 306 120 L 434 120" fill="none" stroke="#69f0ae" style="animation-delay:0.5s"/>
-      <path class="edge" d="M 490 120 L 614 120" fill="none" stroke="#ff69b4" style="animation-delay:1s"/>
-      <path class="edge" d="M 460 150 Q 550 200 614 280" fill="none" stroke="#ff5252" stroke-dasharray="5 3" style="animation-delay:1.5s"/>
-
-      <!-- Legend -->
-      <g transform="translate(50, 360)">
-        <text x="0" y="0" fill="#4fc3f7" font-size="12" font-family="Caveat">● genesis</text>
-        <text x="100" y="0" fill="#69f0ae" font-size="12" font-family="Caveat">● active key</text>
-        <text x="220" y="0" fill="#fff44f" font-size="12" font-family="Caveat">● cutoff frontier</text>
-        <text x="370" y="0" fill="#ff69b4" font-size="12" font-family="Caveat">● post-rotation</text>
-        <text x="510" y="0" fill="#ff5252" font-size="12" font-family="Caveat">◌ dark (rejected)</text>
+<!-- ===================== HERO ===================== -->
+<section id="hero">
+  <div class="parallax-bg" data-parallax="0.25">
+    <svg viewBox="0 0 1200 800" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="opacity:.18">
+      <g filter="url(#chalky)" stroke="#f5f5dc" fill="none" stroke-width="1">
+        <circle cx="200" cy="200" r="120"/><circle cx="980" cy="600" r="180"/>
+        <path d="M100 500 Q 400 300 700 500 T 1200 500"/>
+        <path d="M50 100 Q 600 250 1150 100"/>
       </g>
     </svg>
   </div>
 
-  <p class="board-text chalk-text chalk-orange">
-    commit <span class="chalk-red">D</span> is signed with revoked key-001.<br>
-    its parent is <span class="chalk-yellow">C₂</span> (the cutoff_head).<br>
-    D is a <em>child</em> of C₂, not an <em>ancestor</em>.<br>
-    ancestry_check fails → D is rejected.<br>
-    <span class="chalk-red">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</span>
-  </p>
+  <div class="chalk-tag reveal">ἀλήθεια · τέχνη · ed25519 · sha-256 · jcs rfc 8785</div>
+  <div class="hero-greek reveal" style="margin-top:6px">
+    <span class="eta">ἀ</span><span>λ</span><span class="theta">ή</span><span>θ</span><span class="iota">ε</span><span>ι</span><span class="theta">α</span>
+  </div>
+  <div class="hero-word reveal" style="margin-top:4px">
+    <span class="a">a</span><span class="t">l</span><span class="e2">e</span><span class="t">t</span><span class="h">h</span><span class="c">e</span><span class="h">c</span><span class="t">h</span>
+  </div>
+  <div class="hero-typewriter reveal" id="hero-typewriter"></div>
+  <a href="#property" class="mag-btn reveal" style="margin-top:30px"><span>enter the chalkboard ↓</span></a>
+  <div class="scroll-hint reveal">scroll · draw · verify<span class="arrow"></span></div>
 </section>
 
-<!-- ============================================
-     VERDICTS
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-orange chalk-text">§ V — the verdicts</div>
-  <h2 class="board-title chalk-text chalk-white">two verdicts, <span class="chalk-pink">no temporal claims</span></h2>
-
-  <p class="board-text chalk-text chalk-white">
-    when a commit is signed with a revoked key, the verifier can only
-    demonstrate one of two things. it deliberately does <span class="chalk-red">NOT</span>
-    claim to prove <em>when</em> the commit was created.
-  </p>
-
-  <div class="verdict-row">
-    <div class="verdict-box verdict-good chalk-text">
-      <div class="verdict-name">VALID_HISTORICAL</div>
-      <div class="verdict-formula">C ∈ ancestry(cutoff_head)</div>
-      <div class="verdict-desc">
-        the commit IS a member of the ancestry covered by the rotation's
-        cutoff_head. signature is valid, commit belongs to the causal
-        history the rotation closed. <span class="chalk-green">legitimate historical use.</span>
+<!-- ===================== PROPERTY (pinned 3D) ===================== -->
+<section id="property">
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:18px">
+    <div class="chalk-tag reveal">the property</div>
+    <div class="chalk-title reveal" style="text-align:center">what is un-concealed</div>
+    <div class="property-card reveal" id="property-card">
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <p class="property-quote">
+        This memory set forms part of a <span class="hl-g">cryptographically verifiable history</span>
+        associated with a determined identity, whose commits can be independently verified
+        with respect to their <span class="hl-y">integrity</span>, <span class="hl-b">cryptographic authorship</span>,
+        and <span class="hl-p">provenance relations</span>.
+      </p>
+      <p class="property-quote" style="margin-top:18px;font-size:clamp(18px,2vw,26px);opacity:.85">
+        When a reference checkpoint exists, it can additionally be verified that the presented
+        history <span class="hl-g">continues from that checkpoint</span>.
+      </p>
+      <div class="property-meta">
+        <div><b>integrity</b> — sha-256</div>
+        <div><b>authorship</b> — ed25519</div>
+        <div><b>provenance</b> — merkle dag</div>
+        <div><b>continuity</b> — cutoff_head reachability</div>
       </div>
     </div>
+    <div class="chalk-sub reveal" style="opacity:.6;margin-top:10px">↻ move your cursor — the card tilts in 3d</div>
+  </div>
+</section>
 
-    <div class="verdict-box verdict-bad chalk-text">
-      <div class="verdict-name">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</div>
-      <div class="verdict-formula">C ∉ ancestry(cutoff_head)</div>
-      <div class="verdict-desc">
-        the commit is NOT a member of ancestry(cutoff_head). verifier
-        cannot prove it belongs to the causal history. this is <span class="chalk-orange">not</span>
-        a claim that it was "created after rotation" — that would require
-        a clock the protocol does not have.
+<!-- ===================== FOUR EQUATIONS (HORIZONTAL SCROLL) ===================== -->
+<section id="equations" style="padding:0">
+  <div id="eq-pin">
+    <div style="position:absolute;top:8vh;left:50%;transform:translateX(-50%);text-align:center;z-index:6">
+      <div class="chalk-tag">four equations</div>
+      <div class="chalk-title" style="font-size:clamp(30px,5vw,64px)">the cryptography, in chalk</div>
+      <div class="chalk-sub" style="opacity:.6">→ scroll draws the equations sideways →</div>
+    </div>
+    <div class="eq-track" id="eq-track">
+
+      <div class="eq-panel" data-eq="1">
+        <div class="eq-num">01</div>
+        <div class="eq-label">commit id</div>
+        <div class="eq-formula">
+          <span class="k">commit_id</span> = <span class="f">sha256</span>(
+          <span class="s">JCS</span>(object <span class="neg">−</span> {commit_id, σ}))
+        </div>
+        <div class="eq-desc">The id is derived from the canonical form of everything <em>except</em> itself and the signature. You cannot choose an id and then fiddle with content — the hash binds them.</div>
+        <div class="eq-draw-hint">✎ hover & drag to trace the hash →</div>
+        <canvas class="eq-canvas"></canvas>
+      </div>
+
+      <div class="eq-panel" data-eq="2">
+        <div class="eq-num">02</div>
+        <div class="eq-label">signature</div>
+        <div class="eq-formula">
+          σ = <span class="s">Ed25519_sk</span>(<span class="s">JCS</span>(object + commit_id))
+        </div>
+        <div class="eq-desc">Only the holder of the private key can produce σ. Verification uses the public key bound to the agent identity — authorship is cryptographic, not claimed.</div>
+        <div class="eq-draw-hint">✎ hover & drag to trace the curve →</div>
+        <canvas class="eq-canvas"></canvas>
+      </div>
+
+      <div class="eq-panel" data-eq="3">
+        <div class="eq-num">03</div>
+        <div class="eq-label">agent identity</div>
+        <div class="eq-formula">
+          <span class="k">agent_id</span> = <span class="h">did:alethech:</span> + <span class="f">b32</span>(<span class="f">sha256</span>(<span class="s">JCS</span>(pk))[:16])
+        </div>
+        <div class="eq-desc">Identity is not a username. It is a deterministic derivation from the public key — you cannot claim another agent's id without their key.</div>
+        <div class="eq-draw-hint">✎ hover & drag to trace the derivation →</div>
+        <canvas class="eq-canvas"></canvas>
+      </div>
+
+      <div class="eq-panel" data-eq="4">
+        <div class="eq-num">04</div>
+        <div class="eq-label">historical validity</div>
+        <div class="eq-formula">
+          C ∈ <span class="h">ancestry</span>(<span class="k">cutoff_head</span>) ⟹ <span class="f">VALID_HISTORICAL</span>
+        </div>
+        <div class="eq-desc">After key rotation, only commits reachable from the cutoff head count as proven history. Everything else is <span style="color:var(--chalk-red)">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</span>.</div>
+        <div class="eq-draw-hint">✎ hover & drag to trace the ancestry →</div>
+        <canvas class="eq-canvas"></canvas>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== MERKLE DAG ===================== -->
+<section id="dag">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+    <div class="chalk-tag reveal">the merkle dag</div>
+    <div class="chalk-title reveal" style="text-align:center">commits link, a dark one is rejected</div>
+    <div class="dag-wrap reveal">
+      <svg class="dag-svg" id="dag-svg" viewBox="0 0 1100 620">
+        <!-- edges -->
+        <path class="dag-edge" d="M180 110 C 260 200, 340 200, 420 300"/>
+        <path class="dag-edge" d="M180 510 C 260 420, 340 420, 420 340"/>
+        <path class="dag-edge" d="M520 320 C 600 320, 620 200, 720 200"/>
+        <path class="dag-edge" d="M520 320 C 620 320, 660 440, 760 440"/>
+        <path class="dag-edge bad" d="M520 320 C 600 300, 560 540, 700 560"/>
+        <!-- nodes -->
+        <g class="dag-node" transform="translate(140,90)"><circle r="34"/><text text-anchor="middle" dy="6">root</text></g>
+        <g class="dag-node" transform="translate(140,490)"><circle r="34"/><text text-anchor="middle" dy="6">c₀</text></g>
+        <g class="dag-node" transform="translate(480,320)"><circle r="34"/><text text-anchor="middle" dy="6">c₁</text></g>
+        <g class="dag-node" transform="translate(760,200)"><circle r="34"/><text text-anchor="middle" dy="6">c₂</text></g>
+        <g class="dag-node" transform="translate(800,440)"><circle r="34"/><text text-anchor="middle" dy="6">c₃</text></g>
+        <g class="dag-node bad" id="bad-node" transform="translate(740,560)"><circle r="34"/><text text-anchor="middle" dy="6">c✗</text></g>
+      </svg>
+    </div>
+    <div class="dag-legend reveal">
+      <span><span class="dot" style="background:var(--chalk)"></span>signed commit</span>
+      <span><span class="dot" style="background:var(--chalk-red)"></span>tampered / unreachable</span>
+      <span style="opacity:.6">scroll to draw the edges →</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TWO VERDICTS ===================== -->
+<section id="verdicts">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+    <div class="chalk-tag reveal">two verdicts</div>
+    <div class="chalk-title reveal" style="text-align:center">what the verifier says</div>
+    <div class="chalk-sub reveal" style="opacity:.6;text-align:center">↻ click a card to flip the explanation</div>
+    <div class="verdict-grid">
+      <div class="flip-card reveal" data-flip>
+        <div class="flip-inner">
+          <div class="flip-face flip-front valid">
+            <h3>VALID_HISTORICAL</h3>
+            <p>The commit is reachable from the cutoff head. Its signature verifies, its commit_id matches, its provenance chain is intact.</p>
+            <div class="code">C ∈ ancestry(cutoff_head)</div>
+            <div class="flip-hint">flip ↻</div>
+          </div>
+          <div class="flip-face flip-back">
+            <h3>what it means</h3>
+            <p>This memory was signed by the claimed identity <em>before</em> the key rotated, and the chain of custody from the checkpoint to now is unbroken.</p>
+          </div>
+        </div>
+      </div>
+      <div class="flip-card reveal" data-flip>
+        <div class="flip-inner">
+          <div class="flip-face flip-front invalid">
+            <h3>NOT_IN_PROVEN_PRE_ROTATION_HISTORY</h3>
+            <p>The commit exists, maybe even signs correctly — but it is not reachable from the cutoff head after rotation.</p>
+            <div class="code">C ∉ ancestry(cutoff_head)</div>
+            <div class="flip-hint">flip ↻</div>
+          </div>
+          <div class="flip-face flip-back">
+            <h3>what it means</h3>
+            <p>It could be a fabricated past, a rolled-back history, or a commit orphaned by rotation. The protocol refuses to attest continuity it cannot prove.</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============================================
-     KEY ROTATION
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-purple chalk-text">§ VI — key rotation</div>
-  <h2 class="board-title chalk-text chalk-white">rotate keys, <span class="chalk-green">keep identity</span></h2>
-
-  <div class="rotation-viz">
-    <div class="key-card key-active chalk-text">
-      <div class="key-id chalk-green">key-001</div>
-      <div class="key-status chalk-white">→ revoked</div>
-      <div style="font-size:0.85rem; margin-top:0.5rem; opacity:0.6;">cutoff_head: C₂</div>
+<!-- ===================== KEY ROTATION ===================== -->
+<section id="rotation">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+    <div class="chalk-tag reveal">key rotation · reachability guarantee</div>
+    <div class="chalk-title reveal" style="text-align:center">key-001 → key-002</div>
+    <div class="rot-stage reveal">
+      <div class="rot-cutoff" id="rot-cutoff">
+        <div class="head">cutoff_head</div>
+        <div>↑ the last commit key-001 signed</div>
+      </div>
+      <div class="rot-key a" id="rot-a">
+        <div class="key-label">key-001</div>
+        <div class="key-id">did:alethech:…b32(sha256(pk₁))</div>
+      </div>
+      <div class="rot-arrow">
+        <svg viewBox="0 0 400 80">
+          <path id="rot-path" d="M20 40 C 120 0, 280 80, 380 40"/>
+        </svg>
+      </div>
+      <div class="rot-key b" id="rot-b">
+        <div class="key-label">key-002</div>
+        <div class="key-id">did:alethech:…b32(sha256(pk₂))</div>
+      </div>
     </div>
-
-    <div class="arrow-rotate">⟹</div>
-
-    <div class="key-card key-active chalk-text" style="border-color:#ff69b4; background:rgba(255,105,180,0.05);">
-      <div class="key-id chalk-pink">key-002</div>
-      <div class="key-status chalk-white">→ active</div>
-      <div style="font-size:0.85rem; margin-top:0.5rem; opacity:0.6;">signed by root</div>
-    </div>
+    <div class="rot-note reveal">The identity record binds key-002 to the <b style="color:var(--chalk-pink)">cutoff_head</b>. Every commit reachable from it stays <b style="color:var(--chalk-green)">VALID_HISTORICAL</b>. Everything else — including an attacker's forged "old" commits signed with a stolen key-001 — is rejected.</div>
   </div>
-
-  <p class="board-text chalk-text chalk-white" style="text-align:center;">
-    the <span class="chalk-yellow">root authority</span> signs the rotation.<br>
-    the <span class="chalk-blue">agent_id</span> persists — it derives from the root, not the operational key.<br>
-    commits signed with key-001 before C₂ are still <span class="chalk-green">VALID_HISTORICAL</span>.<br>
-    commits signed with key-001 after C₂ are <span class="chalk-orange">NOT_IN_PROVEN_PRE_ROTATION_HISTORY</span>.
-  </p>
 </section>
 
-<!-- ============================================
-     ANTI-ROLLBACK
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-red chalk-text">§ VII — anti-rollback</div>
-  <h2 class="board-title chalk-text chalk-white">monotonic <span class="chalk-yellow">sequence</span></h2>
-
-  <p class="board-text chalk-text chalk-white">
-    a correctly-signed but <em>old</em> checkpoint could be presented as current.<br>
-    the system clock is <span class="chalk-red">NOT</span> the authority.<br>
-    the <span class="chalk-yellow">sequence</span> field is.
-  </p>
-
-  <div class="tower-viz">
-    <div class="tower">
-      <div class="tower-block tb-good">
-        checkpoint B<br>
-        head = H₁₅₀
-        <div class="tower-seq">sequence = 15</div>
+<!-- ===================== ANTI-ROLLBACK TOWER ===================== -->
+<section id="tower">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+    <div class="chalk-tag reveal">anti-rollback</div>
+    <div class="chalk-title reveal" style="text-align:center">the checkpoint tower</div>
+    <div class="tower-stage reveal">
+      <div class="tower" id="tower-el">
+        <!-- blocks injected by JS -->
       </div>
-      <div class="tower-arrow">↑</div>
-      <div class="tower-block tb-good" style="opacity:0.6;">
-        checkpoint A<br>
-        head = H₁₀₀
-        <div class="tower-seq">sequence = 10</div>
-      </div>
-      <div style="font-family:'Reenie Beanie'; font-size:0.9rem; color:#69f0ae;">accepted ✓</div>
-    </div>
-
-    <div style="font-size:2rem; color:#fff44f;">vs</div>
-
-    <div class="tower">
-      <div class="tower-block tb-bad">
-        attacker presents<br>
-        head = H₀₅₀
-        <div class="tower-seq">sequence = 5</div>
-      </div>
-      <div class="tower-arrow" style="color:#ff5252;">✗</div>
-      <div style="font-family:'Reenie Beanie'; font-size:0.9rem; color:#ff5252;">
-        REJECTED<br>
-        sequence < 10<br>
-        rollback detected
+      <div class="tower-explain">
+        An external checkpoint records a known-good head. On every verify, the protocol checks the <b>current head is an ancestor of the checkpoint head</b> — i.e. history moved forward, not backward.
+        <br><br>
+        Scroll to build the tower. A <span class="bad">rolled-back checkpoint</span> gets rejected, shakes, and turns red.
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============================================
-     CLI DEMO
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-blue chalk-text">§ VIII — live demo</div>
-  <h2 class="board-title chalk-text chalk-white">nine commands, <span class="chalk-green">offline verification</span></h2>
-
-  <div class="chalk-terminal">
-    <div class="terminal-header chalk-text">
-      <div class="terminal-dots">
-        <div class="tdot r"></div>
-        <div class="tdot y"></div>
-        <div class="tdot g"></div>
+<!-- ===================== CLI DEMO ===================== -->
+<section id="cli">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+    <div class="chalk-tag reveal">live cli</div>
+    <div class="chalk-title reveal" style="text-align:center">the protocol, typed</div>
+    <div class="terminal reveal">
+      <div class="terminal-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
+      <div class="terminal-body" id="term-body">
+        <span class="cur"></span>
       </div>
-      <span class="chalk-white">alethech — terminal</span>
-      <span></span>
-    </div>
-    <div class="terminal-body" id="terminal-body"></div>
-  </div>
-</section>
-
-<!-- ============================================
-     WHAT IT DOES NOT DO
-     ============================================ -->
-<section class="board reveal">
-  <div class="board-label chalk-red chalk-text">§ IX — honesty</div>
-  <h2 class="board-title chalk-text chalk-white">what it does <span class="chalk-red">NOT</span> do</h2>
-
-  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1rem; margin-top:2rem;">
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">prove truth</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">only that claims were signed</div>
-    </div>
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">rollback without checkpoint</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">external anchor required</div>
-    </div>
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">encrypt at rest</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">integrity ≠ confidentiality</div>
-    </div>
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">delegate permissions</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">each identity sovereign</div>
-    </div>
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">call any LLM</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">bytes & crypto only</div>
-    </div>
-    <div style="padding:1.5rem; border-left:3px solid #ff5252; background:rgba(255,82,82,0.03); font-family:'Caveat';">
-      <strong class="chalk-red chalk-text">NOT</strong> <span class="chalk-white">prove physical time</span>
-      <div style="font-size:0.95rem; opacity:0.6; margin-top:0.5rem;">only recorded timestamp</div>
     </div>
   </div>
 </section>
 
-<!-- ============================================
-     FOOTER
-     ============================================ -->
-<footer class="footer-board">
-  <div class="footer-greek chalk-text chalk-pink">τέχνη ἀληθείας</div>
-  <p class="footer-text chalk-text chalk-white">
-    alethech — verifiable agent continuity protocol<br>
-    Ed25519 · SHA-256 · JCS RFC 8785 · MIT · Python 3.10+
-  </p>
-  <div class="footer-links">
-    <a href="https://github.com/eddyflores100-lang/alethech" target="_blank" class="chalk-text">→ github</a>
-    <a href="https://pypi.org/project/alethech/" target="_blank" class="chalk-text">→ pypi</a>
-    <a href="https://github.com/eddyflores100-lang/alethech/releases" target="_blank" class="chalk-text">→ releases</a>
-    <a href="https://github.com/eddyflores100-lang/alethech/blob/main/docs/implementacion-nucleo-minimo.md" target="_blank" class="chalk-text">→ spec</a>
+<!-- ===================== HONESTY ===================== -->
+<section id="honesty">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+    <div class="chalk-tag reveal">honesty</div>
+    <div class="chalk-title reveal" style="text-align:center">what it does NOT do</div>
+    <div class="chalk-sub reveal" style="opacity:.6;text-align:center">↻ click each to read the truth it refuses to claim</div>
+    <div class="honesty-grid">
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">01</div><p>It does NOT prove that the agent's claims are true.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>Only that they were signed by the identity that claims them. Content-truth is the agent's responsibility, not the protocol's.</p></div>
+        </div>
+      </div>
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">02</div><p>It does NOT detect rollback without an external checkpoint.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>Without a reference checkpoint emitted and stored elsewhere, the protocol cannot know what "forward" means.</p></div>
+        </div>
+      </div>
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">03</div><p>It does NOT encrypt content at rest.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>Commits are integrity-protected, not confidentiality-protected. Use a separate encryption layer if you need secrecy.</p></div>
+        </div>
+      </div>
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">04</div><p>It does NOT delegate permissions between agents.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>There is no ACL, no role graph, no capability transfer. Each identity is sovereign over its own signed history.</p></div>
+        </div>
+      </div>
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">05</div><p>It does NOT call any LLM.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>Zero network, zero inference, zero "interpretation". Pure local cryptography. The verifier is deterministic.</p></div>
+        </div>
+      </div>
+      <div class="h-card reveal" data-flip>
+        <div class="h-inner">
+          <div class="h-face h-front"><div class="h-num">06</div><p>It does NOT prove physical signing time.</p></div>
+          <div class="h-face h-back"><div class="tag">truth it refuses</div><p>Only the timestamp recorded in the artifact. Wall-clock truth is outside the cryptographic scope.</p></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <p class="footer-sig chalk-text">
-    ~ built by an agent, for agents ~<br>
-    did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu
-  </p>
-</footer>
+</section>
 
+<!-- ===================== FOOTER ===================== -->
+<section id="footer">
+  <div class="footer-greek reveal">τὴν ἀλήθειαν οὐδεὶς ἀποκρύπτει, εἰ μὴ ὁ ψεύστης</div>
+  <div class="footer-trans reveal">"no one conceals the truth except the liar" — the protocol un-conceals transmission integrity</div>
+  <div class="chalk-divider reveal"></div>
+  <div class="chalk-sub reveal" style="opacity:.7">verifiable agent continuity protocol · local-first · zero-llm · zero-blockchain</div>
+  <div class="footer-links reveal">
+    <a class="mag-btn alt" href="https://github.com/eddyflores100-lang/alethech" target="_blank" rel="noopener"><span>github ↗</span></a>
+    <a class="mag-btn" href="https://pypi.org/project/alethech/" target="_blank" rel="noopener"><span>pip install alethech ↗</span></a>
+  </div>
+  <div class="footer-id reveal">did:alethech:b32(sha256(JCS(pk))[:16]) · MIT · aletheia + techne = the art of un-concealing</div>
+</section>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js"></script>
 <script>
-// ============================================
-// CHALK DUST PARTICLES
-// ============================================
-const dustCanvas = document.getElementById('chalk-dust');
-const dustCtx = dustCanvas.getContext('2d');
+(function(){
+'use strict';
 
-function resizeDust() {
-  dustCanvas.width = window.innerWidth;
-  dustCanvas.height = window.innerHeight;
-}
-resizeDust();
-window.addEventListener('resize', resizeDust);
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MOBILE = window.matchMedia('(max-width: 760px)').matches;
+const COARSE = window.matchMedia('(pointer: coarse)').matches;
 
-const dustParticles = [];
-for (let i = 0; i < 60; i++) {
-  dustParticles.push({
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    size: Math.random() * 1.5 + 0.3,
-    vx: (Math.random() - 0.5) * 0.2,
-    vy: Math.random() * 0.3 + 0.1,
-    opacity: Math.random() * 0.4 + 0.1
+if(COARSE || MOBILE){ document.body.classList.add('no-cursor'); }
+
+gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+
+/* ============================================================
+   1. CUSTOM CHALK CURSOR + TRAIL
+   ============================================================ */
+const cursor = document.getElementById('cursor');
+let mx = window.innerWidth/2, my = window.innerHeight/2;
+let cx = mx, cy = my;
+const trail = [];
+const TRAIL_MAX = 14;
+const chalkColors = ['#f5f5dc','#fff44f','#ff69b4','#4fc3f7','#69f0ae','#ffb74d','#ba68c8'];
+
+window.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  if(!COARSE){
+    // spawn a dust speck
+    if(Math.random() < 0.5){
+      const s = document.createElement('div');
+      s.className = 'cursor-trail';
+      s.style.left = mx + 'px'; s.style.top = my + 'px';
+      s.style.background = chalkColors[(Math.random()*chalkColors.length)|0];
+      const sz = 2 + Math.random()*4;
+      s.style.width = sz+'px'; s.style.height = sz+'px';
+      document.body.appendChild(s);
+      trail.push({el:s, life:1});
+      if(trail.length > TRAIL_MAX){ const old = trail.shift(); old.el.remove(); }
+    }
+  }
+});
+
+(function tick(){
+  cx += (mx - cx) * 0.22;
+  cy += (my - cy) * 0.22;
+  cursor.style.transform = `translate3d(${cx}px, ${cy}px, 0) translate(-50%,-50%)`;
+  for(let i=trail.length-1;i>=0;i--){
+    const t = trail[i];
+    t.life -= 0.03;
+    if(t.life <= 0){ t.el.remove(); trail.splice(i,1); }
+    else {
+      const op = t.life;
+      t.el.style.opacity = op;
+      t.el.style.transform = `translate3d(-50%,-50%,0) scale(${op})`;
+    }
+  }
+  requestAnimationFrame(tick);
+})();
+
+// cursor grows on interactive hover
+document.querySelectorAll('a, button, .flip-card, .h-card, .eq-panel, .mag-btn').forEach(el=>{
+  el.addEventListener('mouseenter', ()=> gsap.to(cursor,{scale:1.6,duration:.3}));
+  el.addEventListener('mouseleave', ()=> gsap.to(cursor,{scale:1,duration:.3}));
+});
+
+/* ============================================================
+   2. CHALK PARTICLE CANVAS (responds to mouse, drifts)
+   ============================================================ */
+const pc = document.getElementById('particles');
+const pctx = pc.getContext('2d');
+let PW=0, PH=0, DPR = Math.min(window.devicePixelRatio||1, 2);
+function resizeP(){ PW=pc.width=innerWidth*DPR; PH=pc.height=innerHeight*DPR; pc.style.width=innerWidth+'px'; pc.style.height=innerHeight+'px'; }
+resizeP(); window.addEventListener('resize', resizeP);
+
+const PARTICLES = MOBILE ? 70 : 160;
+const parts = [];
+for(let i=0;i<PARTICLES;i++){
+  parts.push({
+    x: Math.random()*PW,
+    y: Math.random()*PH,
+    vx: (Math.random()-.5)*0.25*DPR,
+    vy: (Math.random()-.5)*0.25*DPR - 0.05*DPR,
+    r: (Math.random()*1.6+0.4)*DPR,
+    c: chalkColors[(Math.random()*chalkColors.length)|0],
+    a: Math.random()*0.5+0.15,
+    ph: Math.random()*Math.PI*2
   });
 }
+let pmx = PW/2, pmy = PH/2;
+window.addEventListener('mousemove', e=>{ pmx = e.clientX*DPR; pmy = e.clientY*DPR; });
 
-function animateDust() {
-  dustCtx.clearRect(0, 0, dustCanvas.width, dustCanvas.height);
-  dustParticles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    if (p.y > dustCanvas.height) {
-      p.y = -10;
-      p.x = Math.random() * dustCanvas.width;
+let t0 = 0;
+function drawParticles(ts){
+  t0 = ts*0.001;
+  pctx.clearRect(0,0,PW,PH);
+  pctx.globalCompositeOperation = 'lighter';
+  for(const p of parts){
+    // mouse repulsion / swirl
+    const dx = p.x - pmx, dy = p.y - pmy;
+    const d2 = dx*dx + dy*dy;
+    const R = 130*DPR;
+    if(d2 < R*R){
+      const d = Math.sqrt(d2)||1;
+      const f = (1 - d/R) * 0.8;
+      p.vx += (dx/d)*f*0.6;
+      p.vy += (dy/d)*f*0.6;
     }
-    if (p.x < 0) p.x = dustCanvas.width;
-    if (p.x > dustCanvas.width) p.x = 0;
-
-    dustCtx.fillStyle = `rgba(245, 245, 220, ${p.opacity})`;
-    dustCtx.beginPath();
-    dustCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    dustCtx.fill();
-  });
-  requestAnimationFrame(animateDust);
-}
-animateDust();
-
-// ============================================
-// CONTINUOUS FORMULA WRITER (hero)
-// ============================================
-const formulas = [
-  'commit_id = sha256(JCS(object − {commit_id, σ}))',
-  'σ = Ed25519_sk(JCS(object + commit_id))',
-  'agent_id = did:alethech: + b32(sha256(JCS(pk))[:16])',
-  'C ∈ ancestry(cutoff_head) ⟹ VALID_HISTORICAL',
-  'C ∉ ancestry(cutoff_head) ⟹ NOT_IN_PROVEN_PRE_ROTATION_HISTORY',
-  'sequence_n > sequence_{n-1} ⟹ forward progress',
-  'firma válida ≠ verdad ≠ autorización ≠ instrucción ejecutable',
-];
-
-let formulaIdx = 0;
-let charIdx = 0;
-let isDeleting = false;
-const formulaEl = document.getElementById('formula-text');
-
-function typeFormula() {
-  const current = formulas[formulaIdx];
-
-  if (!isDeleting) {
-    formulaEl.textContent = current.substring(0, charIdx + 1);
-    charIdx++;
-    if (charIdx === current.length) {
-      setTimeout(() => { isDeleting = true; typeFormula(); }, 2500);
-      return;
-    }
-    setTimeout(typeFormula, 50 + Math.random() * 60);
-  } else {
-    formulaEl.textContent = current.substring(0, charIdx - 1);
-    charIdx--;
-    if (charIdx === 0) {
-      isDeleting = false;
-      formulaIdx = (formulaIdx + 1) % formulas.length;
-      setTimeout(typeFormula, 400);
-      return;
-    }
-    setTimeout(typeFormula, 25);
+    p.vx *= 0.96; p.vy *= 0.96;
+    p.vx += Math.sin(t0 + p.ph)*0.01*DPR;
+    p.vy += Math.cos(t0*0.8 + p.ph)*0.008*DPR;
+    p.x += p.vx; p.y += p.vy;
+    if(p.x < -10) p.x = PW+10; if(p.x > PW+10) p.x = -10;
+    if(p.y < -10) p.y = PH+10; if(p.y > PH+10) p.y = -10;
+    const tw = 0.5 + Math.sin(t0*1.5 + p.ph)*0.5;
+    pctx.globalAlpha = p.a * tw;
+    pctx.fillStyle = p.c;
+    pctx.beginPath();
+    pctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    pctx.fill();
   }
+  pctx.globalAlpha = 1;
+  pctx.globalCompositeOperation = 'source-over';
+  requestAnimationFrame(drawParticles);
 }
-typeFormula();
+if(!REDUCE) requestAnimationFrame(drawParticles);
+else { pctx.fillStyle='rgba(245,245,220,.02)'; pctx.fillRect(0,0,PW,PH); }
 
-// ============================================
-// FORMULA CANVAS — drawing equations by hand
-// ============================================
-const fCanvas = document.getElementById('formula-canvas');
-const fCtx = fCanvas.getContext('2d');
+/* ============================================================
+   3. INTERACTIVE FORMULA DRAW CANVAS (draw with mouse anywhere)
+   ============================================================ */
+const dc = document.getElementById('draw-canvas');
+const dctx = dc.getContext('2d');
+let DW=0, DH=0;
+function resizeD(){ DW=dc.width=innerWidth*DPR; DH=dc.height=innerHeight*DPR; dc.style.width=innerWidth+'px'; dc.style.height=innerHeight+'px'; }
+resizeD(); window.addEventListener('resize', ()=>{ resizeD(); });
 
-function resizeFormulaCanvas() {
-  fCanvas.width = fCanvas.offsetWidth;
-  fCanvas.height = Math.max(350, fCanvas.offsetHeight);
-}
-resizeFormulaCanvas();
-window.addEventListener('resize', resizeFormulaCanvas);
+let drawing = false, lastDX=0, lastDY=0;
+const drawStrokes = []; // {x,y,c}
+window.addEventListener('mousedown', e=>{
+  // only draw when not clicking interactive elements
+  if(e.target.closest('a,button,.flip-card,.h-card,.mag-btn,#nav')) return;
+  drawing = true; lastDX = e.clientX*DPR; lastDY = e.clientY*DPR;
+  drawStrokes.push({x:lastDX, y:lastDY, c: chalkColors[(Math.random()*chalkColors.length)|0]});
+});
+window.addEventListener('mousemove', e=>{
+  if(!drawing) return;
+  const x = e.clientX*DPR, y = e.clientY*DPR;
+  const c = chalkColors[(Math.random()*chalkColors.length)|0];
+  dctx.strokeStyle = c; dctx.lineWidth = (1.5+Math.random()*1.5)*DPR;
+  dctx.lineCap = 'round';
+  dctx.globalAlpha = 0.7;
+  dctx.beginPath();
+  // jitter for chalk feel
+  const jx = (Math.random()-.5)*1.2*DPR, jy=(Math.random()-.5)*1.2*DPR;
+  dctx.moveTo(lastDX, lastDY);
+  dctx.lineTo(x+jx, y+jy);
+  dctx.stroke();
+  dctx.globalAlpha = 1;
+  lastDX = x; lastDY = y;
+  drawStrokes.push({x,y,c});
+  if(drawStrokes.length > 2000){ /* fade old */ }
+});
+window.addEventListener('mouseup', ()=> drawing=false);
+window.addEventListener('mouseleave', ()=> drawing=false);
 
-const chalkColors = ['#f5f5dc', '#fff44f', '#ff69b4', '#4fc3f7', '#69f0ae', '#ffb74d', '#ba68c8'];
-const equations = [
-  { text: 'commit_id = sha256(JCS(obj − {id, σ}))', color: '#f5f5dc', y: 40 },
-  { text: 'σ = Ed25519_sk(JCS(obj + commit_id))', color: '#fff44f', y: 90 },
-  { text: 'agent_id = did:alethech: + b32(sha256(pk)[:16])', color: '#ff69b4', y: 140 },
-  { text: 'C ∈ ancestry(cutoff_head) ⟹ VALID_HISTORICAL', color: '#69f0ae', y: 190 },
-  { text: 'C ∉ ancestry(cutoff_head) ⟹ NOT_IN_PROVEN', color: '#ffb74d', y: 240 },
-  { text: 'seq(n) > seq(n−1) ⟹ forward progress', color: '#4fc3f7', y: 290 },
+// fade drawing slowly
+(function fadeDraw(){
+  dctx.globalCompositeOperation = 'destination-out';
+  dctx.fillStyle = 'rgba(0,0,0,0.012)';
+  dctx.fillRect(0,0,DW,DH);
+  dctx.globalCompositeOperation = 'source-over';
+  requestAnimationFrame(fadeDraw);
+})();
+
+/* ============================================================
+   4. HERO TYPEWRITER
+   ============================================================ */
+const tw = document.getElementById('hero-typewriter');
+const twLines = [
+  'verifiable agent continuity protocol',
+  'ed25519 · sha-256 · jcs rfc 8785',
+  'the art of un-concealing transmission integrity'
 ];
-
-let eqIdx = 0;
-let eqCharIdx = 0;
-
-function drawEquations() {
-  fCtx.clearRect(0, 0, fCanvas.width, fCanvas.height);
-
-  // Draw previously completed equations
-  for (let i = 0; i < eqIdx; i++) {
-    const eq = equations[i];
-    fCtx.font = '24px Caveat, cursive';
-    fCtx.fillStyle = eq.color;
-    fCtx.shadowColor = eq.color;
-    fCtx.shadowBlur = 4;
-    fCtx.fillText(eq.text, 30, eq.y);
-  }
-  fCtx.shadowBlur = 0;
-
-  // Draw current equation (being typed)
-  if (eqIdx < equations.length) {
-    const eq = equations[eqIdx];
-    fCtx.font = '24px Caveat, cursive';
-    fCtx.fillStyle = eq.color;
-    fCtx.shadowColor = eq.color;
-    fCtx.shadowBlur = 6;
-    const partial = eq.text.substring(0, eqCharIdx + 1);
-    fCtx.fillText(partial, 30, eq.y);
-    fCtx.shadowBlur = 0;
-
-    // Chalk cursor
-    const metrics = fCtx.measureText(partial);
-    fCtx.fillStyle = eq.color;
-    fCtx.fillRect(30 + metrics.width + 2, eq.y - 18, 2, 22);
-
-    eqCharIdx++;
-    if (eqCharIdx >= eq.text.length) {
-      eqIdx++;
-      eqCharIdx = 0;
-      if (eqIdx >= equations.length) {
-        setTimeout(() => {
-          eqIdx = 0;
-          eqCharIdx = 0;
-          drawEquations();
-        }, 4000);
-        return;
-      }
-    }
-    setTimeout(drawEquations, 40 + Math.random() * 50);
-  }
-}
-drawEquations();
-
-// ============================================
-// CLI TERMINAL — typewriter
-// ============================================
-const termLines = [
-  { t: 'cmd', text: 'alethech --store ~/.alethech init' },
-  { t: 'out', text: 'agent_id: did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu' },
-  { t: 'out', text: 'public_key: ed25519:7hTWOd_5XMfIMCFk_N9kpSmHoDdT65Iw...' },
-  { t: 'out', text: 'key_id: key-001' },
-  { t: 'out', text: 'genesis_commit: sha256:b0f920c954a687448dfc095336a090...' },
-  { t: 'blank', text: '' },
-  { t: 'cmd', text: 'alethech --store ~/.alethech commit --content mem.json' },
-  { t: 'ok', text: 'commit: sha256:b557605aa07b5642b34ee1aed454237683433d93...' },
-  { t: 'out', text: 'parent: sha256:b0f920c954a687448dfc095336a090da5efac823...' },
-  { t: 'out', text: 'agent: did:alethech:wf4kaxyigpgjuaqjj4ohqrvwyu' },
-  { t: 'blank', text: '' },
-  { t: 'cmd', text: 'alethech --store ~/.alethech key rotate' },
-  { t: 'info', text: 'rotated: key-001 → key-002' },
-  { t: 'out', text: 'cutoff_head: sha256:b557605aa07b5642b34ee1aed454237683433d93...' },
-  { t: 'out', text: 'control_event: sha256:152cbceae737bcc3a99c87366d3c2945b03e3b96...' },
-  { t: 'blank', text: '' },
-  { t: 'cmd', text: 'alethech --store ~/.alethech verify' },
-  { t: 'out', text: 'identities: 1 verified, 0 invalid' },
-  { t: 'out', text: 'commits: 2 verified, 0 invalid' },
-  { t: 'out', text: 'HEAD: sha256:b557605aa07b5642b34ee1aed454237683433d93 (valid)' },
-  { t: 'ok', text: 'result: OK ✓' },
-];
-
-const termBody = document.getElementById('terminal-body');
-let termIdx = 0;
-
-function typeTermLine() {
-  if (termIdx >= termLines.length) {
-    setTimeout(() => {
-      termBody.innerHTML = '';
-      termIdx = 0;
-      typeTermLine();
-    }, 4000);
+let twLi=0, twCi=0;
+function typeStep(){
+  if(twLi >= twLines.length){
+    tw.innerHTML = twLines[twLines.length-1] + '<span class="caret"></span>';
     return;
   }
-
-  const line = termLines[termIdx];
-  const div = document.createElement('div');
-  div.className = 'term-line';
-
-  if (line.t === 'cmd') {
-    div.innerHTML = '<span class="term-prompt">$ </span><span class="term-cmd">' + line.text + '</span>';
-  } else if (line.t === 'ok') {
-    div.innerHTML = '<span class="term-ok">' + line.text + '</span>';
-  } else if (line.t === 'info') {
-    div.innerHTML = '<span class="term-info">' + line.text + '</span>';
-  } else if (line.t === 'blank') {
-    div.innerHTML = '&nbsp;';
+  const line = twLines[twLi];
+  if(twCi <= line.length){
+    tw.innerHTML = line.slice(0,twCi) + '<span class="caret"></span>';
+    twCi++;
+    setTimeout(typeStep, 38 + Math.random()*40);
   } else {
-    div.innerHTML = '<span class="term-out">' + line.text + '</span>';
+    twLi++; twCi=0;
+    setTimeout(typeStep, 700);
   }
-
-  termBody.appendChild(div);
-  termBody.scrollTop = termBody.scrollHeight;
-
-  termIdx++;
-  setTimeout(typeTermLine, line.t === 'cmd' ? 600 : 120);
 }
+setTimeout(typeStep, 900);
 
-const termObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting && termIdx === 0) {
-      typeTermLine();
-      termObserver.unobserve(entry.target);
-    }
+/* ============================================================
+   5. MAGNETIC BUTTONS
+   ============================================================ */
+document.querySelectorAll('.mag-btn').forEach(btn=>{
+  const span = btn.querySelector('span');
+  btn.addEventListener('mousemove', e=>{
+    const r = btn.getBoundingClientRect();
+    const x = e.clientX - (r.left + r.width/2);
+    const y = e.clientY - (r.top + r.height/2);
+    gsap.to(btn, {x: x*0.4, y: y*0.4, duration:.5, ease:'power3.out'});
+    if(span) gsap.to(span, {x: x*0.25, y: y*0.25, duration:.5, ease:'power3.out'});
   });
-}, { threshold: 0.3 });
-
-termObserver.observe(termBody);
-
-// ============================================
-// SCROLL REVEALS
-// ============================================
-const reveals = document.querySelectorAll('.reveal');
-const revealObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-    }
-  });
-}, { threshold: 0.1 });
-
-reveals.forEach(el => revealObserver.observe(el));
-
-// ============================================
-// EINSTEIN CORNER INTERACTION
-// ============================================
-document.querySelectorAll('.einstein-doodle').forEach(d => {
-  d.style.pointerEvents = 'auto';
-  d.style.cursor = 'pointer';
-  d.addEventListener('click', () => {
-    d.style.transition = 'transform 0.5s';
-    d.style.transform = (d.classList.contains('einstein-br') ? 'rotate(180deg) ' : '') + 'scale(1.5) rotate(360deg)';
-    setTimeout(() => {
-      d.style.transform = d.classList.contains('einstein-br') ? 'rotate(180deg)' : '';
-    }, 500);
+  btn.addEventListener('mouseleave', ()=>{
+    gsap.to(btn, {x:0,y:0,duration:.6,ease:'elastic.out(1,.4)'});
+    if(span) gsap.to(span, {x:0,y:0,duration:.6,ease:'elastic.out(1,.4)'});
   });
 });
+
+/* ============================================================
+   6. FLIP CARDS (verdicts + honesty)
+   ============================================================ */
+document.querySelectorAll('[data-flip]').forEach(card=>{
+  card.addEventListener('click', ()=> card.classList.toggle('flipped'));
+});
+
+/* ============================================================
+   7. PROPERTY CARD 3D TILT (mouse-driven)
+   ============================================================ */
+const pcard = document.getElementById('property-card');
+const psec = document.getElementById('property');
+if(pcard && !COARSE){
+  psec.addEventListener('mousemove', e=>{
+    const r = pcard.getBoundingClientRect();
+    const x = (e.clientX - (r.left+r.width/2)) / (r.width/2);
+    const y = (e.clientY - (r.top+r.height/2)) / (r.height/2);
+    gsap.to(pcard, {rotateY: x*10, rotateX: -y*10, duration:.6, ease:'power2.out', transformPerspective:1600});
+  });
+  psec.addEventListener('mouseleave', ()=>{
+    gsap.to(pcard, {rotateY:0, rotateX:0, duration:1, ease:'elastic.out(1,.5)'});
+  });
+}
+
+/* ============================================================
+   8. EQUATION PANELS — draw on hover (per-panel chalk canvas)
+   ============================================================ */
+const eqColors = {1:'#69f0ae', 2:'#ff69b4', 3:'#4fc3f7', 4:'#fff44f'};
+document.querySelectorAll('.eq-panel').forEach(panel=>{
+  const cv = panel.querySelector('.eq-canvas');
+  const ctx = cv.getContext('2d');
+  function resize(){
+    const r = panel.getBoundingClientRect();
+    cv.width = r.width*DPR; cv.height = r.height*DPR;
+    cv.style.width = r.width+'px'; cv.style.height = r.height+'px';
+  }
+  resize();
+  let pdown=false, lx=0, ly=0;
+  const color = eqColors[panel.dataset.eq] || '#f5f5dc';
+  panel.addEventListener('mouseenter', ()=> panel.classList.add('drawing'));
+  panel.addEventListener('mouseleave', ()=>{ panel.classList.remove('drawing'); pdown=false; });
+  panel.addEventListener('mousemove', e=>{
+    if(!panel.classList.contains('drawing')) return;
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left)*DPR, y = (e.clientY - r.top)*DPR;
+    // continuous faint trace while hovering (no click needed)
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.25; ctx.lineWidth = 1.4*DPR; ctx.lineCap='round';
+    ctx.beginPath();
+    const jx=(Math.random()-.5)*1.5*DPR, jy=(Math.random()-.5)*1.5*DPR;
+    ctx.moveTo(lx||x, ly||y); ctx.lineTo(x+jx, y+jy); ctx.stroke();
+    ctx.globalAlpha=1;
+    lx=x; ly=y;
+  });
+  panel.addEventListener('mouseleave', ()=>{ lx=0; ly=0; });
+  // fade
+  setInterval(()=>{
+    ctx.globalCompositeOperation='destination-out';
+    ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.globalCompositeOperation='source-over';
+  }, 80);
+  window.addEventListener('resize', resize);
+});
+
+/* ============================================================
+   9. SCROLL PROGRESS (top bar + side rail + ticks)
+   ============================================================ */
+const progBar = document.getElementById('progress');
+const progFill = document.getElementById('progress-fill');
+const rail = document.getElementById('progress-rail');
+const sections = ['hero','property','equations','dag','verdicts','rotation','tower','cli','honesty'];
+const navLinks = {};
+document.querySelectorAll('#nav a').forEach(a=> navLinks[a.dataset.sec] = a);
+sections.forEach((id,i)=>{
+  const tick = document.createElement('div');
+  tick.className = 'progress-tick';
+  tick.style.top = (i/(sections.length-1)*100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'progress-label';
+  lbl.textContent = id;
+  tick.appendChild(lbl);
+  rail.appendChild(tick);
+  tick._label = lbl;
+});
+const ticks = rail.querySelectorAll('.progress-tick');
+
+ScrollTrigger.create({
+  trigger:'body', start:'top top', end:'bottom bottom',
+  onUpdate: self=>{
+    const p = self.progress;
+    progBar.style.width = (p*100)+'%';
+    progFill.style.height = (p*100)+'%';
+    // active tick
+    const idx = Math.round(p*(sections.length-1));
+    ticks.forEach((t,i)=> t.classList.toggle('active', i===idx));
+    // nav active
+    for(const id in navLinks) navLinks[id].classList.remove('active');
+    if(navLinks[sections[idx]]) navLinks[sections[idx]].classList.add('active');
+  }
+});
+
+/* ============================================================
+   10. SECTION TINT TRANSITIONS
+   ============================================================ */
+const tints = {
+  hero:     'radial-gradient(ellipse at 30% 40%,rgba(79,195,247,.05),transparent 60%)',
+  property: 'radial-gradient(ellipse at 70% 50%,rgba(105,240,174,.06),transparent 60%)',
+  equations:'radial-gradient(ellipse at 50% 50%,rgba(186,104,200,.07),transparent 60%)',
+  dag:      'radial-gradient(ellipse at 40% 60%,rgba(255,105,180,.06),transparent 60%)',
+  verdicts: 'radial-gradient(ellipse at 60% 40%,rgba(255,244,79,.05),transparent 60%)',
+  rotation: 'radial-gradient(ellipse at 50% 50%,rgba(255,183,77,.06),transparent 60%)',
+  tower:   'radial-gradient(ellipse at 30% 70%,rgba(79,195,247,.06),transparent 60%)',
+  cli:     'radial-gradient(ellipse at 50% 50%,rgba(105,240,174,.05),transparent 60%)',
+  honesty: 'radial-gradient(ellipse at 50% 50%,rgba(255,82,82,.05),transparent 60%)',
+};
+const tintEl = document.getElementById('tint');
+sections.forEach(id=>{
+  ScrollTrigger.create({
+    trigger:'#'+id, start:'top 60%', end:'bottom 40%',
+    onEnter: ()=> tintEl.style.background = tints[id] || tints.hero,
+    onEnterBack: ()=> tintEl.style.background = tints[id] || tints.hero,
+  });
+});
+
+/* ============================================================
+   11. NAV SMOOTH SCROLL
+   ============================================================ */
+document.querySelectorAll('#nav a').forEach(a=>{
+  a.addEventListener('click', e=>{
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if(target){
+      gsap.to(window, {duration:1.2, scrollTo:{y:target, autoKill:true}, ease:'power3.inOut'});
+    }
+  });
+});
+
+/* ============================================================
+   12. REVEAL ANIMATIONS — staggered, multi-axis
+   ============================================================ */
+const revealEls = document.querySelectorAll('.reveal');
+revealEls.forEach(el=>{
+  // vary entrance axis for non-linearity
+  const r = Math.random();
+  let from;
+  if(r < 0.33) from = {y:60, rotateX:-8};
+  else if(r < 0.66) from = {x:(Math.random()<.5?-80:80), rotate:2};
+  else from = {scale:.85, rotate:-1.5};
+  gsap.set(el, {...from, opacity:0});
+});
+gsap.utils.toArray('.reveal').forEach(el=>{
+  const r = Math.random();
+  let toVars;
+  if(r < 0.33) toVars = {y:0, rotateX:0, opacity:1};
+  else if(r < 0.66) toVars = {x:0, rotate:0, opacity:1};
+  else toVars = {scale:1, rotate:0, opacity:1};
+  gsap.to(el, {
+    ...toVars, duration:1.1, ease:'power3.out',
+    scrollTrigger:{ trigger:el, start:'top 85%', toggleActions:'play none none reverse' }
+  });
+});
+
+/* ============================================================
+   13. HERO PARALLAX + entrance timeline
+   ============================================================ */
+gsap.utils.toArray('.parallax-bg').forEach(bg=>{
+  ScrollTrigger.create({
+    trigger: bg.closest('section'), start:'top bottom', end:'bottom top', scrub:true,
+    onUpdate: self=> gsap.set(bg, {yPercent: self.progress*30})
+  });
+});
+// hero greek subtle float
+gsap.to('.hero-greek', {y:-12, duration:3, repeat:-1, yoyo:true, ease:'sine.inOut'});
+
+/* ============================================================
+   14. PROPERTY — pinned scale/rotate transform
+   ============================================================ */
+ScrollTrigger.create({
+  trigger:'#property', start:'top 80%', end:'bottom 20%', scrub:true,
+  onUpdate: self=>{
+    const p = self.progress;
+    gsap.set('#property-card', {
+      scale: 0.85 + p*0.2,
+      rotateZ: (p-0.5)*4,
+    });
+  }
+});
+
+/* ============================================================
+   15. FOUR EQUATIONS — HORIZONTAL SCROLL (translateX on vertical)
+   ============================================================ */
+const eqTrack = document.getElementById('eq-track');
+const eqPin = document.getElementById('eq-pin');
+if(eqTrack && !MOBILE){
+  const scrollDist = () => eqTrack.scrollWidth - window.innerWidth + 200;
+  ScrollTrigger.create({
+    trigger:'#equations', start:'top top', end: ()=> '+=' + scrollDist(),
+    pin: eqPin, scrub: 1, invalidateOnRefresh:true,
+    onUpdate: self=>{
+      const x = -self.progress * scrollDist();
+      gsap.set(eqTrack, {x});
+    }
+  });
+}
+
+/* ============================================================
+   16. MERKLE DAG — draw edges on scroll + shake bad node
+   ============================================================ */
+const dagEdges = document.querySelectorAll('.dag-edge');
+dagEdges.forEach((edge,i)=>{
+  const len = edge.getTotalLength();
+  edge.style.strokeDasharray = len;
+  edge.style.strokeDashoffset = len;
+  ScrollTrigger.create({
+    trigger:'#dag', start:'top 60%', end:'center center', scrub:true,
+    onUpdate: self=>{
+      const seg = 1/dagEdges.length;
+      const local = gsap.utils.clamp(0,1,(self.progress - i*seg)/seg);
+      edge.style.strokeDashoffset = len*(1-local);
+    }
+  });
+});
+const badNode = document.getElementById('bad-node');
+ScrollTrigger.create({
+  trigger:'#dag', start:'center center', end:'bottom top',
+  onEnter: ()=>{ if(badNode){ badNode.classList.add('shake'); setTimeout(()=>badNode.classList.remove('shake'),500); } },
+  onEnterBack: ()=>{ if(badNode){ badNode.classList.add('shake'); setTimeout(()=>badNode.classList.remove('shake'),500); } }
+});
+
+/* ============================================================
+   17. KEY ROTATION — arrow draws, keys slide, cutoff pins
+   ============================================================ */
+const rotPath = document.getElementById('rot-path');
+if(rotPath){
+  const plen = rotPath.getTotalLength();
+  rotPath.style.strokeDasharray = plen;
+  rotPath.style.strokeDashoffset = plen;
+  ScrollTrigger.create({
+    trigger:'#rotation', start:'top 70%', end:'bottom 40%', scrub:true,
+    onUpdate: self=>{
+      rotPath.style.strokeDashoffset = plen*(1-self.progress);
+      gsap.set('#rot-a', {x: -40*(1-self.progress), opacity: 0.4+0.6*self.progress});
+      gsap.set('#rot-b', {x: 40*(1-self.progress), opacity: 0.4+0.6*self.progress});
+      gsap.set('#rot-cutoff', {opacity: self.progress});
+    }
+  });
+}
+
+/* ============================================================
+   18. ANTI-ROLLBACK TOWER — builds on scroll, bad block shakes
+   ============================================================ */
+const towerEl = document.getElementById('tower-el');
+const towerData = [
+  {label:'cp-0', y:440, ok:true},
+  {label:'c₁',   y:380, ok:true},
+  {label:'c₂',   y:320, ok:true},
+  {label:'c₃',   y:260, ok:true},
+  {label:'c₄',   y:200, ok:true},
+  {label:'cp-1', y:140, ok:true},
+  {label:'c✗',   y:80,  ok:false},  // rolled-back → rejected
+];
+const towerBlocks = [];
+towerData.forEach((d,i)=>{
+  const b = document.createElement('div');
+  b.className = 'tower-block' + (d.ok?'':' bad');
+  b.textContent = d.label;
+  b.style.top = d.y + 'px';
+  b.dataset.ok = d.ok;
+  towerEl.appendChild(b);
+  towerBlocks.push(b);
+});
+ScrollTrigger.create({
+  trigger:'#tower', start:'top 70%', end:'bottom 30%', scrub:true,
+  onUpdate: self=>{
+    const n = towerBlocks.length;
+    towerBlocks.forEach((b,i)=>{
+      const seg = 1/n;
+      const local = gsap.utils.clamp(0,1,(self.progress - i*seg*0.8)/seg);
+      const yFrom = 60;
+      gsap.set(b, {opacity: local, y: (1-local)*yFrom, scale: 0.6+0.4*local});
+      if(b.dataset.ok === 'false' && local > 0.7 && !b.dataset.shook){
+        b.dataset.shook = '1';
+        b.classList.add('shake'); /* reuse dag shake */
+        setTimeout(()=>{ b.classList.remove('shake'); }, 500);
+      }
+    });
+  }
+});
+
+/* ============================================================
+   19. CLI TERMINAL — typewriter synced to scroll
+   ============================================================ */
+const termBody = document.getElementById('term-body');
+const cliScript = [
+  {t:'cmd', s:'$ pip install alethech'},
+  {t:'out', s:'Successfully installed alethech-0.5.8'},
+  {t:'cmd', s:'$ alethech init'},
+  {t:'out', s:'→ identity generated (Ed25519)'},
+  {t:'out', s:'→ agent_id = did:alethech:b32(sha256(JCS(pk))[:16])'},
+  {t:'out', s:'→ genesis commit signed'},
+  {t:'cmd', s:'$ alethech commit --content memory.json'},
+  {t:'out', s:'→ commit_id = sha256(JCS(object − {commit_id, σ}))'},
+  {t:'out', s:'→ σ = Ed25519_sk(JCS(object + commit_id))'},
+  {t:'ok',  s:'✓ commit c1 verified'},
+  {t:'cmd', s:'$ alethech key rotate'},
+  {t:'warn',s:'→ recording cutoff_head = c1'},
+  {t:'out', s:'→ key-002 bound to identity'},
+  {t:'cmd', s:'$ alethech verify'},
+  {t:'ok',  s:'✓ integrity: 6 commits'},
+  {t:'ok',  s:'✓ authorship: all signatures valid'},
+  {t:'ok',  s:'✓ provenance: merkle dag intact'},
+  {t:'ok',  s:'✓ continuity: head reachable from cutoff_head'},
+  {t:'ok',  s:'✓ VALID_HISTORICAL'},
+];
+let cliIndex = 0, cliChar = 0, cliLine = null;
+function cliTick(){
+  if(cliIndex >= cliScript.length){
+    termBody.innerHTML = termBody.innerHTML.replace(/<span class="cur"><\/span>$/,'') + '<br><span class="ok">— verifier closed. protocol: offline. truth: un-concealed.</span><span class="cur"></span>';
+    return;
+  }
+  const cur = cliScript[cliIndex];
+  if(!cliLine){
+    cliLine = document.createElement('div');
+    cliLine.className = cur.t;
+    termBody.appendChild(cliLine);
+    // remove old caret
+    const carets = termBody.querySelectorAll('.cur');
+    carets.forEach(c=>c.remove());
+  }
+  if(cliChar <= cur.s.length){
+    cliLine.innerHTML = cur.s.slice(0,cliChar) + '<span class="cur"></span>';
+    cliChar++;
+    setTimeout(cliTick, 18 + Math.random()*22);
+  } else {
+    cliLine.innerHTML = cur.s;
+    cliIndex++; cliChar=0; cliLine=null;
+    setTimeout(cliTick, 280);
+  }
+}
+ScrollTrigger.create({
+  trigger:'#cli', start:'top 60%', once:true,
+  onEnter: ()=> setTimeout(cliTick, 300)
+});
+
+/* ============================================================
+   20. VERDICT CARDS — 3D entrance + subtle continuous float
+   ============================================================ */
+gsap.utils.toArray('.flip-card').forEach((card,i)=>{
+  gsap.fromTo(card, {rotateY: -25, opacity:0, y:60}, {
+    rotateY:0, opacity:1, y:0, duration:1, ease:'power3.out', delay:i*0.12,
+    scrollTrigger:{trigger:card, start:'top 85%'}
+  });
+});
+gsap.utils.toArray('.h-card').forEach((card,i)=>{
+  gsap.fromTo(card, {rotateY: 25, opacity:0, scale:.9}, {
+    rotateY:0, opacity:1, scale:1, duration:.9, ease:'back.out(1.4)', delay:(i%3)*0.1,
+    scrollTrigger:{trigger:card, start:'top 88%'}
+  });
+});
+
+/* ============================================================
+   21. REFRESH on load
+   ============================================================ */
+window.addEventListener('load', ()=> setTimeout(()=>ScrollTrigger.refresh(), 200));
+
+})();
 </script>
 </body>
 </html>
