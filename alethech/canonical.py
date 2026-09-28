@@ -1,11 +1,16 @@
-"""JCS (JSON Canonicalization Scheme) — RFC 8785.
+"""JCS (JSON Canonicalization Scheme) — RFC 8785 (with errata).
 
 Serializes JSON to a canonical byte string suitable for hashing and signing.
 
 Implementation notes:
 - Object keys sorted by UTF-16 code unit (RFC 8785 §3.2.3).
 - Strings escaped per RFC 8259 (no escaped non-ASCII — UTF-8 direct).
-- Numbers: integer if no fractional/exponent, else minimal float repr.
+- Numbers: serialized per ECMAScript Number::toString() algorithm.
+  - Integer if no fractional/exponent, else minimal float repr.
+  - -0 serializes as "0" (RFC 8785 erratum: sign of zero NOT preserved).
+  - Positive exponents keep the '+' sign (e.g. "1e+21", not "1e21").
+  - Negative exponents strip leading zeros (e.g. "1e-7", not "1e-07").
+  - Decimal notation for 1e-6 <= |n| < 1e21, scientific otherwise.
 - No whitespace, no trailing newline.
 """
 from __future__ import annotations
@@ -70,8 +75,14 @@ def _serialize_number(n: float | int) -> str:
         raise ValueError("-Infinity not representable in JCS")
 
     if n == 0.0:
-        # Preserve sign of zero per RFC 8785
-        return "-0" if math.copysign(1.0, n) < 0 else "0"
+        # RFC 8785 erratum + ECMAScript Number::toString(x): both +0 and -0
+        # serialize as "0". The sign of zero is NOT preserved.
+        # Reference: ECMAScript spec §6.1.6.1.20 step 2:
+        #   "If x is +0 or -0, return the String value '0'."
+        # Reference: RFC 8785 Appendix A test vectors:
+        #   0x0000000000000000 → "0"
+        #   0x8000000000000000 → "0"  (negative zero)
+        return "0"
 
     abs_n = abs(n)
 
@@ -89,9 +100,14 @@ def _serialize_number(n: float | int) -> str:
         # Otherwise, it uses decimal notation
         if abs_n >= 1e21 or abs_n < 1e-6:
             # Keep scientific notation, but fix the format:
-            # - No '+' for positive exponents
-            # - No leading zeros in exponent
-            return f"{mantissa}e{exp}"
+            # - KEEP '+' for positive exponents (RFC 8785 / ECMAScript
+            #   requires '1e+21', not '1e21'). Reference: ECMAScript
+            #   Number::toString spec, and cyberphone reference impl.
+            # - Strip leading zeros from negative exponents:
+            #   Python repr(1e-7) = '1e-07', JCS wants '1e-7'.
+            # Using '{:+d}' format gives '+21' for positive and '-7' for negative
+            # (without leading zeros), which is exactly the ECMAScript format.
+            return f"{mantissa}e{exp:+d}"
         else:
             # Convert from scientific to decimal notation
             return _scientific_to_decimal(mantissa, exp)

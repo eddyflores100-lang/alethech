@@ -94,11 +94,15 @@ class TestFloatVectors:
         assert canonical_json(1e-10) == "1e-10"
 
     def test_one_e21(self):
-        """1e21 — Python repr gives '1e+21', RFC 8785 wants '1e21'."""
-        assert canonical_json(1e21) == "1e21"
+        """1e21 — RFC 8785 / ECMAScript requires '+' for positive exponents.
+        Python repr(1e21) = '1e+21' (correct), JCS keeps '1e+21' (NOT '1e21').
+        Reference: ECMAScript Number::toString spec.
+        Reference: RFC 8785 Appendix A shows '1e+30' format."""
+        assert canonical_json(1e21) == "1e+21"
 
     def test_one_e_minus_7(self):
-        """1e-7 — Python repr gives '1e-07', RFC 8785 wants '1e-7'."""
+        """1e-7 — RFC 8785 strips leading zero from negative exponent.
+        Python repr(1e-7) = '1e-07', JCS wants '1e-7'."""
         assert canonical_json(1e-7) == "1e-7"
 
     def test_one_e20(self):
@@ -106,7 +110,7 @@ class TestFloatVectors:
         assert canonical_json(1e20) == "100000000000000000000"
 
     def test_negative_one_e21(self):
-        assert canonical_json(-1e21) == "-1e21"
+        assert canonical_json(-1e21) == "-1e+21"
 
     def test_5e_minus_324(self):
         """Smallest representable positive subnormal float."""
@@ -131,18 +135,28 @@ class TestFloatVectors:
 # ============================================================================
 
 class TestNegativeZero:
-    """RFC 8785 §3.2.2.3: 'Although the format used for representing the
-    sign of zero deviates from JSON, it is still compatible with JSON
-    parsers since the minus is treated as part of the number.'
+    """RFC 8785 (with erratum) and ECMAScript: -0 and +0 BOTH serialize as "0".
+    The sign of zero is NOT preserved in JCS.
 
-    ECMAScript distinguishes -0 from +0, and JCS preserves this.
+    References:
+    - ECMAScript spec §6.1.6.1.20 Number::toString step 2:
+      'If x is +0 or -0, return the String value "0".'
+    - RFC 8785 Appendix A test vectors:
+      0x0000000000000000 → "0"
+      0x8000000000000000 → "0"  (negative zero)
+    - RFC 8785 erratum confirmed by RFC Editor.
     """
 
     def test_positive_zero(self):
         assert canonical_json(0.0) == "0"
 
     def test_negative_zero(self):
-        assert canonical_json(-0.0) == "-0"
+        """RFC 8785 erratum: -0 serializes as '0' (sign NOT preserved).
+        Reference: ECMAScript spec §6.1.6.1.20 step 2:
+          'If x is +0 or -0, return the String value "0".'
+        Reference: RFC 8785 Appendix A test vectors:
+          0x8000000000000000 (negative zero) → '0'"""
+        assert canonical_json(-0.0) == "0"
 
     def test_positive_zero_int(self):
         # int 0 doesn't have sign — always "0"
@@ -151,8 +165,8 @@ class TestNegativeZero:
     def test_zero_from_arithmetic(self):
         # 1.0 * 0 = 0.0 (positive)
         assert canonical_json(1.0 * 0) == "0"
-        # -1.0 * 0 = -0.0 (negative)
-        assert canonical_json(-1.0 * 0) == "-0"
+        # -1.0 * 0 = -0.0 (negative) — but JCS serializes as '0'
+        assert canonical_json(-1.0 * 0) == "0"
 
 
 # ============================================================================
@@ -315,17 +329,17 @@ class TestRFC8785OfficialVectors:
     """
 
     def test_numbers_appA(self):
-        # RFC 8785 Appendix A.1 — corrected to match ECMAScript ToString()
-        # (the appendix shows '1E2' and '5e-3' but the actual ECMAScript
-        # algorithm produces '100' and '0.005' for these values)
+        # RFC 8785 Appendix A.1 — using ECMAScript Number::toString() rules:
+        #   - -0 serializes as '0' (sign not preserved per erratum)
+        #   - positive exponents keep '+' (e.g. '1e+21')
         cases = [
             (0.0, "0"),
-            (-0.0, "-0"),
+            (-0.0, "0"),  # erratum: -0 → "0"
             (1.0, "1"),
             (2.0, "2"),
             (123456789012345680000.0, "123456789012345680000"),
-            (1e+21, "1e21"),
-            (1.5e+20, "150000000000000000000"),  # < 1e21 → decimal, not scientific
+            (1e+21, "1e+21"),  # '+' kept
+            (1.5e+20, "150000000000000000000"),  # < 1e21 → decimal
         ]
         for value, expected in cases:
             assert canonical_json(value) == expected, \
@@ -353,16 +367,22 @@ class TestRFC8785OfficialVectors:
 
     def test_appA_numbers(self):
         """The number serialization vectors from RFC 8785 §3.2.2.3,
-        corrected to match ECMAScript Number.prototype.toString()."""
+        per ECMAScript Number.prototype.toString().
+
+        Per RFC 8785 erratum and ECMAScript spec:
+          - -0 → '0' (sign of zero NOT preserved)
+          - positive exponents keep '+' (e.g. '1e+21', not '1e21')
+          - negative exponents strip leading zeros (e.g. '1e-7', not '1e-07')
+        """
         cases = [
             (0.0, "0"),
-            (-0.0, "-0"),
+            (-0.0, "0"),  # erratum: sign not preserved
             (1.0, "1"),
             (2.0, "2"),
             (123456789012345680000.0, "123456789012345680000"),
-            (1e21, "1e21"),
-            (-1e21, "-1e21"),
-            (1e22, "1e22"),
+            (1e21, "1e+21"),  # '+' kept
+            (-1e21, "-1e+21"),  # '+' kept
+            (1e22, "1e+22"),  # '+' kept
             (1e-7, "1e-7"),
             (-1e-7, "-1e-7"),
             (1.5e20, "150000000000000000000"),  # < 1e21 → decimal
