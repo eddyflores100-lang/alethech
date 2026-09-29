@@ -33,9 +33,9 @@ python conformance/cross_language_check.py --no-byte-compare
 
 Exit codes:
 
-- `0`: all implementations agree on all fixtures.
+- `0`: all three implementations ran and agree on all comparable fixtures.
 - `1`: at least one implementation disagrees.
-- `2`: a required implementation is not available.
+- `2`: a required implementation or runtime is not available in the default three-language run. `--only` is a diagnostic single-runtime mode.
 
 ## Fixture format
 
