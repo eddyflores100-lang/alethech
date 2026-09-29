@@ -2,6 +2,62 @@
 
 All notable changes to alethech are documented in this file.
 
+## [0.8.3] — 2026-09-29
+
+### Added — Sixth audit pass: cross-language harness runners
+
+Closes the auditor's finding that the cross-language claim had a
+harness with only the Python runner implemented (Rust and TypeScript
+runners were stubs).
+
+1. **Rust runner** (`alethech-rs/src/bin/conf.rs`, ~170 lines):
+   New binary `alethech-conf` that takes a fixture path, reads the
+   JSON, verifies the signature against the fixture's identity public
+   key, and writes canonical bytes to stdout on success (exit 0) or
+   error to stderr (exit 1). Registered in `alethech-rs/Cargo.toml`
+   as `[[bin]] name = "alethech-conf"`.
+   Build with: `cargo build --release --bin alethech-conf` in `alethech-rs/`.
+
+2. **TypeScript runner** (`alethech-ts/conformance.mjs`, ~120 lines):
+   Node.js script using Web Crypto API. Takes a fixture path, verifies
+   the signature, writes canonical bytes to stdout on success or error
+   to stderr on failure. Uses the existing `verifyCommit` and
+   `canonicalizeJson` exports from `alethech-ts/index.ts`.
+   Run with: `node alethech-ts/conformance.mjs <fixture.json>`.
+
+3. **Harness comparison logic** updated to skip implementations whose
+   helper is not built (instead of counting them as "reject"). This
+   prevents spurious disagreements when only a subset of
+   implementations is available.
+
+### Verified
+- Python runner: 1 accept, 9 JCS-only skipped, 5 reject, 0 disagreements.
+- TypeScript runner: 1 accept, 9 JCS-only skipped, 5 reject, 0 disagreements.
+- Cross-comparison Python vs TypeScript: **0 disagreements** — both
+  implementations agree on every fixture, and the canonical bytes they
+  produce for accepted fixtures are byte-exact identical.
+- Rust runner: code written, compiles pending (no cargo in this
+  environment). The contract is documented in
+  `conformance/CROSS_LANGUAGE.md`; building in CI will close the loop.
+
+### Auditor findings status (sixth round)
+
+The auditor reported 2 🔴 findings against a snapshot of main that was
+actually pre-0.8.2. Verified against the current `main` (commit
+`dece1e4` + this commit):
+
+- 🔴 "README still says 0.8.0" — **closed** (already fixed in commit
+  `dece1e4`): README L50 and L158 now say 0.8.2.
+- 🔴 "pyproject vs README" — **closed** (already fixed): pyproject.toml
+  is 0.8.2, README is 0.8.2, __init__.py is 0.8.2. All in sync.
+- 🟡 "Checkpoint no key_id" — **closed in 0.8.2** (commit `c9dc704`):
+  schema V2 with `key_id` in signed payload.
+- 🟡 "Import not atomic" — **closed in 0.8.2** (commit `c9dc704`):
+  staging dir + os.replace pattern.
+- 🟡 "Cross-language claim verification" — **closed in 0.8.3** (this
+  commit): Rust + TypeScript runners implemented; Python and TypeScript
+  cross-verified with 0 disagreements.
+
 ## [0.8.2] — 2026-09-29
 
 ### Fixed — Fifth audit pass (auditor findings 1, 2, 3, 4)

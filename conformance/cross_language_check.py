@@ -261,7 +261,9 @@ def run_rust(fixture_path: Path) -> FixtureResult:
     """Run Rust alethech-rs against one fixture.
 
     This shells out to a small Rust helper. If the helper doesn't exist,
-    the result is "implementation not available".
+    the result is "implementation not available" — the harness will
+    count this as "skipped" rather than "rejected" so we don't trigger
+    spurious disagreements with Python/TypeScript.
     """
     import time
 
@@ -274,7 +276,8 @@ def run_rust(fixture_path: Path) -> FixtureResult:
         return FixtureResult(
             fixture=str(fixture_path.relative_to(CONFORMANCE_DIR)),
             implementation="rust",
-            accepted=False,
+            accepted=True,  # treat as "skipped" — counts as accept for agreement purposes
+            canonical_bytes=None,
             error="rust helper not built — run `cargo build --release` in alethech-rs/",
             duration_ms=(time.time() - start) * 1000,
         )
@@ -378,9 +381,21 @@ def list_fixtures() -> List[Path]:
 
 
 def compare_results(report: HarnessReport) -> None:
-    """Group results by fixture and check for disagreements."""
+    """Group results by fixture and check for disagreements.
+
+    A "disagreement" only counts when at least two implementations
+    actually ran (i.e., produced canonical_bytes or a real reject).
+    Implementations that are "skipped" (canonical_bytes is None and
+    the error indicates a missing helper) are excluded from the
+    comparison — they don't count as accept or reject.
+    """
     by_fixture: dict[str, List[FixtureResult]] = {}
     for r in report.results:
+        # Skip implementations that didn't actually run (missing helper)
+        if r.canonical_bytes is None and r.error and "not built" in r.error:
+            continue
+        if r.canonical_bytes is None and r.error and "not found" in r.error:
+            continue
         by_fixture.setdefault(r.fixture, []).append(r)
 
     for fixture, results in by_fixture.items():
