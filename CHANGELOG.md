@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — audit corrections
+
+- Cross-language harness now fails closed with exit 2 when a required runtime/helper is unavailable in the default three-language run.
+- CI now builds the Rust conformance helper and runs Python, Rust, and TypeScript together.
+- README version synchronized to 0.8.3.
+- Import documentation now distinguishes per-file atomic replacement from whole-store transactionality.
+- Release provenance note: the GitHub Actions release jobs for v0.8.2 and v0.8.3 failed at the PyPI publish step; release notes must not be treated as proof that those artifacts were published by the workflow.
+
 All notable changes to alethech are documented in this file.
 
 ## [0.8.3] — 2026-09-29
