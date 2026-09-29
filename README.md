@@ -12,7 +12,7 @@
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
 > The art of un-concealing transmission integrity.
 >
-> © 2026 AliceLabs LLC. Todos los derechos reservados.
+> Copyright (c) 2026 AliceLabs LLC.
 
 From Greek **ἀλήθεια** (aletheia, "truth as un-concealment") + **τέχνη** (techne, "art, craft").
 The art of revealing that a memory was not modified after being signed.
@@ -21,7 +21,7 @@ This is the reference implementation of the protocol specified in `docs/implemen
 
 ## what this is
 
-`alethech` is a Python package that provides **cryptographically verifiable memory continuity for AI agents**. It lets an agent sign its memory commits with Ed25519, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.
+`alethech` is a Python package that provides **cryptographically verifiable memory continuity for AI agents**. It lets an agent sign its memory commits with Ed25519, link them in a hash-linked DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.
 
 **What this repo IS:**
 - A cryptographic protocol implementation (Ed25519 + SHA-256 + JCS RFC 8785)
@@ -180,4 +180,4 @@ MIT.
 
 ---
 
-© 2026 AliceLabs LLC. Todos los derechos reservados. · MIT License
+Copyright (c) 2026 AliceLabs LLC. MIT License.

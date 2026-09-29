@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|----------|
-| 0.7.x   | ✅       |
-| < 0.7   | ❌       |
+| 0.8.x   | ✅       |
+| < 0.8   | ❌       |
 
 ## Reporting a Vulnerability
 
@@ -76,10 +76,34 @@ alethech does NOT provide:
 
 ## Audit History
 
-- **2026-09-27**: External review by tonydzi (Palo Alto AI Research Lab) — reachability guarantee gap found and fixed
-- **2026-09-28**: External review by Kaushalt2004 (CogniCore) — firing test implemented, merged with 14/14 passing
+- **2026-09-27**: External review by tonydzi (Palo Alto AI Research Lab) — [run-llama/llama_index#23122](https://github.com/run-llama/llama_index/issues/23122) (Palo Alto AI Research Lab) — reachability guarantee gap found and fixed
+- **2026-09-28**: External review by Kaushalt2004 (CogniCore) — [cognicore-dev/cognicore-env#136](https://github.com/cognicore-dev/cognicore-env/pull/136) — merged, 14/14 passing (CogniCore) — firing test implemented, merged with 14/14 passing
 
 ## Contact
 
 - Security email: security@alicelabs.site
 - GitHub Security Advisories: https://github.com/eddyflores100-lang/alethech/security/advisories/new
+
+## Clarifications
+
+### Rollback detection
+
+- **With external checkpoint**: `verify_store` checks that `checkpoint.head_commit_id` is an ancestor of the current HEAD via `ancestry_check()`. Count mismatch is a fail-closed error. The `sequence` field is monotonic and signed — a consumer with a prior checkpoint can detect rollback by comparing `sequence` values.
+- **Without external checkpoint**: alethech CANNOT detect rollback. There is no internal state to compare against. This is a documented limitation, not a bug.
+
+### Private key storage
+
+- Private keys are stored as PEM with `0600` permissions on POSIX systems (Linux/macOS).
+- **Windows**: POSIX permissions do not apply. The PEM file is created without ACL restrictions on Windows. Users on Windows should manually restrict access to the `.alethech/keys/` directory.
+- PEM files are **not encrypted with a passphrase**. This is a known limitation. Future versions may add optional passphrase encryption via `--encrypt` flag.
+
+### Timestamps
+
+- All timestamps in alethech are self-declared by the agent. The protocol does NOT anchor to an external time source (NTP, blockchain, or trusted timestamp authority).
+- Without an external time anchor, there is **no reliable temporal ordering** between identities or commits from different agents.
+- The `sequence` field in Checkpoint provides **monotonic ordering** within a single agent's history, but NOT across agents.
+
+### Import safety
+
+- Import processes untrusted data. Defenses include: symlink rejection, path traversal rejection, file size limits (50MB), file count limits (10000), total size limits (500MB), artifact hash verification before write, and verify-before-write staging.
+- Import does NOT provide true filesystem transactionality. If I/O fails mid-write, the store may be partially modified. This is documented as "verify-before-write", not "atomic".
