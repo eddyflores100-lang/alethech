@@ -10,7 +10,7 @@
 - Import documentation distinguishes per-file atomic replacement from whole-store transactionality.
 - Release workflow migrated from a stored PyPI API token to PyPI Trusted Publishing via GitHub OIDC.
 - Python, Rust, and TypeScript package metadata synchronized to 0.8.4.
-- Transitional provenance note: v0.8.2 and v0.8.3 PyPI artifacts were uploaded manually; v0.8.4 is the first release intended to use the CI trusted-publishing chain.
+- Transitional provenance note: v0.8.2, v0.8.3, and v0.8.4 PyPI artifacts were uploaded manually via `twine upload` (the CI trusted-publishing workflow is configured in `.github/workflows/release.yml` but the PyPI trusted publisher registration was not yet completed at release time — the workflow ran, signed the artifacts with Sigstore via OIDC, but failed at the `pypa/gh-action-pypi-publish` step with `invalid-publisher`). Once the PyPI trusted publisher is registered (see `docs/RELEASE.md`), v0.8.5+ will be the first release published entirely through the CI chain with no local token.
 
 All notable changes to alethech are documented in this file.
 
