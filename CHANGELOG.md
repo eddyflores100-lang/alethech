@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased — audit corrections
+## [0.8.4] — 2026-09-29
 
-- Cross-language harness now fails closed with exit 2 when a required runtime/helper is unavailable in the default three-language run.
-- CI now builds the Rust conformance helper and runs Python, Rust, and TypeScript together.
-- README version synchronized to 0.8.3.
-- Import documentation now distinguishes per-file atomic replacement from whole-store transactionality.
-- Release provenance note: the GitHub Actions release jobs for v0.8.2 and v0.8.3 failed at the PyPI publish step; release notes must not be treated as proof that those artifacts were published by the workflow.
+### Audit closure and release provenance
+
+- Cross-language harness fails closed with exit 2 when a required runtime/helper is unavailable in the default three-language run.
+- CI builds the Rust conformance helper and runs Python, Rust, and TypeScript together.
+- Removed the source-inspection pseudo-security assertion from import hardening tests; security coverage is behavioral.
+- Import documentation distinguishes per-file atomic replacement from whole-store transactionality.
+- Release workflow migrated from a stored PyPI API token to PyPI Trusted Publishing via GitHub OIDC.
+- Python, Rust, and TypeScript package metadata synchronized to 0.8.4.
+- Transitional provenance note: v0.8.2 and v0.8.3 PyPI artifacts were uploaded manually; v0.8.4 is the first release intended to use the CI trusted-publishing chain.
 
 All notable changes to alethech are documented in this file.
 
