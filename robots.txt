@@ -3,7 +3,6 @@
 
 User-agent: *
 Allow: /
-Disallow: /assets/screenshots/
 
 # Sitemap
 Sitemap: https://alethech.alicelabs.site/sitemap.xml
