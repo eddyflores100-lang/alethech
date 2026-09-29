@@ -223,14 +223,33 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
     else:
         report.errors.append("cycle_detected: DAG contains a cycle (should not happen if hashes are correct)")
 
-    # 5. Verify evidence signatures
+    # 5. Verify evidence signatures (B4 FIX: support V2 identity)
     for eid, ev in evidence.items():
         ident = identities.get(ev.agent_id)
-        if ident is None:
-            report.evidence_invalid += 1
-            report.errors.append(f"unknown_identity: evidence {eid} claims unknown agent_id {ev.agent_id}")
-            continue
-        if not ev.verify(ident.public_key):
+        if ident is not None:
+            public_jwk = ident.public_key
+        else:
+            # B4 FIX: try V2 identity — find the key by key_id
+            v2_ident = None
+            for v2 in identities_v2.values():
+                if v2.agent_id == ev.agent_id:
+                    v2_ident = v2
+                    break
+            if v2_ident is None:
+                report.evidence_invalid += 1
+                report.errors.append(f"unknown_identity: evidence {eid} claims unknown agent_id {ev.agent_id}")
+                continue
+            key_obj = None
+            for k in v2_ident.active_keys + v2_ident.revoked_keys:
+                if k.get("key_id") == ev.key_id:
+                    key_obj = k
+                    break
+            if key_obj is None:
+                report.evidence_invalid += 1
+                report.errors.append(f"unknown_key: evidence {eid} uses key_id {ev.key_id} not in identity {ev.agent_id}")
+                continue
+            public_jwk = key_obj["public_key"]
+        if not ev.verify(public_jwk):
             report.evidence_invalid += 1
             report.errors.append(f"signature_invalid: evidence {eid} does not verify")
 
@@ -296,10 +315,37 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
     # current HEAD. I.e., ancestry_check(checkpoint.head_commit_id,
     # current_head, commits) must return True. This closes the dark gap.
     if checkpoint is not None:
+        # B5 FIX: checkpoint must support V2 identity, not just legacy
         cp_ident = identities.get(checkpoint.agent_id)
-        if cp_ident is None:
+        if cp_ident is not None:
+            cp_public_jwk = cp_ident.public_key
+        else:
+            # Try V2 identity — find active key matching checkpoint's key_id
+            v2_ident = None
+            for v2 in identities_v2.values():
+                if v2.agent_id == checkpoint.agent_id:
+                    v2_ident = v2
+                    break
+            if v2_ident is None:
+                report.errors.append(f"checkpoint_unknown_identity: {checkpoint.agent_id}")
+                cp_public_jwk = None
+            else:
+                key_obj = None
+                for k in v2_ident.active_keys + v2_ident.revoked_keys:
+                    if k.get("key_id") == getattr(checkpoint, 'key_id', 'key-001'):
+                        key_obj = k
+                        break
+                if key_obj is None and v2_ident.active_keys:
+                    key_obj = v2_ident.active_keys[0]
+                if key_obj is None:
+                    report.errors.append(f"checkpoint_unknown_key: {checkpoint.agent_id}")
+                    cp_public_jwk = None
+                else:
+                    cp_public_jwk = key_obj["public_key"]
+
+        if cp_public_jwk is None and not report.errors:
             report.errors.append(f"checkpoint_unknown_identity: {checkpoint.agent_id}")
-        elif not checkpoint.verify(cp_ident.public_key):
+        elif cp_public_jwk is not None and not checkpoint.verify(cp_public_jwk):
             report.errors.append("checkpoint_signature_invalid")
         elif checkpoint.head_commit_id not in commits:
             report.errors.append(f"rollback_detected: checkpoint head {checkpoint.head_commit_id} not present in store")
@@ -339,6 +385,19 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
                 )
             else:
                 report.continuity_verified = True
+
+            # B10: Document that sequence enforcement is consumer-side.
+            # verify_store receives a single checkpoint and verifies its
+            # signature, presence, count, and causal ancestry. But it
+            # cannot detect rollback (sequence < N) because it has no
+            # prior checkpoint to compare against. That is the consumer's
+            # responsibility. We add a WARNING to make this explicit.
+            if checkpoint.sequence > 0:
+                report.warnings.append(
+                    f"checkpoint_sequence_note: checkpoint has sequence={checkpoint.sequence}. "
+                    f"Rollback detection (sequence < N) is consumer-side — verify_store "
+                    f"cannot detect rollback without a prior checkpoint to compare against."
+                )
 
     return report
 
@@ -414,6 +473,15 @@ def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:  # typed
     for agent_id, ident in identities_v2.items():
         if not ident.verify_self():
             report.errors.append(f"identity_v2_mismatch: {agent_id} does not derive from root_public_key")
+
+        # B3 FIX: verify the IdentityRecordV2 signature against the root public key.
+        # verify_self() only proves agent_id derives from root_public_key.
+        # We must also verify that the record was actually signed by the root.
+        if not ident.verify(root.root_public_key):
+            report.errors.append(
+                f"identity_v2_signature_invalid: {agent_id} signature does not verify "
+                f"against root_public_key — record may have been tampered"
+            )
 
     # 0.5.6 BLOQUEANTE #2: explicit root_id binding.
     #

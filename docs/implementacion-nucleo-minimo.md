@@ -14,7 +14,7 @@
 
 ## alcance estricto
 
-Seis comandos. Nada más.
+Nine commands. Nada más.
 
 ```
 1. alethech init
@@ -323,13 +323,13 @@ Argumentos opcionales. Si no se pasa `--recovery-key-file`, se genera un nuevo p
 3. Construye `public_key` en formato JWK.
 4. Calcula `agent_id` según algoritmo de "definición formal" de arriba.
 5. Construye objeto `Identity` según estructura de arriba.
-6. Crea directorio `.memex/` en el cwd (o lo inicializa vacío si existe).
-7. Guarda `identity.json` en `.memex/identities/<agent_id>.json`.
-8. Guarda `signing.key` (private key) en `.memex/keys/signing.key` con permisos `0600`.
-9. Guarda `recovery.key` (private key) en `.memex/keys/recovery.key` con permisos `0600`.
+6. Crea directorio `.alethech/` en el cwd (o lo inicializa vacío si existe).
+7. Guarda `identity.json` en `.alethech/identities/<agent_id>.json`.
+8. Guarda `signing.key` (private key) en `.alethech/keys/signing.key` con permisos `0600`.
+9. Guarda `recovery.key` (private key) en `.alethech/keys/recovery.key` con permisos `0600`.
 10. Crea `genesis commit` — un MemoryCommit con `parents: []` y `content: { "type": "genesis" }` firmado por la signing key.
-11. Guarda el genesis commit en `.memex/commits/<commit_id>.json`.
-12. Actualiza `.memex/HEAD` con el `commit_id` del genesis.
+11. Guarda el genesis commit en `.alethech/commits/<commit_id>.json`.
+12. Actualiza `.alethech/HEAD` con el `commit_id` del genesis.
 
 ### salida
 
@@ -350,8 +350,8 @@ genesis_commit: sha256:...
 
 ### qué errores debe detectar
 
-- Permisos incorrectos en `.memex/keys/` (debe advertir, no proceder).
-- Directorio `.memex/` ya inicializado con identidad distinta (debe abortar).
+- Permisos incorrectos en `.alethech/keys/` (debe advertir, no proceder).
+- Directorio `.alethech/` ya inicializado con identidad distinta (debe abortar).
 - Fallo en generación de claves (debe abortar y limpiar).
 
 ### qué propiedades demuestra
@@ -378,7 +378,7 @@ genesis_commit: sha256:...
 
 - Si `identity.json` está corrupto, `init` debe negarse a proceder.
 - Si `signing.key` falta, `init` debe abortar (no se puede firmar genesis).
-- Si `.memex/HEAD` ya existe pero apunta a commit inválido, `init` debe abortar y pedir intervención manual.
+- Si `.alethech/HEAD` ya existe pero apunta a commit inválido, `init` debe abortar y pedir intervención manual.
 
 ### compatibilidad del formato portable
 
@@ -399,8 +399,8 @@ alethech commit --content <json-file> [--type semantic|episodic|procedural] [--e
 
 1. Lee `content` del archivo JSON.
 2. Valida que `content` sea un objeto JSON serializable.
-3. Lee `agent_id` y `signing.key` de `.memex/`.
-4. Lee `.memex/HEAD` para obtener el parent actual.
+3. Lee `agent_id` y `signing.key` de `.alethech/`.
+4. Lee `.alethech/HEAD` para obtener el parent actual.
 5. Construye `provenance`:
    - `source`: default `agent_observation`.
    - `evidence_refs`: lista de evidence IDs pasados con `--evidence`.
@@ -412,8 +412,8 @@ alethech commit --content <json-file> [--type semantic|episodic|procedural] [--e
 10. Re-canonicaliza (con commit_id, sin signature).
 11. Firma con signing key.
 12. Agrega `signature`.
-13. Guarda en `.memex/commits/<commit_id>.json`.
-14. Actualiza `.memex/HEAD`.
+13. Guarda en `.alethech/commits/<commit_id>.json`.
+14. Actualiza `.alethech/HEAD`.
 
 ### salida
 
@@ -472,12 +472,12 @@ timestamp: 2026-09-26T12:34:56.789Z
 ### comportamiento con almacenamiento corrupto
 
 - Si `signing.key` está corrupta, `commit` aborta.
-- Si `.memex/HEAD` no coincide con el último commit en disco, `commit` aborta y pide `verify`.
+- Si `.alethech/HEAD` no coincide con el último commit en disco, `commit` aborta y pide `verify`.
 - Si el directorio `commits/` no es escribible, error claro.
 
 ### compatibilidad del formato portable
 
-- El commit se serializa como JSON canónico y se incluye en `project.memex/commits/`.
+- El commit se serializa como JSON canónico y se incluye en `project.alethech/commits/`.
 
 ## comando 3: alethech evidence
 
@@ -498,8 +498,8 @@ Todos los argumentos requeridos salvo `--result` (default: success) y `--artifac
 5. Lee `agent_id` y `signing.key`.
 6. Construye `EvidenceCommit` según estructura, sin `commit_id` ni `signature`.
 7. Canonicaliza, calcula `commit_id`, firma.
-8. Guarda en `.memex/evidence/<commit_id>.json`.
-9. Los artifacts binarios se guardan aparte en `.memex/artifacts/<hash>` (sin extensión, identificados por hash).
+8. Guarda en `.alethech/evidence/<commit_id>.json`.
+9. Los artifacts binarios se guardan aparte en `.alethech/artifacts/<hash>` (sin extensión, identificados por hash).
 10. NO actualiza HEAD — evidence no es parte del DAG lineal.
 
 ### salida
@@ -565,7 +565,7 @@ Tampoco demuestra:
 ### compatibilidad del formato portable
 
 - El EvidenceCommit se serializa como JSON canónico.
-- Los artifacts binarios se incluyen en `project.memex/artifacts/<hash>`.
+- Los artifacts binarios se incluyen en `project.alethech/artifacts/<hash>`.
 - El hash del artifact es su nombre de archivo — no hay colisiones (dedup automático).
 
 ## comando 4: alethech verify
@@ -576,7 +576,7 @@ Tampoco demuestra:
 alethech verify [--path <memex-dir>] [--strict] [--emit-checkpoint <output-file>] [--checkpoint <external-checkpoint-file>]
 ```
 
-Default: `.memex/` en cwd. `--strict` falla en warnings. `--emit-checkpoint` genera checkpoint al final. `--checkpoint` recibe un checkpoint externo para verificar continuidad.
+Default: `.alethech/` en cwd. `--strict` falla en warnings. `--emit-checkpoint` genera checkpoint al final. `--checkpoint` recibe un checkpoint externo para verificar continuidad.
 
 ### qué hace
 
@@ -608,7 +608,7 @@ Recorre en orden:
    - El hash del archivo debe coincidir con el declarado.
 
 6. **Verificar consistencia de HEAD**:
-   - Si `.memex/HEAD` apunta a un commit que no existe, marcar `head_invalid`.
+   - Si `.alethech/HEAD` apunta a un commit que no existe, marcar `head_invalid`.
    - Si HEAD no coincide con la punta esperada del DAG, advertir (no necesariamente error).
 
 7. **Verificar continuidad observable** (corrección 2 — solo si se pasó `--checkpoint`):
@@ -692,7 +692,7 @@ Recalcula todos los hashes para verificar.
 
 ### compatibilidad del formato portable
 
-- `verify` debe poder correr sobre un `project.memex/` exportado, no solo sobre `.memex/` runtime.
+- `verify` debe poder correr sobre un `project.alethech/` exportado, no solo sobre `.alethech/` runtime.
 
 ## comando 5: alethech export
 
@@ -733,7 +733,7 @@ alethech export --output <path> [--from <commit-id>] [--include-artifacts] [--em
 ### salida
 
 ```
-exported to: /path/to/project.memex/
+exported to: /path/to/project.alethech/
 commits: 5
 evidence: 3
 artifacts: 7 (45.6 KB)
@@ -798,7 +798,7 @@ checkpoint: /path/to/project.memex.checkpoint.json (preserve externally)
 alethech import --input <path> [--target <memex-dir>] [--trust-unknown-identities] [--allow-conflicts] [--checkpoint <external-checkpoint>]
 ```
 
-`--input` obligatorio. `--target` default `.memex/`.
+`--input` obligatorio. `--target` default `.alethech/`.
 
 ### qué hace (corrección 4 — policy y authorization son locales y mínimos)
 

@@ -696,7 +696,7 @@ def import_(input_path: str, target_path: str | None,
     else:
         store = Store.open(target)
 
-    # 0.7.0 ATOMIC IMPORT: build a staging dict of everything that WOULD be
+    # 0.7.0 VERIFY-BEFORE-WRITE IMPORT: build a staging dict of everything that WOULD be
     # written, run full verification on the staged content, and only then
     # commit atomically. This closes the audit finding that the import
     # could leave the store partially modified if a step failed mid-way.
@@ -847,9 +847,20 @@ def import_(input_path: str, target_path: str | None,
                 f"checkpoint_evidence_mismatch: checkpoint says {cp.evidence_count} evidence, "
                 f"staged has {len(staged_evidence)} — refusing to import (target untouched)"
             )
+        # B6 FIX: verify causal continuity — checkpoint head must be ancestor of current HEAD
+        from .verify import ancestry_check
+        current_head = store.read_head()
+        if current_head is not None and current_head != cp.head_commit_id:
+            if not ancestry_check(cp.head_commit_id, current_head, staged_commits):
+                raise click.ClickException(
+                    f"checkpoint_continuity_failed: checkpoint head {cp.head_commit_id} "
+                    f"is NOT an ancestor of current HEAD {current_head} — "
+                    f"the presented history does not causally continue from the checkpoint "
+                    f"(dark gap detected — target untouched)"
+                )
         continuity = "verified"
 
-    # Step F: ATOMIC WRITE PHASE
+    # Step F: VERIFY-BEFORE-WRITE PHASE (not truly atomic on I/O failure)
     # All verification has passed. Now write everything. If a write fails
     # at this point, it's a genuine I/O error, not a verification failure.
     # The target may end up partially written, but ONLY if there was a
