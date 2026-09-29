@@ -55,7 +55,7 @@ alethech does NOT provide:
 | Identity forgery | agent_id derived from public key |
 | Key compromise after rotation | cutoff_head reachability check |
 | Checkpoint rollback | Monotonic sequence field |
-| Import of corrupted bundles | Atomic verify-then-write |
+| Import of corrupted bundles | Verify-before-write + staged per-file atomic replacement |
 | Recall-seam attacks | IdentityRecord ↔ ControlEvent consistency |
 
 ### What alethech does NOT protect against
@@ -106,4 +106,4 @@ alethech does NOT provide:
 ### Import safety
 
 - Import processes untrusted data. Defenses include: symlink rejection, path traversal rejection, file size limits (50MB), file count limits (10000), total size limits (500MB), artifact hash verification before write, and verify-before-write staging.
-- Import does NOT provide true filesystem transactionality. If I/O fails mid-write, the store may be partially modified. This is documented as "verify-before-write", not "atomic".
+- Import does NOT provide whole-store filesystem transactionality. Validation completes before mutation, and each destination file is replaced atomically on supported filesystems, but a crash or I/O failure between file replacements can leave a partially applied import. Recovery/whole-store transactions remain outside the current guarantee.
