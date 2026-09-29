@@ -47,7 +47,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Version 0.8.0. 9 commands, 230 tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Version 0.8.2. 9 commands, 230 tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -155,7 +155,7 @@ alethech/                    # this repo — cryptographic protocol only
 ├── CITATION.cff             # academic citation
 ├── LICENSE                  # MIT
 ├── README.md                # this file
-└── pyproject.toml           # alethech 0.8.0, deps: cryptography + click only
+└── pyproject.toml           # alethech 0.8.2, deps: cryptography + click only
 ```
 
 ## cross-language validation
