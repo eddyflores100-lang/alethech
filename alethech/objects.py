@@ -54,7 +54,7 @@ class Identity:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Identity":
+    def from_dict(cls, d: dict) -> "Identity":  # typed
         if d.get("type") != "Identity":
             raise ValueError(f"not an Identity record: type={d.get('type')}")
         return cls(

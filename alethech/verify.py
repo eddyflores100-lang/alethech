@@ -375,7 +375,7 @@ def _detect_cycle(commits: dict[str, MemoryCommit]) -> bool:
 from .objects import IdentityRecordV2, ControlEvent, MigrationRecord, RootAuthority
 
 
-def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:
+def verify_identity_layer(store, report: VerifyReport) -> VerifyReport:  # typed
     """Verify the identity layer (rev 3):
     - Root authority exists and self-verifies
     - IdentityRecordV2 exists and agent_id derives from root

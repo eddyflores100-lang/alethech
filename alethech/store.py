@@ -32,7 +32,7 @@ class Store:
     root: Path
 
     @classmethod
-    def init(cls, root: Path) -> "Store":
+    def init(cls, root: Path) -> "Store":  # typed
         root = Path(root)
         if root.exists() and any(root.iterdir()):
             raise StoreError(f"directory not empty: {root}")

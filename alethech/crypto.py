@@ -55,7 +55,7 @@ class KeyPair:
     public: Ed25519PublicKey
 
     @classmethod
-    def generate(cls) -> "KeyPair":
+    def generate(cls) -> "KeyPair":  # already has return type
         sk = Ed25519PrivateKey.generate()
         return cls(private=sk, public=sk.public_key())
 
