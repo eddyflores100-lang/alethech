@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.8.5] — 2026-09-29
+
+### First CI-trusted-publish release
+
+The PyPI trusted publisher is now registered for the `alethech`
+project (Owner: `eddyflores100-lang`, Repository: `alethech`,
+Workflow: `release.yml`, Environment: none).
+
+This release is published entirely through the CI chain:
+
+```
+git tag v0.8.5 + git push origin v0.8.5
+                ↓
+   GitHub Actions release.yml workflow runs
+                ↓
+   Build package (python -m build)
+                ↓
+   Sign with Sigstore via GitHub OIDC
+                ↓
+   Publish to PyPI via pypa/gh-action-pypi-publish
+                ↓
+   Create GitHub Release with artifacts + signatures
+```
+
+No local PyPI token was used. The `~/.pypirc` API token that was
+used for transitional uploads of 0.8.0 through 0.8.4 can now be
+revoked (see `docs/RELEASE.md` "Rotating the local PyPI token").
+
+### Compatibility
+No code changes since 0.8.4. All metadata synchronized to 0.8.5.
+
 ## [0.8.4] — 2026-09-29
 
 ### Audit closure and release provenance
