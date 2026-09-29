@@ -349,23 +349,31 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
             report.errors.append("checkpoint_signature_invalid")
         elif checkpoint.head_commit_id not in commits:
             report.errors.append(f"rollback_detected: checkpoint head {checkpoint.head_commit_id} not present in store")
-        elif checkpoint.commit_count != len(commits):
-            # 0.7.0 FAIL-CLOSED: count mismatch is now an ERROR, not a warning.
-            # Audit finding #8: previously this was a warning and the code
-            # fell through to set continuity_verified = True. That allowed
-            # "continuity: verified" to coexist with a count mismatch,
-            # which is semantically incoherent.
+        elif checkpoint.commit_count > len(commits):
+            # H2 FIX: checkpoint says MORE commits than store has = data loss.
+            # (checkpoint_count=10 but store has 5 = commits were deleted)
             report.errors.append(
-                f"checkpoint_count_mismatch: checkpoint says {checkpoint.commit_count} commits, "
-                f"store has {len(commits)} — continuity cannot be verified (fail-closed)"
+                f"checkpoint_count_regression: checkpoint says {checkpoint.commit_count} commits, "
+                f"store has {len(commits)} — store has FEWER commits than checkpoint (data loss detected)"
             )
-        elif checkpoint.evidence_count != len(evidence):
-            # 0.7.0 FAIL-CLOSED: same logic for evidence count
+        elif checkpoint.evidence_count > len(evidence):
+            # H2 FIX: same logic — evidence_count going DOWN means data loss
             report.errors.append(
-                f"checkpoint_evidence_mismatch: checkpoint says {checkpoint.evidence_count} evidence, "
-                f"store has {len(evidence)} — continuity cannot be verified (fail-closed)"
+                f"checkpoint_evidence_regression: checkpoint says {checkpoint.evidence_count} evidence, "
+                f"store has {len(evidence)} — store has FEWER evidence than checkpoint (data loss detected)"
             )
         else:
+            # H2 FIX: count mismatch where store has MORE than checkpoint is OK.
+            # The store may have advanced past the checkpoint — that's expected.
+            # What matters is causal ancestry: checkpoint.head must be an
+            # ancestor of current HEAD. If it is, the store continues from
+            # the checkpoint, even if it has grown since.
+            if checkpoint.commit_count < len(commits):
+                report.warnings.append(
+                    f"checkpoint_count_advanced: checkpoint says {checkpoint.commit_count} commits, "
+                    f"store has {len(commits)} — store has advanced past checkpoint (expected, not an error)"
+                )
+
             # 0.5.6: verify causal continuity. The current HEAD must descend
             # from the checkpoint's head_commit_id. Equivalently:
             # checkpoint.head_commit_id ∈ ancestry(current_HEAD).
@@ -403,27 +411,35 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
 
 
 def _detect_cycle(commits: dict[str, MemoryCommit]) -> bool:
-    """Detect if the DAG contains a cycle. Should not happen if hashes are correct."""
-    # DFS-based cycle detection
+    """Detect if the DAG contains a cycle. Should not happen if hashes are correct.
+
+    M3 FIX: Iterative DFS (was recursive — caused RecursionError on large DAGs).
+    Uses explicit stack instead of Python call stack.
+    """
     WHITE, GRAY, BLACK = 0, 1, 2
     color: dict[str, int] = {cid: WHITE for cid in commits}
 
-    def visit(cid: str) -> bool:
-        color[cid] = GRAY
-        for parent in commits[cid].parents:
-            if parent not in commits:
-                continue  # missing parent, handled elsewhere
-            if color[parent] == GRAY:
-                return True  # back-edge → cycle
-            if color[parent] == WHITE and visit(parent):
-                return True
-        color[cid] = BLACK
-        return False
-
-    for cid in commits:
-        if color[cid] == WHITE:
-            if visit(cid):
-                return True
+    for start in commits:
+        if color[start] != WHITE:
+            continue
+        stack = [(start, iter(commits[start].parents))]
+        color[start] = GRAY
+        while stack:
+            node, parents_iter = stack[-1]
+            found_next = False
+            for parent in parents_iter:
+                if parent not in commits:
+                    continue
+                if color[parent] == GRAY:
+                    return True
+                if color[parent] == WHITE:
+                    color[parent] = GRAY
+                    stack.append((parent, iter(commits[parent].parents)))
+                    found_next = True
+                    break
+            if not found_next:
+                color[node] = BLACK
+                stack.pop()
     return False
 
 
@@ -703,19 +719,20 @@ def check_commit_against_governance(commit, identities_v2: dict, events: dict) -
     return "UNKNOWN_KEY"
 
 
-def ancestry_check(commit_id: str, cutoff_head: str, commits: dict, max_depth: int = 10000) -> bool:
+def ancestry_check(commit_id: str, cutoff_head: str, commits: dict) -> bool:
     """Check if commit_id is in the ancestry of cutoff_head (inclusive).
 
-    Uses BFS to traverse parents. Returns True if commit_id == cutoff_head or
-    commit_id is reachable by following parents from cutoff_head.
+    M2 FIX: Uses collections.deque for O(1) popleft (was O(n) with list.pop(0)).
+    Removed arbitrary max_depth limit — was incorrectly rejecting legitimate
+    commits in chains longer than 10000. BFS terminates naturally via visited set.
     """
+    from collections import deque
     if commit_id == cutoff_head:
         return True
     visited = set()
-    queue = [cutoff_head]
-    depth = 0
-    while queue and depth < max_depth:
-        current = queue.pop(0)
+    queue = deque([cutoff_head])
+    while queue:
+        current = queue.popleft()
         if current in visited:
             continue
         visited.add(current)
@@ -726,5 +743,4 @@ def ancestry_check(commit_id: str, cutoff_head: str, commits: dict, max_depth: i
         for parent in commits[current].parents:
             if parent not in visited:
                 queue.append(parent)
-        depth += 1
     return False

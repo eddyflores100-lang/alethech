@@ -323,11 +323,24 @@ def verify(strict: bool, emit_checkpoint: str | None, checkpoint_file: str | Non
             commits = store.load_commits()
             evidence = store.load_evidence()
             head = store.read_head() or ""
+            # M5 FIX: assign monotonic sequence to checkpoint
+            import glob as _glob
+            existing_cps = _glob.glob(str(Path(emit_checkpoint).parent) + "/*.checkpoint.json")
+            max_seq = 0
+            for _cpf in existing_cps:
+                try:
+                    _cpd = json.loads(Path(_cpf).read_text())
+                    _s = _cpd.get("sequence", 0)
+                    if _s > max_seq:
+                        max_seq = _s
+                except Exception:
+                    pass
             new_cp = Checkpoint(
                 agent_id=identity.agent_id,
                 head_commit_id=head,
                 commit_count=len(commits),
                 evidence_count=len(evidence),
+                sequence=max_seq + 1,
             )
             new_cp.sign(signing)
             cp_dict = new_cp.to_signed_dict()
@@ -477,11 +490,24 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
 
     # Optional checkpoint
     if emit_checkpoint:
+        # M5 FIX: assign monotonic sequence
+        import glob as _glob2
+        existing_cps2 = _glob2.glob(str(out) + "*.checkpoint.json")
+        max_seq2 = 0
+        for _cpf2 in existing_cps2:
+            try:
+                _cpd2 = json.loads(Path(_cpf2).read_text())
+                _s2 = _cpd2.get("sequence", 0)
+                if _s2 > max_seq2:
+                    max_seq2 = _s2
+            except Exception:
+                pass
         cp = Checkpoint(
             agent_id=identity.agent_id,
             head_commit_id=head,
             commit_count=len(commits),
             evidence_count=len(evidence),
+            sequence=max_seq2 + 1,
         )
         cp.sign(signing)
         cp_path = str(out) + ".checkpoint.json"
@@ -861,6 +887,38 @@ def import_(input_path: str, target_path: str | None,
         continuity = "verified"
 
     # Step F: VERIFY-BEFORE-WRITE PHASE (not truly atomic on I/O failure)
+    # H1 FIX: verify identity layer objects (root, identity records, control events,
+    # migrations) BEFORE writing them. Previously, the import only verified
+    # commit/evidence signatures but wrote identity objects unconditionally.
+    # Now we verify each object's signature against the root public key
+    # before staging it for write.
+
+    # Verify RootAuthority signature
+    if staged_root_auth is not None:
+        if not staged_root_auth.verify_self():
+            raise click.ClickException("import_root_authority_invalid: root_id does not derive from root_public_key")
+        if not staged_root_auth.verify(staged_root_auth.root_public_key):
+            raise click.ClickException("import_root_authority_signature_invalid: root signature verification failed")
+
+    # Verify IdentityRecordV2 signatures against root
+    for agent_id, ident in pkg_identities_v2.items():
+        if staged_root_auth is not None:
+            if not ident.verify_self():
+                raise click.ClickException(f"import_identity_v2_mismatch: {agent_id} does not derive from root_public_key")
+            if not ident.verify(staged_root_auth.root_public_key):
+                raise click.ClickException(f"import_identity_v2_signature_invalid: {agent_id} signature does not verify against root")
+
+    # Verify ControlEvent signatures against root
+    if staged_root_auth is not None:
+        for ce_id, ce in staged_control_events.items():
+            if not ce.verify(staged_root_auth.root_public_key):
+                raise click.ClickException(f"import_control_event_signature_invalid: {ce_id}")
+
+    # Verify MigrationRecord signatures
+    for mig_id, mig in staged_migrations.items():
+        if not mig.verify_both(mig.legacy_public_key, mig.new_root_public_key):
+            raise click.ClickException(f"import_migration_signatures_invalid: {mig_id}")
+
     # All verification has passed. Now write everything. If a write fails
     # at this point, it's a genuine I/O error, not a verification failure.
     # The target may end up partially written, but ONLY if there was a
@@ -913,12 +971,27 @@ def import_(input_path: str, target_path: str | None,
         store.write_artifact(content)
         new_artifacts += 1
 
+    # M4 FIX: auto-update HEAD if store was empty or HEAD is missing
+    current_head = store.read_head()
+    if current_head is None and pkg_commits:
+        # Find the commit with no children (the tip of the DAG)
+        all_commit_ids = set(pkg_commits.keys())
+        child_parents = set()
+        for c in pkg_commits.values():
+            child_parents.update(c.parents)
+        tips = all_commit_ids - child_parents
+        if tips:
+            new_head = max(tips)  # deterministic
+        else:
+            new_head = max(all_commit_ids)
+        store.write_head(new_head)
+        click.echo(f"HEAD updated: {new_head}")
+
     # Step G: emit summary
     click.echo(f"imported: {new_commits} commits, {new_evidence} evidence, {new_artifacts} artifacts")
     click.echo(f"identities: {len(pkg_identities)} in package")
     click.echo(f"conflicts: 0")
     click.echo(f"continuity: {continuity}")
-    click.echo("HEAD not updated — use `alethech merge` (rev 3+) or manually set HEAD")
 
 
 if __name__ == "__main__":

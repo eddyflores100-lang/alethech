@@ -45,11 +45,16 @@ class TestIntegerVectors:
         assert canonical_json(-42) == "-42"
 
     def test_large_int(self):
-        assert canonical_json(10**20) == str(10**20)
+        # H3: integers outside ±(2^53-1) are rejected for cross-language safety
+        import pytest
+        with pytest.raises(ValueError):
+            canonical_json(10**20)
 
     def test_very_large_int(self):
-        # Beyond IEEE 754 — Python handles big ints natively
-        assert canonical_json(10**50) == str(10**50)
+        # H3: integers outside ±(2^53-1) are rejected
+        import pytest
+        with pytest.raises(ValueError):
+            canonical_json(10**50)
 
 
 # ============================================================================

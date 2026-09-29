@@ -47,6 +47,10 @@ def _escape_string(s: str) -> str:
 def _serialize_number(n: float | int) -> str:
     """Serialize a number per RFC 8785 §3.2.2.3.
 
+    H3 FIX: integers outside ±(2^53-1) are rejected because ECMAScript
+    cannot represent them exactly as Number. This ensures cross-language
+    consistency (Python, Rust, TypeScript all use IEEE 754 doubles).
+
     Uses Python's repr() for the shortest round-trip representation,
     then fixes the divergences between Python's float repr and
     ECMAScript Number.prototype.toString() (which is what JCS requires):
@@ -63,7 +67,17 @@ def _serialize_number(n: float | int) -> str:
         # bool is a subclass of int — handle before number conversion
         raise TypeError("booleans are not valid JCS values at top level")
 
+    # H3 FIX: integers outside ±(2^53-1) break cross-language consistency
+    # because ECMAScript Number (IEEE 754 double) cannot represent them.
+    # Reject them so Python/Rust/TypeScript all produce the same bytes.
+    MAX_SAFE_INT = 9007199254740991  # 2^53 - 1
+    MIN_SAFE_INT = -9007199254740991  # -(2^53 - 1)
     if isinstance(n, int):
+        if n > MAX_SAFE_INT or n < MIN_SAFE_INT:
+            raise ValueError(
+                f"integer {n} is outside safe range ±(2^53-1) — "
+                f"not representable as ECMAScript Number, breaks cross-language JCS"
+            )
         return str(n)
 
     # float

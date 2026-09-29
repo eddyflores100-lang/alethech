@@ -179,9 +179,9 @@ class TestFailClosedCheckpoint:
         ])
         assert r.exit_code != 0
         assert "FAIL" in r.output
-        assert "checkpoint_count_mismatch" in r.output or "checkpoint_evidence_mismatch" in r.output
+        assert "checkpoint_count_regression" in r.output
         assert "continuity: verified" not in r.output, \
-            "must NOT report continuity_verified when count mismatch occurs"
+            "must NOT report continuity_verified when count regression occurs"
 
 
 # ============================================================================

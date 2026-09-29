@@ -112,8 +112,11 @@ class Store:
         return path.read_text(encoding="utf-8").strip() or None
 
     def write_head(self, commit_id: str) -> None:
+        # M6 FIX: atomic HEAD write via temp file + os.replace
         path = self.root / "HEAD"
-        path.write_text(commit_id + "\n", encoding="utf-8")
+        tmp_path = self.root / "HEAD.tmp"
+        tmp_path.write_text(commit_id + "\n", encoding="utf-8")
+        os.replace(str(tmp_path), str(path))  # atomic on POSIX
 
     # ---------- commits ----------
 

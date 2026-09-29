@@ -79,3 +79,33 @@ All notable changes to alethech are documented in this file.
 ### Added
 - Rev 3 identity layer: RootAuthority, ControlEvent chain, MigrationRecord
 - IdentityRecordV2 with key rotation and revocation
+
+## [0.8.0] — 2026-09-29
+
+### Fixed
+- IdentityRecordV2 signature now verified against root in verify_identity_layer
+- EvidenceCommit now supports V2 identity lookup (was only legacy)
+- Checkpoint now supports V2 identity lookup (was only legacy)
+- Import now verifies causal continuity (ancestry_check) before writing
+- Import now verifies identity layer objects (root, identity records, control events, migrations) before writing
+- Import auto-updates HEAD when store was empty (was leaving store in FAIL state)
+- Checkpoint count mismatch: store having MORE commits than checkpoint is now OK (warning, not error) — only data loss (fewer) is an error
+- JCS: integers outside ±(2^53-1) now rejected (cross-language consistency)
+- ancestry_check: O(1) popleft via deque (was O(n) with list.pop(0)), removed max_depth limit
+- _detect_cycle: iterative DFS (was recursive — caused RecursionError on large DAGs)
+- CLI now assigns monotonic sequence to checkpoints (was always 0)
+- HEAD writes are atomic via os.replace (was plain write_text)
+- Spec translated to English (Spanish preserved as spec-es.md)
+- "Merkle DAG" → "hash-linked DAG" (no Merkle root exists)
+- License text: removed "Todos los derechos reservados" (contradicts MIT)
+- pyproject.toml: added readme, classifiers, urls, keywords, SPDX license
+
+### Added
+- LangChain integration (AlethechCallbackHandler)
+- Sigstore signing in release workflow
+- Rust SDK (31 tests)
+- TypeScript SDK (15 tests)
+- robots.txt, sitemap.xml, llms.txt, agents.md
+- Open Graph, Twitter Card, JSON-LD structured data
+- SECURITY.md threat model clarifications
+- 30 security/pentesting skills installed
