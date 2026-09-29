@@ -21,7 +21,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install build tools
-        run: pip install build twine sigstore
+        run: pip install build sigstore
 
       - name: Build package
         run: python -m build
@@ -34,10 +34,7 @@ jobs:
           cp dist/*.whl.sig dist/*.whl.pem dist/*.tar.gz.sig dist/*.tar.gz.pem . 2>/dev/null || true
 
       - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*.whl dist/*.tar.gz
+        uses: pypa/gh-action-pypi-publish@76f52bc884231489b2a9c7132b812f3b7f33e158 # release/v1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
