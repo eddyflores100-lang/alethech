@@ -1,0 +1,84 @@
+# alethech
+
+> Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.
+
+## What is this?
+
+alethech is a Python package that provides cryptographically verifiable memory continuity for AI agents. It lets an agent sign its memory commits with Ed25519, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.
+
+## Key facts
+
+- **Language**: Python 3.10+
+- **License**: MIT
+- **Version**: 0.7.0
+- **Dependencies**: cryptography + click (only 2)
+- **Tests**: 230 passing, 8 mutation-guard paths
+- **PyPI**: https://pypi.org/project/alethech/
+- **GitHub**: https://github.com/eddyflores100-lang/alethech
+- **Landing page**: https://alethech.alicelabs.site/
+
+## What it does
+
+1. Ed25519 signatures on every memory commit
+2. SHA-256 content addressing (JCS RFC 8785 canonicalization)
+3. Key rotation preserving identity (root authority → operational keys)
+4. Reachability guarantee: revoked key commits checked against ancestry(cutoff_head)
+5. External checkpoints prove continuity (monotonic sequence, NOT system clock)
+6. Atomic import (verify-then-write, target untouched on failure)
+
+## What it does NOT do
+
+- Prove content is true (only that it was signed)
+- Encrypt content at rest
+- Detect rollback without external checkpoint
+- Delegate permissions between agents
+- Call any LLM (zero-LLM by design)
+
+## CLI commands
+
+```
+alethech init                    # generate identity + genesis commit
+alethech commit --content <file> # create signed MemoryCommit
+alethech evidence --tool <name>  # create signed EvidenceCommit
+alethech verify                  # verify the whole store, offline
+alethech export --output <dir>   # portable package
+alethech import --input <dir>    # import external memory
+alethech key rotate              # rotate operational key
+alethech key revoke --key-id X   # revoke a key
+alethech migrate --to v0.2       # migrate identity layer
+```
+
+## Install
+
+```bash
+pip install alethech
+```
+
+## Interactive terminal
+
+The landing page has a live terminal that runs REAL Ed25519 + SHA-256 + JCS in your browser via Web Crypto API. No backend, no simulation.
+
+Visit: https://alethech.alicelabs.site/
+
+## Cryptographic primitives
+
+- Ed25519 (RFC 8032) — signatures
+- SHA-256 (FIPS 180-4) — hashing
+- JCS (RFC 8785) — JSON canonicalization
+- Base32 (RFC 4648) — agent_id encoding
+
+## Semantic guarantees
+
+```
+commit ∈ ancestry(cutoff_head)  →  VALID_HISTORICAL
+commit ∉ ancestry(cutoff_head)  →  NOT_IN_PROVEN_PRE_ROTATION_HISTORY
+```
+
+The verifier does NOT claim to prove WHEN a commit was created — only membership in the causal frontier covered by cutoff_head.
+
+## Audit history
+
+- tonydzi (Palo Alto AI Research Lab) — found reachability guarantee gap, fixed in 0.5.2
+- Kaushalt2004 (CogniCore) — implemented firing test, merged with 14/14 passing
+- Security audit score: 80/100, OWASP Top 10 all pass
+- Threat model: https://github.com/eddyflores100-lang/alethech/blob/main/SECURITY.md

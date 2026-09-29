@@ -1,0 +1,16 @@
+{
+  "name": "alethech",
+  "short_name": "alethech",
+  "description": "Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
