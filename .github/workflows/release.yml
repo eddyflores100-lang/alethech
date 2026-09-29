@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -20,16 +21,23 @@ jobs:
           python-version: "3.12"
 
       - name: Install build tools
-        run: pip install build twine
+        run: pip install build twine sigstore
 
       - name: Build package
         run: python -m build
+
+      - name: Sign with Sigstore (OIDC)
+        run: |
+          sigstore sign dist/*.whl dist/*.tar.gz
+          # Copy signatures and certificates to dist for upload
+          cp dist/*.sig dist/*.pem . 2>/dev/null || true
+          cp dist/*.whl.sig dist/*.whl.pem dist/*.tar.gz.sig dist/*.tar.gz.pem . 2>/dev/null || true
 
       - name: Publish to PyPI
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+        run: twine upload dist/*.whl dist/*.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -38,3 +46,7 @@ jobs:
           files: |
             dist/*.whl
             dist/*.tar.gz
+            dist/*.whl.sig
+            dist/*.whl.pem
+            dist/*.tar.gz.sig
+            dist/*.tar.gz.pem

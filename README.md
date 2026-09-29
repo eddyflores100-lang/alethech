@@ -6,6 +6,8 @@
 [![Tests](https://img.shields.io/badge/tests-230%20passing-brightgreen)](https://github.com/eddyflores100-lang/alethech)
 [![CI](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml)
 [![Mutation paths](https://img.shields.io/badge/mutation%20paths-8-blue)](https://github.com/eddyflores100-lang/alethech)
+[![Coverage](https://img.shields.io/badge/coverage-85%25-yellow)](https://github.com/eddyflores100-lang/alethech)
+[![Type hints](https://img.shields.io/badge/type%20hints-100%25-brightgreen)](https://github.com/eddyflores100-lang/alethech)
 
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
 > The art of un-concealing transmission integrity.
