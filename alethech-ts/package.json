@@ -1,15 +1,41 @@
 {
   "name": "alethech-ts",
   "version": "0.8.0",
-  "description": "Verifiable agent continuity protocol — Ed25519-signed memory, Merkle DAG, key rotation. TypeScript implementation.",
+  "description": "Verifiable agent continuity protocol — Ed25519-signed memory commits, hash-linked DAG, key rotation with reachability guarantee. Zero dependencies. Web Crypto API only.",
   "main": "index.ts",
+  "types": "index.ts",
+  "files": [
+    "index.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
-  "author": "AliceLabs",
+  "author": "AliceLabs <eddyflores100-lang@users.noreply.github.com>",
+  "homepage": "https://alethech.alicelabs.site/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eddyflores100-lang/alethech"
+    "url": "https://github.com/eddyflores100-lang/alethech.git",
+    "directory": "alethech-ts"
   },
-  "keywords": ["cryptography", "ed25519", "agent", "memory", "verifiable", "jcs", "rfc8785"],
+  "bugs": {
+    "url": "https://github.com/eddyflores100-lang/alethech/issues"
+  },
+  "keywords": [
+    "cryptography",
+    "ed25519",
+    "agent-memory",
+    "verifiable",
+    "provenance",
+    "merkle-dag",
+    "jcs",
+    "rfc8785",
+    "key-rotation",
+    "web-crypto",
+    "zero-dependencies"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "npx tsx index.ts"
   }
