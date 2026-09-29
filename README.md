@@ -17,7 +17,7 @@
 From Greek **ἀλήθεια** (aletheia, "truth as un-concealment") + **τέχνη** (techne, "art, craft").
 The art of revealing that a memory was not modified after being signed.
 
-This is the reference implementation of the protocol specified in `docs/implementacion-nucleo-minimo.md` (rev 2).
+This is the reference implementation of the protocol specified in `docs/implementacion-nucleo-minimo.md` (rev 2 + rev 3 identity layer).
 
 ## what this is
 
@@ -47,7 +47,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Implementation of rev 2 spec (rev 3 identity layer). 9 commands, 230 tests (incl. 56 RFC 8785 JCS conformance vectors + 15 adversarial conformance vectors + 7 import-hardening tests + 6 anti-rollback tests + 5 atomic-import/fail-closed/artifact-hash tests), 8 mutation-guard paths. No LLM, no MCP, no MarketNow, no UTA, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Version 0.8.0. 9 commands, 230 tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -73,6 +73,9 @@ alethech evidence --tool <name>            # create signed EvidenceCommit
 alethech verify                            # verify the whole store, offline
 alethech export --output <dir>             # portable package
 alethech import --input <dir>              # import external memory
+alethech key rotate                        # rotate operational key
+alethech key revoke --key-id <id>          # revoke a key
+alethech migrate --to v0.2                  # migrate identity layer
 ```
 
 ## what it does NOT do
@@ -105,11 +108,11 @@ It does NOT un-conceal whether the content is true — that's the agent's respon
 python -m pytest tests/
 ```
 
-196 tests covering:
+230 tests covering:
 - crypto primitives (Ed25519, SHA-256, base64url, base32)
 - JCS canonicalization (RFC 8785) — 56 conformance vectors including:
   - integer/float serialization per ECMAScript Number.prototype.toString()
-  - -0 sign preservation (per RFC 8785 erratum)
+  - -0 serializes as "0" (per RFC 8785 erratum, NOT preserved)
   - scientific notation format (positive exponents keep '+', negative strip leading zeros)
   - decimal vs scientific threshold (1e21 / 1e-6)
   - UTF-16 key ordering with surrogate pairs
@@ -117,30 +120,55 @@ python -m pytest tests/
   - NaN/Infinity rejection
 - agent_id derivation (cryptographic binding to public_key)
 - MemoryCommit signing, tamper detection, wrong-key rejection
-- EvidenceCommit signing
+- EvidenceCommit signing (supports both legacy and V2 identity)
 - all 9 CLI commands (init, commit, evidence, verify, export, import, migrate, key rotate, key revoke)
-- checkpoint emission + rollback detection + **causal continuity** (0.5.6)
+- checkpoint emission + rollback detection + **causal continuity** (ancestry check)
 - identity_mismatch detection
 - export/import roundtrip preservation
 - tampered manifest rejection
 - key rotation with cutoff_head reachability guarantee
 - ancestry_check mutation guard (3 code-level defeats)
 - recall-seam defeats (2 data-level mutations: active-keys tampering, cutoff_head mutation)
-- **root_id binding** (RootAuthority ↔ IdentityRecord ↔ ControlEvent, 0.5.6)
-- **checkpoint continuity** (checkpoint HEAD must be ancestor of current HEAD, 0.5.6)
+- **root_id binding** (RootAuthority ↔ IdentityRecord ↔ ControlEvent)
+- **checkpoint continuity** (checkpoint HEAD must be ancestor of current HEAD)
+- **IdentityRecordV2 signature verification** (against root public key)
+- **import causal continuity** (ancestry check before writing)
+- **import hardening** (symlinks, path traversal, archive bombs, artifact hash verification)
 
 ## repository structure
 
 ```
 alethech/                    # this repo — cryptographic protocol only
 ├── alethech/                # source: crypto, objects, store, verify, cli, canonical
-├── tests/                   # 196 tests (incl. 56 JCS conformance + 8 mutation-guard paths)
+│   └── integrations/        # langchain + memex hooks
+├── alethech-rs/             # Rust SDK (31 tests, cross-validation)
+├── alethech-ts/             # TypeScript SDK (15 tests, Web Crypto API)
+├── tests/                   # 230 tests (incl. 56 JCS conformance + 8 mutation-guard paths)
+├── conformance/             # 15 adversarial conformance vectors
 ├── docs/                    # protocol specification
+├── examples/                # basic_usage.py
 ├── INTEGRATION.md           # how to integrate with memex via MemexAlethechHook
+├── CHANGELOG.md             # version history
+├── SECURITY.md              # threat model + vulnerability policy
+├── CONTRIBUTING.md          # dev setup + PR process
+├── CODE_OF_CONDUCT.md      # Contributor Covenant
+├── CITATION.cff             # academic citation
 ├── LICENSE                  # MIT
 ├── README.md                # this file
-└── pyproject.toml           # alethech 0.5.8, deps: cryptography + click only
+└── pyproject.toml           # alethech 0.8.0, deps: cryptography + click only
 ```
+
+## cross-language validation
+
+The protocol is implemented in three independent languages:
+
+| Language | Tests | Dependencies |
+|---|---|---|
+| Python | 230 | cryptography + click |
+| Rust | 31 | ed25519-dalek, sha2, serde |
+| TypeScript | 15 | 0 (Web Crypto API only) |
+
+All three use the same NIST SHA-256 test vectors, RFC 4648 base32 vectors, and RFC 8785 JCS conformance vectors. Cross-validation confirms the spec is language-independent.
 
 ## license
 

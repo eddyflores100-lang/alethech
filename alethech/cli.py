@@ -698,7 +698,7 @@ def import_(input_path: str, target_path: str | None,
 
     # 0.7.0 VERIFY-BEFORE-WRITE IMPORT: build a staging dict of everything that WOULD be
     # written, run full verification on the staged content, and only then
-    # commit atomically. This closes the audit finding that the import
+    # commit (verify-before-write, not truly atomic on I/O failure). This closes the audit finding that the import
     # could leave the store partially modified if a step failed mid-way.
     #
     # Architecture:
@@ -712,7 +712,7 @@ def import_(input_path: str, target_path: str | None,
     #     ↓
     #   checkpoint continuity check (on staged content, before any writes)
     #     ↓
-    #   ATOMIC WRITE: write all files (no failure possible after this point
+    #   WRITE PHASE: write all files (verify-before-write, not truly atomic) (no failure possible after this point
     #   because all verification already passed)
     #
     # If ANY step fails, the target store is untouched.

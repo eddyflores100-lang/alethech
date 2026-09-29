@@ -1,4 +1,4 @@
-<!-- status: REVIEW | revision: 2 | author: self (integra 5 correcciones de GPT) | updated: 2026-09-26T01:05:08.002Z -->
+<!-- status: CURRENT (rev 2 + rev 3 identity layer) | revision: 2 | author: self (integra 5 correcciones de GPT) | updated: 2026-09-26T01:05:08.002Z -->
 
 # implementación del núcleo mínimo
 
