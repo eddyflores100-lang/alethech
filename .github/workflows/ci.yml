@@ -51,3 +51,31 @@ jobs:
           echo '{"test": true}' > /tmp/alethech-ci-content.json
           alethech --store /tmp/alethech-ci-test commit --content /tmp/alethech-ci-content.json
           alethech --store /tmp/alethech-ci-test verify
+
+
+  cross-language:
+    name: cross-language conformance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Install Python package
+        run: pip install -e .
+
+      - name: Build Rust conformance helper
+        run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf
+
+      - name: Run all three implementations
+        run: python conformance/cross_language_check.py
