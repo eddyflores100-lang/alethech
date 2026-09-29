@@ -113,6 +113,11 @@ def init(recovery_key_file: str | None) -> None:
     store.write_identity(identity)
     store.write_signing_key(signing)
     store.write_recovery_key(recovery)
+    # Also write the root key so that `key rotate` works out of the box.
+    # In V1 stores, the signing key IS the root key (single-key model).
+    # In V2 stores (post-migrate), a separate root key is generated and
+    # overwrites this file. See `alethech migrate --to v0.2`.
+    store.write_root_key(signing)
 
     # Genesis commit: parents=[], content={"type": "genesis"}
     genesis = MemoryCommit(
@@ -1030,7 +1035,23 @@ def key_rotate(reason: str, content_file: str | None) -> None:
     # Load identity records v2 (only the first one for now; multi-wallet comes later)
     identities = store.load_identity_records_v2()
     if not identities:
-        raise click.ClickException("no IdentityRecordV2 in store — run `alethech migrate --to v0.2` first")
+        # Auto-migrate from V1 to V2 transparently. This makes `key rotate`
+        # work out of the box after `alethech init`, without forcing the
+        # user to run `alethech migrate --to v0.2` first.
+        # The V1 signing key is reused as the V2 root (single-key model),
+        # so existing V1 commits remain verifiable under the new V2 identity.
+        # If you want a *separate* root key (recommended for production),
+        # run `alethech migrate --to v0.2` explicitly before any rotation.
+        click.echo("auto-migrate: no IdentityRecordV2 found, migrating V1 → V2 transparently")
+        ctx.invoke(migrate, target_version="v0.2")
+        # Reload after migration
+        try:
+            root_keypair = store.load_root_key()
+        except StoreError as e:
+            raise click.ClickException(f"root key not available after auto-migrate: {e}")
+        identities = store.load_identity_records_v2()
+        if not identities:
+            raise click.ClickException("auto-migrate failed: still no IdentityRecordV2")
     identity = next(iter(identities.values()))
 
     # Find current active key

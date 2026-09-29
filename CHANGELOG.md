@@ -2,6 +2,23 @@
 
 All notable changes to alethech are documented in this file.
 
+## [0.8.1] — 2026-09-29
+
+### Fixed
+- `alethech init` now writes `keys/root.key` (was: only signing + recovery).
+  Without this, `alethech key rotate` failed with "root key not available:
+  root key not found" on a fresh store.
+- `alethech key rotate` now auto-migrates V1 → V2 if no IdentityRecordV2
+  is found, instead of erroring with "run `alethech migrate --to v0.2`
+  first". This makes the full lifecycle (init → commit → rotate → commit)
+  work out of the box.
+
+### Changed
+- The V1 signing key is reused as the V2 root during auto-migrate
+  (single-key model). If you want a *separate* root key (recommended
+  for production), run `alethech migrate --to v0.2` explicitly before
+  any rotation.
+
 ## [0.8.0] — 2026-09-29
 
 ### Added — Fourth audit pass (code-level review)
