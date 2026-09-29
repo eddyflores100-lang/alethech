@@ -330,18 +330,42 @@ def verify_store(store: Store, checkpoint: Checkpoint | None = None) -> VerifyRe
                 report.errors.append(f"checkpoint_unknown_identity: {checkpoint.agent_id}")
                 cp_public_jwk = None
             else:
-                key_obj = None
-                for k in v2_ident.active_keys + v2_ident.revoked_keys:
-                    if k.get("key_id") == getattr(checkpoint, 'key_id', 'key-001'):
-                        key_obj = k
-                        break
-                if key_obj is None and v2_ident.active_keys:
-                    key_obj = v2_ident.active_keys[0]
-                if key_obj is None:
+                # 0.8.2 SIGNER BINDING FIX (auditor finding #2):
+                # Use checkpoint.key_id if present (V2 schema). If the
+                # checkpoint is V1 (no key_id), flag it but fall back to
+                # active_keys[0] for backward compatibility — the
+                # signature still has to verify, so this is not a
+                # security hole, just a missing binding.
+                checkpoint_key_id = getattr(checkpoint, 'key_id', '') or ''
+                if not checkpoint_key_id:
+                    # V1 checkpoint — flag the missing binding
+                    report.errors.append(
+                        f"checkpoint_missing_key_id: {checkpoint.agent_id} "
+                        f"(V1 checkpoint without signer binding; falling back "
+                        f"to active_keys[0] for backward compatibility)"
+                    )
+                    if v2_ident.active_keys:
+                        key_obj = v2_ident.active_keys[0]
+                    else:
+                        key_obj = None
+                else:
+                    # V2 checkpoint — strict binding, no fallback
+                    key_obj = None
+                    for k in v2_ident.active_keys + v2_ident.revoked_keys:
+                        if k.get("key_id") == checkpoint_key_id:
+                            key_obj = k
+                            break
+                    if key_obj is None:
+                        report.errors.append(
+                            f"checkpoint_unknown_key: {checkpoint.agent_id} "
+                            f"key_id={checkpoint_key_id} not found in active "
+                            f"or revoked keys"
+                        )
+                if key_obj is None and not report.errors:
                     report.errors.append(f"checkpoint_unknown_key: {checkpoint.agent_id}")
                     cp_public_jwk = None
                 else:
-                    cp_public_jwk = key_obj["public_key"]
+                    cp_public_jwk = key_obj["public_key"] if key_obj else None
 
         if cp_public_jwk is None and not report.errors:
             report.errors.append(f"checkpoint_unknown_identity: {checkpoint.agent_id}")

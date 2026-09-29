@@ -334,6 +334,18 @@ class Checkpoint(SignedObject):
 
     This closes the gap where a correctly-signed but old checkpoint
     could be presented as current.
+
+    0.8.2 SIGNER BINDING (auditor finding #2):
+    The `key_id` field cryptographically binds the checkpoint to the
+    operational key that signed it. Without this, the verifier had to
+    guess which key signed the checkpoint by trying active_keys[0],
+    which is not a cryptographic binding — it's a position-based
+    fallback that breaks if the agent has rotated keys since the
+    checkpoint was emitted.
+
+    Schema version bumped to 2 to make `key_id` part of the signed
+    payload. Old V1 checkpoints (without key_id) still verify but are
+    flagged as `checkpoint_missing_key_id` in the verifier report.
     """
 
     agent_id: str = ""
@@ -341,6 +353,7 @@ class Checkpoint(SignedObject):
     commit_count: int = 0
     evidence_count: int = 0
     sequence: int = 0  # 0.6.0: monotonic anti-rollback counter
+    key_id: str = ""  # 0.8.2: signer binding (which operational key signed this)
     created_at: str = field(default_factory=utc_now_iso)
 
     @staticmethod
@@ -348,16 +361,22 @@ class Checkpoint(SignedObject):
         return "Checkpoint"
 
     def to_signable_dict(self) -> dict:
-        return {
+        # Schema V2: includes key_id in the signed payload.
+        # For backward compatibility, the V1 fields are unchanged.
+        # If key_id is empty (V1 checkpoint), it's still serialized as
+        # an empty string — the verifier flags this explicitly.
+        d = {
             "type": "Checkpoint",
-            "version": 1,
+            "version": 2,
             "agent_id": self.agent_id,
             "head_commit_id": self.head_commit_id,
             "commit_count": self.commit_count,
             "evidence_count": self.evidence_count,
             "sequence": self.sequence,
+            "key_id": self.key_id,
             "created_at": self.created_at,
         }
+        return d
 
     def to_signed_dict(self) -> dict:
         d = self.to_signable_dict()
@@ -375,6 +394,7 @@ class Checkpoint(SignedObject):
             commit_count=d.get("commit_count", 0),
             evidence_count=d.get("evidence_count", 0),
             sequence=d.get("sequence", 0),  # 0.6.0: backward-compat with old checkpoints
+            key_id=d.get("key_id", ""),  # 0.8.2: V2 field, empty for V1 checkpoints
             created_at=d["created_at"],
             commit_id=d.get("checkpoint_id", d.get("commit_id", "")),
             signature=d.get("signature", ""),

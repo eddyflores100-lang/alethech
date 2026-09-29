@@ -8,25 +8,25 @@
     "identity": {
       "type": "Identity",
       "version": 1,
-      "agent_id": "did:alethech:ywzpxv5qm2p57pher2ex7vx4ym",
+      "agent_id": "did:alethech:savk7hsyimhmwdbjbnibemeuqe",
       "public_key": {
         "kty": "OKP",
         "crv": "Ed25519",
-        "x": "ZZiHrLd0IZt5haYLjtS9M50D7ETy1O9w6kQqYmaxIzo"
+        "x": "Nmx4XkZsp4-7xYjhuthzQSJZ_mEZWtZ_GkhhRMXnWLc"
       },
       "key_id": "key-001",
-      "created_at": "2026-09-28T01:33:21.811Z",
+      "created_at": "2026-09-29T21:17:48.725Z",
       "recovery_root": ""
     },
     "commit": {
       "type": "MemoryCommit",
       "version": 1,
-      "agent_id": "did:alethech:ywzpxv5qm2p57pher2ex7vx4ym",
+      "agent_id": "did:alethech:savk7hsyimhmwdbjbnibemeuqe",
       "key_id": "key-001",
       "parents": [
         ""
       ],
-      "timestamp": "2026-09-28T01:33:21.811Z",
+      "timestamp": "2026-09-29T21:17:48.725Z",
       "session_id": "",
       "memory_type": "semantic",
       "content": {
@@ -34,8 +34,8 @@
         "value": 42
       },
       "provenance": {},
-      "commit_id": "sha256:e840634c9b08fece0964e620a5333735353887e33e1171cdb9ad8051898f8ebb",
-      "signature": "ed25519:IM3kvXtwwy6XcPRYTu1gSUw5bA-FFPhE7r066P6mzSm5Yraj1qUFMQJkRjnkpiJ3JLcYb-lnN0496cGIKK_dDA"
+      "commit_id": "sha256:8653dad304c58fdf98abbb39111cc38f3dc3f3ea98a3bbca186e2ec717f56de3",
+      "signature": "ed25519:xL_hpFwWgkbjP425foNvBpOu0q3qTcHnc87YYT5gRCvuDalRbSsEb6h41l4FMCUCruAgLhEHFucMvZewAvo4Bg"
     }
   },
   "notes": "Baseline valid case. Used to confirm the verifier accepts correct artifacts."

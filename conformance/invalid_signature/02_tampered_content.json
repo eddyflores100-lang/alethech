@@ -8,33 +8,33 @@
     "identity": {
       "type": "Identity",
       "version": 1,
-      "agent_id": "did:alethech:zcrkrhpgnzgfoymf2hg2yser5q",
+      "agent_id": "did:alethech:ondutaj5dd2xj5rbf4m2patklm",
       "public_key": {
         "kty": "OKP",
         "crv": "Ed25519",
-        "x": "iYs6XDh-1O3IwFqtmmoE2knHJW59n94jZGgTY9g-6rA"
+        "x": "L1lAkAZpUy1638O_-zvDGMWYQGLRitSM2nKH11YR7wY"
       },
       "key_id": "key-001",
-      "created_at": "2026-09-28T01:33:21.811Z",
+      "created_at": "2026-09-29T21:17:48.726Z",
       "recovery_root": ""
     },
     "commit": {
       "type": "MemoryCommit",
       "version": 1,
-      "agent_id": "did:alethech:zcrkrhpgnzgfoymf2hg2yser5q",
+      "agent_id": "did:alethech:ondutaj5dd2xj5rbf4m2patklm",
       "key_id": "key-001",
       "parents": [
         ""
       ],
-      "timestamp": "2026-09-28T01:33:21.812Z",
+      "timestamp": "2026-09-29T21:17:48.727Z",
       "session_id": "",
       "memory_type": "semantic",
       "content": {
         "test": "TAMPERED_CONTENT"
       },
       "provenance": {},
-      "commit_id": "sha256:aec1b060ea10a94d4eabd0f41ecf3622441435acb461f87fb980686dafb3c419",
-      "signature": "ed25519:mtsDXeEvU28sUtQb9fVlFeDkhTkrsQcwiKD2k2WzjxnqA0LAE19x1A-2-6Goo6lA68SejvEiN-7OlM9pYJJTAA"
+      "commit_id": "sha256:671a6b16a6c1c17db8734975e643d10a32d9ff4838a1a91f5dd3a32d11df7c1c",
+      "signature": "ed25519:BUE3OGBqdDsYdDinZWeja5gPyQqM-7CFWdm5p8PH7t33QURI8W11Nud34dW2lRsZqoRq7SCqKV0abmG8JiZMCA"
     }
   },
   "notes": "Catches implementations that don't re-canonicalize content before verifying."

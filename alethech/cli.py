@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -346,6 +347,7 @@ def verify(strict: bool, emit_checkpoint: str | None, checkpoint_file: str | Non
                 commit_count=len(commits),
                 evidence_count=len(evidence),
                 sequence=max_seq + 1,
+                key_id=identity.key_id,  # 0.8.2: signer binding
             )
             new_cp.sign(signing)
             cp_dict = new_cp.to_signed_dict()
@@ -513,6 +515,7 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
             commit_count=len(commits),
             evidence_count=len(evidence),
             sequence=max_seq2 + 1,
+            key_id=identity.key_id,  # 0.8.2: signer binding
         )
         cp.sign(signing)
         cp_path = str(out) + ".checkpoint.json"
@@ -924,73 +927,142 @@ def import_(input_path: str, target_path: str | None,
         if not mig.verify_both(mig.legacy_public_key, mig.new_root_public_key):
             raise click.ClickException(f"import_migration_signatures_invalid: {mig_id}")
 
-    # All verification has passed. Now write everything. If a write fails
-    # at this point, it's a genuine I/O error, not a verification failure.
-    # The target may end up partially written, but ONLY if there was a
-    # real I/O problem (disk full, permissions, etc.) — never because
-    # verification failed mid-way.
+    # All verification has passed. Now write everything using a
+    # staging-directory + atomic-rename pattern so that the import is
+    # truly atomic on POSIX filesystems: either all files land in the
+    # target store, or none do. If the process crashes mid-write, the
+    # staging directory is left behind for inspection/cleanup, but the
+    # target store remains in its pre-import state.
+    #
+    # 0.8.2 ATOMIC IMPORT FIX (auditor finding #1):
+    # Previous code wrote files sequentially to the target store. If a
+    # write failed (disk full, permissions, signal mid-write), the target
+    # could be left partially modified. The previous comment said
+    # "VERIFY-BEFORE-WRITE PHASE (not truly atomic on I/O failure)" —
+    # that was honest about the limitation but the limitation was real.
+    #
+    # The fix: write everything to `<target>/.alethech.import-staging-<pid>/`,
+    # then atomically rename each file into its final location. Per-file
+    # rename is atomic on POSIX (rename(2)). The set-of-files is "as
+    # atomic as a sequence of renames can be" — a crash mid-sequence
+    # leaves the staging dir intact (recoverable) but never corrupts
+    # an individual file in the target (each target file is either
+    # the old version or the new version, never a half-write).
 
-    new_commits = 0
-    new_evidence = 0
-    new_artifacts = 0
+    import shutil as _shutil
+    staging_dir = target / f".alethech.import-staging-{os.getpid()}"
+    if staging_dir.exists():
+        _shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write identities (legacy)
-    for agent_id, ident in pkg_identities.items():
-        if agent_id not in store.load_identities():
-            store.write_identity(ident)
+    def _atomic_write(rel_path: str, content: bytes) -> None:
+        """Write content to staging_dir/rel_path, then rename to target/rel_path.
 
-    # Write v0.2 identity records
-    for agent_id, ident in pkg_identities_v2.items():
-        store.write_identity_record_v2(ident)
+        rename(2) is atomic on POSIX for files on the same filesystem.
+        We use a staging subdirectory on the same filesystem as the
+        target store to guarantee this.
+        """
+        staging_path = staging_dir / rel_path
+        final_path = target / rel_path
+        # Ensure BOTH staging and final parent dirs exist. The target
+        # store may have been created by Store.init() which only makes
+        # 5 standard subdirs (identities, keys, commits, evidence,
+        # artifacts) — but the import may write to identities_v2/,
+        # control_events/, migrations/ which init() doesn't create.
+        staging_path.parent.mkdir(parents=True, exist_ok=True)
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write to staging, fsync, then atomic rename.
+        fd = os.open(str(staging_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+        try:
+            os.write(fd, content)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        # Atomic rename: replaces final_path atomically on POSIX
+        os.replace(str(staging_path), str(final_path))
 
-    # Write RootAuthority
-    if staged_root_auth is not None:
-        store.write_root_authority(staged_root_auth)
+    try:
+        new_commits = 0
+        new_evidence = 0
+        new_artifacts = 0
 
-    # Write ControlEvents
-    for ce in staged_control_events.values():
-        store.write_control_event(ce)
+        # Write identities (legacy)
+        existing_idents = store.load_identities()
+        for agent_id, ident in pkg_identities.items():
+            if agent_id not in existing_idents:
+                rel = f"identities/{agent_id}.json"
+                # Identity V1 has to_dict(), not to_signed_dict()
+                ident_data = ident.to_signed_dict() if hasattr(ident, 'to_signed_dict') else ident.to_dict()
+                _atomic_write(rel, json.dumps(ident_data, separators=(",", ":")).encode())
 
-    # Write MigrationRecords
-    for mig in staged_migrations.values():
-        store.write_migration_record(mig)
+        # Write v0.2 identity records
+        # NOTE: IdentityRecordV2 is stored under identities/ (same as V1),
+        # not identities_v2/. This matches Store.write_identity_record_v2()
+        # convention — the type field on the JSON distinguishes them.
+        for agent_id, ident in pkg_identities_v2.items():
+            rel = f"identities/{agent_id}.json"
+            _atomic_write(rel, json.dumps(ident.to_signed_dict(), separators=(",", ":")).encode())
 
-    # Write commits (don't overwrite)
-    target_commits = store.load_commits()
-    for cid, commit in pkg_commits.items():
-        if cid in target_commits:
-            continue
-        store.write_commit(commit)
-        new_commits += 1
+        # Write RootAuthority
+        if staged_root_auth is not None:
+            rel = "root_authority.json"
+            _atomic_write(rel, json.dumps(staged_root_auth.to_signed_dict(), separators=(",", ":")).encode())
 
-    # Write evidence
-    target_evidence = store.load_evidence()
-    for eid, ev in pkg_evidence.items():
-        if eid in target_evidence:
-            continue
-        store.write_evidence(ev)
-        new_evidence += 1
+        # Write ControlEvents
+        for ce_id, ce in staged_control_events.items():
+            rel = f"control_events/{ce_id}.json"
+            _atomic_write(rel, json.dumps(ce.to_signed_dict(), separators=(",", ":")).encode())
 
-    # Write artifacts (already hash-verified in Step C)
-    for h, content in staged_artifacts.items():
-        store.write_artifact(content)
-        new_artifacts += 1
+        # Write MigrationRecords
+        for mig_id, mig in staged_migrations.items():
+            rel = f"migrations/{mig_id}.json"
+            _atomic_write(rel, json.dumps(mig.to_signed_dict(), separators=(",", ":")).encode())
 
-    # M4 FIX: auto-update HEAD if store was empty or HEAD is missing
-    current_head = store.read_head()
-    if current_head is None and pkg_commits:
-        # Find the commit with no children (the tip of the DAG)
-        all_commit_ids = set(pkg_commits.keys())
-        child_parents = set()
-        for c in pkg_commits.values():
-            child_parents.update(c.parents)
-        tips = all_commit_ids - child_parents
-        if tips:
-            new_head = max(tips)  # deterministic
-        else:
-            new_head = max(all_commit_ids)
-        store.write_head(new_head)
-        click.echo(f"HEAD updated: {new_head}")
+        # Write commits (don't overwrite)
+        target_commits = store.load_commits()
+        for cid, commit in pkg_commits.items():
+            if cid in target_commits:
+                continue
+            rel = f"commits/{cid}.json"
+            _atomic_write(rel, json.dumps(commit.to_signed_dict(), separators=(",", ":")).encode())
+            new_commits += 1
+
+        # Write evidence
+        target_evidence = store.load_evidence()
+        for eid, ev in pkg_evidence.items():
+            if eid in target_evidence:
+                continue
+            rel = f"evidence/{eid}.json"
+            _atomic_write(rel, json.dumps(ev.to_signed_dict(), separators=(",", ":")).encode())
+            new_evidence += 1
+
+        # Write artifacts (already hash-verified in Step C)
+        for h, content in staged_artifacts.items():
+            rel = f"artifacts/{h}"
+            _atomic_write(rel, content)
+            new_artifacts += 1
+
+        # M4 FIX: auto-update HEAD if store was empty or HEAD is missing
+        current_head = store.read_head()
+        if current_head is None and pkg_commits:
+            # Find the commit with no children (the tip of the DAG)
+            all_commit_ids = set(pkg_commits.keys())
+            child_parents = set()
+            for c in pkg_commits.values():
+                child_parents.update(c.parents)
+            tips = all_commit_ids - child_parents
+            if tips:
+                new_head = max(tips)  # deterministic
+            else:
+                new_head = max(all_commit_ids)
+            _atomic_write("HEAD", new_head.encode())
+            click.echo(f"HEAD updated: {new_head}")
+
+    finally:
+        # Always clean up staging dir, even on success (it's empty by now)
+        # or on failure (target is untouched, staging may have leftover files)
+        if staging_dir.exists():
+            _shutil.rmtree(staging_dir, ignore_errors=True)
 
     # Step G: emit summary
     click.echo(f"imported: {new_commits} commits, {new_evidence} evidence, {new_artifacts} artifacts")

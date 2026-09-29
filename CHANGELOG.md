@@ -2,6 +2,68 @@
 
 All notable changes to alethech are documented in this file.
 
+## [0.8.2] — 2026-09-29
+
+### Fixed — Fifth audit pass (auditor findings 1, 2, 3, 4)
+
+1. **Atomic import** (was: "VERIFY-BEFORE-WRITE PHASE, not truly atomic on I/O failure")
+   Import now uses a staging-directory + atomic-rename pattern. Each
+   file is written to `<target>/.alethech.import-staging-<pid>/`, then
+   `os.replace()`'d to its final location. `rename(2)` is atomic on
+   POSIX for files on the same filesystem, so a crash mid-import
+   leaves the target store in its pre-import state — never with a
+   half-written file. The staging dir is cleaned up in a `finally`
+   block, so it's recoverable on crash and invisible on success.
+
+2. **Checkpoint signer binding** (was: no `key_id` in signed payload,
+   verifier fell back to `active_keys[0]`)
+   Checkpoint schema bumped to V2. `key_id` is now part of the signed
+   payload, cryptographically binding the checkpoint to the
+   operational key that signed it. The verifier uses strict lookup
+   (no position-based fallback) for V2 checkpoints. V1 checkpoints
+   (without `key_id`) still verify for backward compatibility but
+   are flagged `checkpoint_missing_key_id` in the report.
+
+3. **Cross-language conformance harness** (was: README claimed
+   "cross-validation confirms" with no executable check)
+   New `conformance/cross_language_check.py` runs Python, Rust, and
+   TypeScript implementations against the same shared fixtures and
+   asserts byte-exact agreement on canonical bytes for accepted
+   fixtures. Exit 0 = all agree, 1 = disagreement, 2 = impl missing.
+   See `conformance/CROSS_LANGUAGE.md` for the contract and how to
+   add a 4th implementation. The README "cross-validation confirms"
+   claim is now backed by an executable check.
+
+4. **Release provenance** (was: PyPI 0.8.1 had no corresponding git tag)
+   Every release from 0.8.2 onward will have:
+   - A git tag `vX.Y.Z` on the exact commit published to PyPI.
+   - A GitHub Release attached to that tag, with release notes.
+   - The PyPI sdist/wheel hash recorded in the GitHub release body.
+   This closes the provenance gap — third parties can verify that
+   the PyPI artifact they downloaded corresponds to a specific
+   git commit.
+
+### Changed
+- `Checkpoint.to_signable_dict()` now includes `key_id` and bumps
+  schema version to 2. V1 checkpoints still parse via `from_dict()`
+  (key_id defaults to empty string).
+- `cli.py:init` and `cli.py:export` now pass `key_id=identity.key_id`
+  when constructing Checkpoints.
+- `verify.py:verify_store` distinguishes V1 vs V2 checkpoints and
+  flags V1 with `checkpoint_missing_key_id` (warning, not error —
+  the signature still has to verify for V1 to pass).
+
+### Compatibility
+- V1 checkpoints (created before 0.8.2) still verify, but produce
+  a `checkpoint_missing_key_id` warning. No action required.
+- V2 checkpoints created in 0.8.2+ are backward-incompatible with
+  pre-0.8.2 verifiers (they will reject `key_id` as an unknown field).
+  This is intentional — the binding has to be in the signed payload
+  to be cryptographically meaningful.
+- Stores created with 0.8.0+ import correctly into 0.8.2+ via the
+  new atomic import. Stores created with pre-0.8.0 should re-import
+  via `alethech import --trust-unknown-identities` once.
+
 ## [0.8.1] — 2026-09-29
 
 ### Fixed

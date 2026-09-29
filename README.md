@@ -168,7 +168,13 @@ The protocol is implemented in three independent languages:
 | Rust | 31 | ed25519-dalek, sha2, serde |
 | TypeScript | 15 | 0 (Web Crypto API only) |
 
-All three use the same NIST SHA-256 test vectors, RFC 4648 base32 vectors, and RFC 8785 JCS conformance vectors. Cross-validation confirms the spec is language-independent.
+All three use the same NIST SHA-256 test vectors, RFC 4648 base32 vectors, and RFC 8785 JCS conformance vectors. The cross-language claim is backed by an executable harness:
+
+```bash
+python conformance/cross_language_check.py
+```
+
+This runs all three implementations against the same shared fixtures in `conformance/` and asserts byte-exact agreement on canonical bytes for accepted fixtures. Exit 0 = all agree, 1 = disagreement, 2 = implementation missing. See [`conformance/CROSS_LANGUAGE.md`](conformance/CROSS_LANGUAGE.md) for the contract and how to add a 4th implementation.
 
 ## license
 
