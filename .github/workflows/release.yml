@@ -27,14 +27,27 @@ jobs:
         run: python -m build
 
       - name: Sign with Sigstore (OIDC)
+        # Sign each artifact. Modern sigstore (>=3.0) emits a .sigstore.json
+        # bundle per file. We do NOT copy these into dist/ — they go to
+        # a separate signatures/ dir so gh-action-pypi-publish doesn't
+        # try to upload them as packages (which would fail with
+        # InvalidDistribution: Unknown distribution format).
         run: |
-          sigstore sign dist/*.whl dist/*.tar.gz
-          # Copy signatures and certificates to dist for upload
-          cp dist/*.sig dist/*.pem . 2>/dev/null || true
-          cp dist/*.whl.sig dist/*.whl.pem dist/*.tar.gz.sig dist/*.tar.gz.pem . 2>/dev/null || true
+          mkdir -p signatures
+          for f in dist/*.whl dist/*.tar.gz; do
+            sigstore sign "$f"
+          done
+          # Move all signature artifacts out of dist/ so PyPI upload is clean
+          mv dist/*.sigstore.json signatures/ 2>/dev/null || true
+          mv dist/*.sig dist/*.pem dist/*.crt signatures/ 2>/dev/null || true
+          ls -la dist/
+          echo "---"
+          ls -la signatures/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        # No inputs needed — defaults to packages-dir=dist which now contains
+        # ONLY .whl and .tar.gz (signature files moved to signatures/ above).
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -43,7 +56,4 @@ jobs:
           files: |
             dist/*.whl
             dist/*.tar.gz
-            dist/*.whl.sig
-            dist/*.whl.pem
-            dist/*.tar.gz.sig
-            dist/*.tar.gz.pem
+            signatures/*
