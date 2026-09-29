@@ -35,3 +35,4 @@ htmlcov/
 *.alethech/
 *.alethech.tar
 *.checkpoint.json
+alethech-rs/target/
