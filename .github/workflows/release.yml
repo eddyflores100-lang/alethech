@@ -34,7 +34,7 @@ jobs:
           cp dist/*.whl.sig dist/*.whl.pem dist/*.tar.gz.sig dist/*.tar.gz.pem . 2>/dev/null || true
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@76f52bc884231489b2a9c7132b812f3b7f33e158 # release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
