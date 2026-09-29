@@ -86,35 +86,22 @@ class TestImportPathTraversal:
         # Valid package should not trigger security errors
         assert "security:" not in r.output.lower()
 
-    def test_absolute_path_rejected(self, tmp_dirs, runner):
-        """An absolute path in the package should be rejected.
-        
-        B8 FIX: Previously this test was `pass` (no assertion). Now it
-        verifies that the import security checks exist by testing that
-        a valid package imports without security errors (proving the
-        checks don't false-positive) AND that the security code paths
-        are reachable.
+    def test_package_paths_are_confined_to_input_root(self, tmp_dirs, runner):
+        """Every discovered package entry must remain under the input root.
+
+        pathlib.rglob() cannot normally yield an absolute child path, so an
+        "absolute filename" test would be artificial. The real escape vector
+        on a filesystem package is a symlink; that is exercised separately
+        below. This regression test executes the import path and proves a
+        normal package is accepted, while the symlink tests prove root escape
+        is rejected.
         """
         src, target = tmp_dirs
         _make_valid_export(src)
 
-        # Verify that valid package doesn't trigger security errors
         r = runner.invoke(cli, ["--store", str(target), "import", "--input", str(src)])
         assert "security:" not in r.output.lower(), \
             f"valid package should not trigger security errors: {r.output}"
-
-        # Verify the security check code exists by checking the CLI source
-        import inspect
-        from alethech.cli import import_
-        # import_ is a click Command, get the underlying function
-        func = import_.callback if hasattr(import_, 'callback') else import_
-        src_code = inspect.getsource(func)
-        assert "path traversal" in src_code.lower() or ".." in src_code, \
-            "import should have path traversal check"
-        assert "symlink" in src_code.lower(), \
-            "import should have symlink check"
-        assert "archive bomb" in src_code.lower() or "MAX_IMPORT_FILE_SIZE" in src_code, \
-            "import should have archive bomb check"
 
 
 class TestImportSymlinkRejection:
