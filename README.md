@@ -47,7 +47,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Version 0.8.2. 9 commands, 230 tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Version 0.8.3. 9 commands, 230 Python tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
 
 ## install
 
@@ -174,7 +174,7 @@ All three use the same NIST SHA-256 test vectors, RFC 4648 base32 vectors, and R
 python conformance/cross_language_check.py
 ```
 
-This runs all three implementations against the same shared fixtures in `conformance/` and asserts byte-exact agreement on canonical bytes for accepted fixtures. Exit 0 = all agree, 1 = disagreement, 2 = implementation missing. See [`conformance/CROSS_LANGUAGE.md`](conformance/CROSS_LANGUAGE.md) for the contract and how to add a 4th implementation.
+This runs all three implementations against the same shared fixtures in `conformance/` and asserts byte-exact agreement on canonical bytes for accepted fixtures. The default run is fail-closed: exit 0 = all three ran and agree, 1 = disagreement, 2 = an implementation/runtime is unavailable. CI builds the Rust helper and executes the three-runtime harness. See [`conformance/CROSS_LANGUAGE.md`](conformance/CROSS_LANGUAGE.md) for the contract and how to add a 4th implementation.
 
 ## license
 
