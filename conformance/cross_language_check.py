@@ -335,10 +335,18 @@ def run_typescript(fixture_path: Path) -> FixtureResult:
             error="typescript helper not found — create alethech-ts/conformance.mjs",
             duration_ms=(time.time() - start) * 1000,
         )
+    if shutil.which("npx") is None:
+        return FixtureResult(
+            fixture=str(fixture_path.relative_to(CONFORMANCE_DIR)),
+            implementation="typescript",
+            accepted=False,
+            error="typescript runtime not found — npx is required",
+            duration_ms=(time.time() - start) * 1000,
+        )
 
     try:
         result = subprocess.run(
-            ["node", str(ts_helper), str(fixture_path)],
+            ["npx", "--yes", "tsx", str(ts_helper), str(fixture_path)],
             capture_output=True,
             timeout=30,
         )
@@ -485,7 +493,26 @@ def main() -> int:
             for d in report.disagreements:
                 print(f"  - {d}")
 
-    return 1 if report.disagreements else 0
+    if report.disagreements:
+        return 1
+
+    # Default mode promises a three-runtime comparison. Missing helpers or
+    # runtimes are therefore an incomplete conformance run, not success.
+    # --only intentionally permits a single-runtime diagnostic run.
+    if args.only is None:
+        unavailable_markers = ("not built", "not found", "runtime not found")
+        unavailable = [
+            r for r in report.results
+            if r.error and any(marker in r.error for marker in unavailable_markers)
+        ]
+        if unavailable:
+            print()
+            print("=== Incomplete run ===")
+            for r in unavailable:
+                print(f"  - {r.implementation}: {r.error}")
+            return 2
+
+    return 0
 
 
 if __name__ == "__main__":
