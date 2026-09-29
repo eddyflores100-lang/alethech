@@ -1,15 +1,106 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+
+  <!-- Main landing page -->
   <url>
     <loc>https://alethech.alicelabs.site/</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://alethech.alicelabs.site/assets/screenshots/alethech-hero.png</image:loc>
+      <image:title>alethech — verifiable agent continuity protocol</image:title>
+      <image:caption>Ed25519-signed memory, Merkle DAG, key rotation with reachability guarantee</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://alethech.alicelabs.site/assets/screenshots/alethech-dag.png</image:loc>
+      <image:title>Merkle DAG architecture diagram</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://alethech.alicelabs.site/assets/screenshots/alethech-terminal.png</image:loc>
+      <image:title>Interactive terminal with real Ed25519 crypto</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://alethech.alicelabs.site/assets/screenshots/alethech-property.png</image:loc>
+      <image:title>The cryptographic property — verifiable history</image:title>
+    </image:image>
   </url>
+
+  <!-- Commercial video -->
   <url>
     <loc>https://alethech.alicelabs.site/assets/commercial.mp4</loc>
     <lastmod>2026-09-29</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.8</priority>
+    <video:video>
+      <video:thumbnail_loc>https://alethech.alicelabs.site/assets/screenshots/alethech-terminal.png</video:thumbnail_loc>
+      <video:title>alethech — verifiable agent continuity protocol</video:title>
+      <video:description>30-second commercial showing Ed25519 crypto, Merkle DAG, key rotation, and live terminal demo</video:description>
+      <video:duration>30</video:duration>
+      <video:publication_date>2026-09-29</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:live>no</video:live>
+    </video:video>
   </url>
+
+  <!-- Screenshots -->
+  <url>
+    <loc>https://alethech.alicelabs.site/assets/screenshots/alethech-hero.png</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://alethech.alicelabs.site/assets/screenshots/alethech-dag.png</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://alethech.alicelabs.site/assets/screenshots/alethech-terminal.png</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://alethech.alicelabs.site/assets/screenshots/alethech-property.png</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <!-- llms.txt for AI agents -->
+  <url>
+    <loc>https://alethech.alicelabs.site/llms.txt</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- robots.txt -->
+  <url>
+    <loc>https://alethech.alicelabs.site/robots.txt</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- site.webmanifest -->
+  <url>
+    <loc>https://alethech.alicelabs.site/site.webmanifest</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- favicon -->
+  <url>
+    <loc>https://alethech.alicelabs.site/favicon.svg</loc>
+    <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
 </urlset>
