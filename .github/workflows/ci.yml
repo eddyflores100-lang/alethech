@@ -121,6 +121,41 @@ jobs:
         run: |
           ./alethech-rs/target/release/alethech-container open /tmp/interop.aleth interop-passphrase > /tmp/rs-payload.json
 
+      - name: Reject corrupted portable containers across runtimes
+        run: |
+          set -e
+          if npx --yes tsx alethech-ts/aleth-container.ts open /tmp/interop.aleth wrong-passphrase >/dev/null 2>&1; then
+            echo "TypeScript accepted wrong passphrase"; exit 1
+          fi
+          if ./alethech-rs/target/release/alethech-container open /tmp/interop.aleth wrong-passphrase >/dev/null 2>&1; then
+            echo "Rust accepted wrong passphrase"; exit 1
+          fi
+
+          cp /tmp/interop.aleth /tmp/tampered.aleth
+          python - <<'PY'
+          p="/tmp/tampered.aleth"
+          b=bytearray(open(p,"rb").read())
+          b[-1] ^= 1
+          open(p,"wb").write(b)
+          PY
+          if npx --yes tsx alethech-ts/aleth-container.ts open /tmp/tampered.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "TypeScript accepted tampered ciphertext"; exit 1
+          fi
+          if ./alethech-rs/target/release/alethech-container open /tmp/tampered.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "Rust accepted tampered ciphertext"; exit 1
+          fi
+
+          python - <<'PY'
+          src=open("/tmp/interop.aleth","rb").read()
+          open("/tmp/truncated.aleth","wb").write(src[:-12])
+          PY
+          if npx --yes tsx alethech-ts/aleth-container.ts open /tmp/truncated.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "TypeScript accepted truncated container"; exit 1
+          fi
+          if ./alethech-rs/target/release/alethech-container open /tmp/truncated.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "Rust accepted truncated container"; exit 1
+          fi
+
       - name: Compare decrypted payload across Python, TypeScript, and Rust
         run: |
           python - <<'PY'
