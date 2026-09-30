@@ -2,7 +2,8 @@
 import pytest
 from alethech import crypto
 from alethech.api import Alethech
-from alethech.container import ContainerError, open_container, seal_store
+from alethech.container import ContainerError, inspect_container, open_container, seal_store
+from alethech.verify import verify_store
 
 def _sealed(tmp_path):
     client=Alethech.initialize(tmp_path/"source")
@@ -57,3 +58,45 @@ def test_refuses_mismatched_portable_signing_key(tmp_path):
 
     with pytest.raises(ContainerError, match="signing key does not match identity"):
         seal_store(client.store, tmp_path / "mismatched.aleth", "passphrase")
+
+
+def test_portable_filesystem_names_preserve_logical_container_paths(tmp_path):
+    client = Alethech.initialize(tmp_path / "source")
+    ev = client.evidence(
+        tool="portable-filenames",
+        input_bytes=b"in",
+        output_bytes=b"out",
+        artifacts={"proof.bin": b"portable-artifact"},
+    )
+    client.commit({"memory": "cross-platform"}, evidence_refs=[ev.commit_id])
+
+    # Physical store names must be valid on Windows too: protocol ':' stays
+    # inside signed objects, not in local filenames.
+    for directory in ("identities", "commits", "evidence", "artifacts"):
+        for path in (client.store.root / directory).iterdir():
+            if path.is_file():
+                assert ":" not in path.name
+    assert any("%3A" in p.name for p in (client.store.root / "commits").iterdir())
+
+    out = tmp_path / "portable.aleth"
+    seal_store(client.store, out, "portable-passphrase")
+    meta = inspect_container(out, "portable-passphrase")
+
+    # The encrypted container contract remains logical/canonical and therefore
+    # unchanged for TypeScript/Rust/browser consumers.
+    assert any(p.startswith("identities/did:alethech:") for p in meta["files"])
+    assert any(p.startswith("commits/sha256:") for p in meta["files"])
+    assert any(p.startswith("evidence/sha256:") for p in meta["files"])
+    assert any(p.startswith("artifacts/sha256:") for p in meta["files"])
+    assert not any("%3A" in p for p in meta["files"])
+
+    restored = open_container(out, tmp_path / "restored", "portable-passphrase")
+    report = verify_store(restored)
+    assert report.ok, report.summary()
+    for directory in ("identities", "commits", "evidence", "artifacts"):
+        for path in (restored.root / directory).iterdir():
+            if path.is_file():
+                assert ":" not in path.name
+
+    artifact_hash = ev.artifacts[0]["hash"]
+    assert restored.read_artifact(artifact_hash) == b"portable-artifact"
