@@ -189,6 +189,21 @@ jobs:
           assert len(v["entries"]) == 1
           PY
 
+      - name: Verify provider-neutral chat context contract
+        run: |
+          npx --yes tsx alethech-ts/context-adapter-test.ts /tmp/interop.aleth interop-passphrase > /tmp/chat-context.json
+          python - <<'PY'
+          import json
+          c=json.load(open("/tmp/chat-context.json"))
+          assert c["format"]=="alethech-context"
+          assert c["version"]==1
+          assert c["source_head"]
+          assert len(c["items"])==1
+          text=json.dumps(c)
+          for forbidden in ("PRIVATE KEY","signing.key","root.key","recovery.key"):
+              assert forbidden not in text
+          PY
+
       - name: Verify V2 portable memory in browser TypeScript verifier
         run: |
           python scripts/make_v2_portable_fixture.py /tmp/aleth-v2 /tmp/v2.aleth
