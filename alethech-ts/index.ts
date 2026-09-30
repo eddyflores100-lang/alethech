@@ -75,7 +75,8 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
 }
 
 export function base64UrlToBytes(s: string): Uint8Array {
-    const padded = s.replace(/-/g, "+").replace(/_/g, "/");
+    let padded = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (padded.length % 4 !== 0) padded += "=";
     const binary = atob(padded);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -182,7 +183,7 @@ function escapeString(s: string): string {
 
 function serializeNumber(n: number): string {
     if (n === 0) return "0";
-    if (!Number.isFinite(n)) return "0";
+    if (!Number.isFinite(n)) throw new Error("NaN/Infinity not representable in JCS");
     if (Number.isInteger(n)) return n.toString();
 
     const abs = Math.abs(n);
