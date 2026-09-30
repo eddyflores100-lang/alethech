@@ -38,10 +38,18 @@ const providerResponse = el<HTMLTextAreaElement>("provider-response");
 const reviewWritebackButton = el<HTMLButtonElement>("review-writeback");
 const writebackSummary = el<HTMLElement>("writeback-summary");
 const acceptWritebackButton = el<HTMLButtonElement>("accept-writeback");
+const selectAllButton = el<HTMLButtonElement>("select-all-memories");
+const clearSelectionButton = el<HTMLButtonElement>("clear-memory-selection");
 
 function ensureWasm(): Promise<unknown> {
   if (!wasmReady) wasmReady = initWasm();
   return wasmReady;
+}
+
+function selectedMemoryIds(): string[] {
+  return Array.from(document.querySelectorAll<HTMLInputElement>(".memory-select:checked"))
+    .map((node) => node.dataset.commitId ?? "")
+    .filter(Boolean);
 }
 
 function renderView(view: VerifiedPortableView): void {
@@ -50,10 +58,21 @@ function renderView(view: VerifiedPortableView): void {
   const memories = el<HTMLElement>("memories");
   memories.replaceChildren();
   for (const entry of view.entries.slice(-20)) {
-    const node = document.createElement("div");
-    node.className = "memory";
-    node.textContent = JSON.stringify(entry.content, null, 2);
-    memories.appendChild(node);
+    const row = document.createElement("label");
+    row.className = "memory memory-select-row";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "memory-select";
+    checkbox.dataset.commitId = entry.commit_id;
+    checkbox.checked = true;
+
+    const content = document.createElement("span");
+    content.className = "memory-content";
+    content.textContent = JSON.stringify(entry.content, null, 2);
+
+    row.append(checkbox, content);
+    memories.appendChild(row);
   }
   saveButton.disabled = !verifiedPayload || !newMemory.value.trim();
 }
@@ -224,7 +243,13 @@ prepareContextButton.addEventListener("click", () => {
     status.textContent = "Unlock and verify a memory first.";
     return;
   }
-  chatContext.value = toContextText(verifiedView, { limit: 20 });
+  const ids = selectedMemoryIds();
+  if (ids.length === 0) {
+    status.className = "status error";
+    status.textContent = "Select at least one memory to share.";
+    return;
+  }
+  chatContext.value = toContextText(verifiedView, { include_ids: ids });
   chatContext.hidden = false;
   contextHint.hidden = false;
   chatContext.focus();
@@ -247,11 +272,14 @@ generateRequestButton.addEventListener("click", () => {
     return;
   }
   try {
+    if (selectedMemoryIds().length === 0) {
+      throw new Error("No memories selected for provider request.");
+    }
     const request = preparePluginRequest(
       { payload: verifiedPayload!, view: verifiedView },
       providerMode.value as PluginProviderKind,
       prompt,
-      { limit: selectedContextLimit() },
+      { limit: selectedContextLimit(), include_ids: selectedMemoryIds() },
     );
     providerRequest.value = JSON.stringify(request, null, 2);
     providerRequest.focus();
@@ -323,4 +351,21 @@ acceptWritebackButton.addEventListener("click", async () => {
     passphrase.value = "";
     acceptWritebackButton.disabled = !pendingWriteback;
   }
+});
+
+
+selectAllButton.addEventListener("click", () => {
+  for (const input of document.querySelectorAll<HTMLInputElement>(".memory-select")) {
+    input.checked = true;
+  }
+  status.className = "status";
+  status.textContent = "All visible memories selected.";
+});
+
+clearSelectionButton.addEventListener("click", () => {
+  for (const input of document.querySelectorAll<HTMLInputElement>(".memory-select")) {
+    input.checked = false;
+  }
+  status.className = "status";
+  status.textContent = "Memory sharing selection cleared.";
 });
