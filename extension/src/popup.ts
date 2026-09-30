@@ -1,6 +1,7 @@
 import initWasm, { open_aleth_payload, seal_aleth_payload } from "./vendor/wasm/alethech_wasm.js";
 import { verifyPortablePayload, type PortablePayload, type VerifiedPortableView } from "../../alethech-ts/portable-verifier.ts";
 import { appendPortableMemory, canonicalPortablePayloadBytes } from "../../alethech-ts/portable-editor.ts";
+import { toContextText } from "../../alethech-ts/context-adapter.ts";
 
 let selectedFile: File | null = null;
 let wasmReady: Promise<unknown> | null = null;
@@ -17,6 +18,9 @@ const status = el<HTMLElement>("status");
 const result = el<HTMLElement>("result");
 const newMemory = el<HTMLTextAreaElement>("new-memory");
 const saveButton = el<HTMLButtonElement>("save");
+const prepareContextButton = el<HTMLButtonElement>("prepare-context");
+const chatContext = el<HTMLTextAreaElement>("chat-context");
+const contextHint = el<HTMLElement>("context-hint");
 
 function ensureWasm(): Promise<unknown> {
   if (!wasmReady) wasmReady = initWasm();
@@ -42,6 +46,9 @@ function clearVerifiedState(): void {
   verifiedView = null;
   newMemory.value = "";
   saveButton.disabled = true;
+  chatContext.value = "";
+  chatContext.hidden = true;
+  contextHint.hidden = true;
 }
 
 function choose(file: File | null): void {
@@ -153,4 +160,20 @@ saveButton.addEventListener("click", async () => {
     passphrase.value = "";
     saveButton.disabled = !verifiedPayload || !newMemory.value.trim();
   }
+});
+
+
+prepareContextButton.addEventListener("click", () => {
+  if (!verifiedView) {
+    status.className = "status error";
+    status.textContent = "Unlock and verify a memory first.";
+    return;
+  }
+  chatContext.value = toContextText(verifiedView, { limit: 20 });
+  chatContext.hidden = false;
+  contextHint.hidden = false;
+  chatContext.focus();
+  chatContext.select();
+  status.className = "status";
+  status.textContent = "Verified chat context prepared locally.";
 });
