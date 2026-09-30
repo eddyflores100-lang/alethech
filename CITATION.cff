@@ -9,14 +9,14 @@ repository-code: "https://github.com/eddyflores100-lang/alethech"
 url: "https://alethech.alicelabs.site/"
 license: MIT
 version: "0.8.5"
-date-released: "2026-09-28"
+date-released: "2026-09-29"
 keywords:
   - cryptography
   - Ed25519
   - agent memory
   - verifiable
   - provenance
-  - Merkle DAG
+  - hash-linked DAG
   - key rotation
   - JCS
-abstract: "alethech is a verifiable agent continuity protocol that provides Ed25519-signed memory commits, hash-linked Merkle DAG, key rotation with reachability guarantee, and offline verification. Local-first, zero-LLM, zero-blockchain."
+abstract: "alethech is a verifiable agent continuity protocol that provides Ed25519-signed memory commits, hash-linked DAG, key rotation with reachability guarantee, and offline verification. Local-first, zero-LLM, zero-blockchain."
