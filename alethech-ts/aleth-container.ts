@@ -34,6 +34,27 @@ function allowedPath(rel: string): boolean {
   return parts.length === 2 && ["identities","commits","evidence","artifacts","control_events","migrations","checkpoints"].includes(parts[0]);
 }
 
+function logicalizePhysicalPath(rel: string): string {
+  const parts=rel.split("/");
+  if(parts.length!==2) return rel;
+  const [dir,name]=parts;
+  const jsonDirs=new Set(["identities","commits","evidence","control_events","migrations","checkpoints"]);
+  if(jsonDirs.has(dir) && name.endsWith(".json")){
+    const stem=name.slice(0,-5);
+    let decoded:string;
+    try { decoded=decodeURIComponent(stem); }
+    catch { throw new Error(`invalid portable filesystem encoding: ${rel}`); }
+    return `${dir}/${decoded}.json`;
+  }
+  if(dir==="artifacts"){
+    let decoded:string;
+    try { decoded=decodeURIComponent(name); }
+    catch { throw new Error(`invalid portable filesystem encoding: ${rel}`); }
+    return `artifacts/${decoded}`;
+  }
+  return rel;
+}
+
 async function collectFiles(root: string): Promise<Record<string,string>> {
   const files: Record<string,string> = {};
   let total = 0;
@@ -45,8 +66,9 @@ async function collectFiles(root: string): Promise<Record<string,string>> {
       if (st.isSymbolicLink()) throw new Error("symlink not allowed");
       if (st.isDirectory()) { await walk(full); continue; }
       if (!st.isFile()) continue;
-      const rel = relative(root, full).split(sep).join("/");
-      if (rel === "keys/root.key" || rel === "keys/recovery.key") continue;
+      const physicalRel = relative(root, full).split(sep).join("/");
+      if (physicalRel === "keys/root.key" || physicalRel === "keys/recovery.key") continue;
+      const rel = logicalizePhysicalPath(physicalRel);
       if (!allowedPath(rel)) continue;
       const data = await readFile(full);
       if (data.length > 100 * 1024 * 1024) throw new Error("file too large");
