@@ -148,3 +148,33 @@ recover a forgotten passphrase.
 Python, Rust and TypeScript implementations MUST eventually be able to open the
 same v1 container and obtain the same payload bytes and protocol-verification
 result. Cross-runtime golden containers will become normative before v1 freeze.
+
+
+## 9. Passphrase rotation
+
+A conforming implementation MAY rotate the passphrase of an existing v1
+container without changing protocol history.
+
+The operation MUST:
+
+1. authenticate/decrypt the existing container first;
+2. validate the logical payload structure before resealing;
+3. preserve the same logical payload content;
+4. generate a fresh 16-byte salt;
+5. generate a fresh 12-byte AES-GCM nonce;
+6. derive a new encryption key from the new passphrase;
+7. write a newly authenticated container.
+
+Commit IDs, signatures, identity records, evidence, provenance, checkpoints and
+HEAD MUST remain unchanged because passphrase rotation belongs only to the
+container encryption layer.
+
+A failed old-passphrase authentication MUST produce no replacement output.
+
+In-place rekey SHOULD use a same-filesystem temporary file followed by atomic
+replacement so the original container is not truncated before the new container
+is complete.
+
+Passphrase rotation is **not recovery**. If the current passphrase is forgotten
+and no already-unlocked trusted session exists, v1 provides no cryptographic
+mechanism to recover the plaintext.
