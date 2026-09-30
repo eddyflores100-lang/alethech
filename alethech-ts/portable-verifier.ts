@@ -58,6 +58,20 @@ export interface PortableControlEvent {
   signature: string;
 }
 
+export interface PortableMigrationRecord {
+  type: "MigrationRecord";
+  version: number;
+  legacy_agent_id: string;
+  legacy_public_key: {kty:string;crv:string;x:string};
+  new_agent_id: string;
+  new_root_id: string;
+  new_root_public_key: {kty:string;crv:string;x:string};
+  migration_timestamp: string;
+  legacy_signature: string;
+  commit_id: string;
+  signature: string;
+}
+
 export interface PortableEvidenceCommit {
   type: "EvidenceCommit";
   version: number;
@@ -188,6 +202,30 @@ async function verifyPortableSigningKeyV2(
   throw new Error("portable signing key does not match an active identity key");
 }
 
+async function verifyMigrationRecord(
+  migration: PortableMigrationRecord,
+  legacyBytes: Uint8Array,
+  rootBytes: Uint8Array,
+): Promise<boolean> {
+  if(!migration.legacy_signature?.startsWith("ed25519:") || !migration.signature?.startsWith("ed25519:")) return false;
+  const {
+    legacy_signature,
+    signature,
+    commit_id,
+    ...body
+  } = migration as any;
+  const bodyBytes=new TextEncoder().encode(canonicalizeJson(body));
+  const expectedId=`sha256:${await sha256Hex(bodyBytes)}`;
+  if(commit_id!==expectedId) return false;
+  const signedBytes=new TextEncoder().encode(canonicalizeJson({...body,commit_id}));
+  const legacySig=base64UrlToBytes(legacy_signature.slice(8));
+  const rootSig=base64UrlToBytes(signature.slice(8));
+  if(legacySig.length!==64||rootSig.length!==64) return false;
+  const legacyPub=await crypto.subtle.importKey("raw",legacyBytes,{name:"Ed25519"},false,["verify"]);
+  const rootPub=await crypto.subtle.importKey("raw",rootBytes,{name:"Ed25519"},false,["verify"]);
+  return (await verify(legacyPub,legacySig,signedBytes)) && (await verify(rootPub,rootSig,signedBytes));
+}
+
 async function verifySignedPortableRecord(
   record: Record<string, unknown> & {commit_id: string; signature: string},
   publicBytes: Uint8Array,
@@ -232,7 +270,6 @@ function assertSupportedPayload(payload: PortablePayload): void {
       throw new Error("forbidden authority key in portable payload");
     }
     if (
-      path.startsWith("migrations/") ||
       path.startsWith("checkpoints/")
     ) {
       throw new Error(`unsupported browser verifier layer: ${path}`);
@@ -412,6 +449,42 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
   if(await deriveAgentId(jwkPublicBytes(identity.root_public_key))!==identity.agent_id) throw new Error("identity_v2_mismatch");
   if(!(await verifySignedPortableRecord(identity as any,rootBytes))) throw new Error("identity_v2_signature_invalid");
 
+  const legacyIdentities=new Map<string,Identity>();
+  for(const path of identityPaths){
+    const candidate=parseJsonFile<any>(files,path);
+    if(candidate.type!=="Identity") continue;
+    const legacy=candidate as Identity;
+    if(legacy.version!==1) throw new Error(`unsupported legacy identity version: ${path}`);
+    if(path!==`identities/${legacy.agent_id}.json`) throw new Error(`legacy identity filename mismatch: ${path}`);
+    const raw=jwkPublicBytes(legacy.public_key);
+    if(await deriveAgentId(raw)!==legacy.agent_id) throw new Error(`legacy identity_mismatch: ${legacy.agent_id}`);
+    legacyIdentities.set(legacy.agent_id,legacy);
+  }
+
+  const migrationPaths=Object.keys(files).filter(p=>p.startsWith("migrations/")&&p.endsWith(".json")).sort();
+  const migrations=new Map<string,PortableMigrationRecord>();
+  for(const path of migrationPaths){
+    const migration=parseJsonFile<PortableMigrationRecord>(files,path);
+    if(migration.type!=="MigrationRecord"||migration.version!==1) throw new Error(`unsupported migration: ${path}`);
+    if(path!==`migrations/${migration.commit_id}.json`) throw new Error(`migration filename mismatch: ${path}`);
+    if(migration.new_agent_id!==identity.agent_id || migration.new_root_id!==root.root_id ||
+       canonicalizeJson(migration.new_root_public_key)!==canonicalizeJson(root.root_public_key)) {
+      throw new Error(`migration target binding failed: ${migration.commit_id}`);
+    }
+    const legacy=legacyIdentities.get(migration.legacy_agent_id);
+    if(!legacy) throw new Error(`migration legacy identity missing: ${migration.legacy_agent_id}`);
+    if(canonicalizeJson(legacy.public_key)!==canonicalizeJson(migration.legacy_public_key)) {
+      throw new Error(`migration legacy key binding failed: ${migration.commit_id}`);
+    }
+    if(!(await verifyMigrationRecord(migration,jwkPublicBytes(migration.legacy_public_key),rootBytes))) {
+      throw new Error(`migration_signatures_invalid: ${migration.commit_id}`);
+    }
+    migrations.set(migration.commit_id,migration);
+  }
+  if(legacyIdentities.size>0 && migrations.size===0) {
+    throw new Error("legacy and V2 identities present without MigrationRecord");
+  }
+
   const eventPaths=Object.keys(files).filter(p=>p.startsWith("control_events/")&&p.endsWith(".json")).sort();
   const events:PortableControlEvent[]=[];
   for(const path of eventPaths){
@@ -431,6 +504,9 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
   }
 
   for(const ev of events){
+    if(ev.migration_record_id && !migrations.has(ev.migration_record_id)) {
+      throw new Error(`control_event_missing_migration: ${ev.migration_record_id}`);
+    }
     if(ev.event_type!=="key_rotation" && ev.event_type!=="key_revoke") continue;
     const revokedId=ev.event_type==="key_rotation"?ev.old_key_id:ev.key_id;
     if(!revokedId) continue;
@@ -450,11 +526,18 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
   for(const path of evidencePaths){
     const ev=parseJsonFile<PortableEvidenceCommit>(files,path);
     if(ev.type!=="EvidenceCommit" || ev.version!==1) throw new Error(`unsupported evidence: ${path}`);
-    if(ev.agent_id!==identity.agent_id) throw new Error(`evidence identity mismatch: ${path}`);
-    const key=allKeys.find(k=>k.key_id===ev.key_id);
-    if(!key) throw new Error(`unknown evidence key: ${ev.key_id}`);
+    let evidencePub:Uint8Array;
+    if(ev.agent_id===identity.agent_id){
+      const key=allKeys.find(k=>k.key_id===ev.key_id);
+      if(!key) throw new Error(`unknown evidence key: ${ev.key_id}`);
+      evidencePub=jwkPublicBytes(key.public_key);
+    }else{
+      const legacy=legacyIdentities.get(ev.agent_id);
+      if(!legacy || legacy.key_id!==ev.key_id) throw new Error(`evidence identity mismatch: ${path}`);
+      evidencePub=jwkPublicBytes(legacy.public_key);
+    }
     if(path!==`evidence/${ev.commit_id}.json`) throw new Error(`evidence filename mismatch: ${path}`);
-    if(!(await verifySignedPortableRecord(ev as any,jwkPublicBytes(key.public_key)))) throw new Error(`evidence verification failed: ${ev.commit_id}`);
+    if(!(await verifySignedPortableRecord(ev as any,evidencePub))) throw new Error(`evidence verification failed: ${ev.commit_id}`);
     for(const art of ev.artifacts??[]){
       if(typeof art.hash!=="string") throw new Error(`evidence artifact hash missing: ${ev.commit_id}`);
       const encoded=files[`artifacts/${art.hash}`];
@@ -474,11 +557,18 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
   for(const path of commitPaths){
     const commit=parseJsonFile<MemoryCommit>(files,path);
     if(commit.type!=="MemoryCommit"||commit.version!==1) throw new Error(`unsupported commit: ${path}`);
-    if(commit.agent_id!==identity.agent_id) throw new Error(`commit identity mismatch: ${path}`);
-    const state=keyState.get(commit.key_id);
-    if(!state) throw new Error(`unknown commit key: ${commit.key_id}`);
+    let commitPub:Uint8Array;
+    if(commit.agent_id===identity.agent_id){
+      const state=keyState.get(commit.key_id);
+      if(!state) throw new Error(`unknown commit key: ${commit.key_id}`);
+      commitPub=jwkPublicBytes(state.public_key);
+    }else{
+      const legacy=legacyIdentities.get(commit.agent_id);
+      if(!legacy || legacy.key_id!==commit.key_id) throw new Error(`commit identity mismatch: ${path}`);
+      commitPub=jwkPublicBytes(legacy.public_key);
+    }
     if(path!==`commits/${commit.commit_id}.json`) throw new Error(`commit filename mismatch: ${path}`);
-    if(!(await verifyCommit(commit,jwkPublicBytes(state.public_key)))) throw new Error(`commit verification failed: ${commit.commit_id}`);
+    if(!(await verifyCommit(commit,commitPub))) throw new Error(`commit verification failed: ${commit.commit_id}`);
     if(commits.has(commit.commit_id)) throw new Error(`duplicate commit_id: ${commit.commit_id}`);
     commits.set(commit.commit_id,commit);
   }
@@ -491,8 +581,8 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
     }
   }
   for(const commit of commits.values()){
-    const state=keyState.get(commit.key_id)!;
-    if(state.state==="revoked"){
+    const state=commit.agent_id===identity.agent_id?keyState.get(commit.key_id):undefined;
+    if(state?.state==="revoked"){
       if(!state.cutoff || !ancestryCheck(commit.commit_id,state.cutoff,commits)) {
         throw new Error(`not_in_proven_pre_rotation_history: ${commit.commit_id}`);
       }
