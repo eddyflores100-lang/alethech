@@ -12,7 +12,8 @@ from cryptography.hazmat.primitives import serialization
 from . import crypto
 from .objects import Identity, MemoryCommit
 from .store import Store, StoreError
-from .verify import VerifyReport, verify_store\nfrom .container import seal_store, open_container
+from .verify import VerifyReport, verify_store
+from .container import seal_store, open_container
 
 class AlethechError(Exception):
     """Programmatic API error with stable, user-facing semantics."""
@@ -126,3 +127,12 @@ class Alethech:
     def verify(self) -> VerifyReport:
         """Run the standalone verifier against this store."""
         return verify_store(self.store)
+
+    def seal(self, output: str | Path, passphrase: str) -> Path:
+        """Export this memory as one encrypted portable .aleth file."""
+        return seal_store(self.store, output, passphrase)
+
+    @classmethod
+    def open_aleth(cls, path: str | Path, destination: str | Path, passphrase: str) -> "Alethech":
+        """Open an encrypted .aleth into a new local working store."""
+        return cls(open_container(path, destination, passphrase))
