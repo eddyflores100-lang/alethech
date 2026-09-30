@@ -83,6 +83,9 @@ jobs:
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
 
+      - name: Run browser WASM crypto tests
+        run: cargo test --manifest-path alethech-wasm/Cargo.toml
+
       - name: Build browser WASM decryptor
         run: |
           rustup target add wasm32-unknown-unknown
