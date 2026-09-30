@@ -146,6 +146,26 @@ def run_python(fixture_path: Path) -> FixtureResult:
 
         obj_type = commit_data.get("type", "")
 
+        if obj_type == "AgentIdDerivation":
+            public_jwk = commit_data.get("public_key", {})
+            expected_id = commit_data.get("expected_agent_id", "")
+            derived = crypto.derive_agent_id(public_jwk)
+            if derived != expected_id:
+                return FixtureResult(
+                    fixture=str(fixture_path.relative_to(CONFORMANCE_DIR)),
+                    implementation="python",
+                    accepted=False,
+                    error=f"agent_id mismatch: {derived}",
+                    duration_ms=(time.time() - start) * 1000,
+                )
+            return FixtureResult(
+                fixture=str(fixture_path.relative_to(CONFORMANCE_DIR)),
+                implementation="python",
+                accepted=True,
+                canonical_bytes=derived.encode("utf-8"),
+                duration_ms=(time.time() - start) * 1000,
+            )
+
         # Some fixtures test JCS canonicalization directly (not signed objects).
         # Those are handled by tests/test_canonical.py — skip them here.
         if obj_type in ("JCSNumberTest", "UnicodeDistinctness"):
