@@ -1,6 +1,6 @@
 //! alethech — verifiable agent continuity protocol.
 //!
-//! Ed25519-signed memory commits, hash-linked Merkle DAG, key rotation
+//! Ed25519-signed memory commits, hash-linked DAG, key rotation
 //! with reachability guarantee.
 //!
 //! # Quick start
