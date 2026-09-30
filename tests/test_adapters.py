@@ -26,3 +26,23 @@ def test_memory_view_never_exposes_unverified_store(tmp_path):
 
     with pytest.raises(AdapterError, match="unverified memory"):
         build_memory_view(agent.store)
+
+
+def test_drop_file_to_verified_context(tmp_path):
+    source = Alethech.initialize(tmp_path / "source")
+    source.commit({"fact": "drag and drop"})
+    container = source.seal(tmp_path / "memory.aleth", "drop-secret")
+
+    context = Alethech.drop_context(container, "drop-secret")
+
+    assert context["format"] == "alethech-memory-view"
+    assert context["head"] == source.head
+    assert [e["content"] for e in context["entries"]] == [{"fact": "drag and drop"}]
+
+
+def test_drop_file_wrong_passphrase_exposes_no_context(tmp_path):
+    source = Alethech.initialize(tmp_path / "source")
+    container = source.seal(tmp_path / "memory.aleth", "drop-secret")
+
+    with pytest.raises(Exception, match="authentication failed"):
+        Alethech.drop_context(container, "wrong")
