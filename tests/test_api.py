@@ -61,3 +61,20 @@ def test_public_api_context_view(tmp_path):
     assert context["head"] == agent.head
     assert len(context["entries"]) == 1
     assert context["entries"][0]["content"] == {"fact": "portable context"}
+
+
+def test_programmatic_evidence_roundtrip(tmp_path):
+    client = Alethech.initialize(tmp_path / "store")
+    ev = client.evidence(
+        tool="filesystem.read",
+        input_bytes=b"request",
+        output_bytes=b"response",
+        artifacts={"proof.txt": b"artifact bytes"},
+    )
+    commit = client.commit({"fact": "backed by evidence"}, evidence_refs=[ev.commit_id])
+
+    report = client.verify()
+    assert report.ok, report.summary()
+    assert ev.commit_id in client.store.load_evidence()
+    assert commit.provenance["evidence_refs"] == [ev.commit_id]
+    assert len(client.store.list_artifacts()) == 1
