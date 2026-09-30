@@ -52,6 +52,27 @@ def _import_and_set_head(runner, tgt, export_dir):
 
 
 class TestRoundtrip:
+    def test_export_package_uses_cross_platform_filenames(self, populated_store, tmp_stores, runner):
+        src, tgt, _ = tmp_stores
+        export_dir = src.parent / "export-portable"
+        r = runner.invoke(cli, ["--store", str(src), "export", "--output", str(export_dir)])
+        assert r.exit_code == 0, r.output
+
+        for directory in ("identities", "commits", "evidence", "artifacts", "control_events", "migrations"):
+            d = export_dir / directory
+            if not d.is_dir():
+                continue
+            for path in d.iterdir():
+                if path.is_file():
+                    assert ":" not in path.name, f"non-portable filename: {path}"
+        assert any("%3A" in p.name for p in (export_dir / "commits").glob("*.json"))
+
+        imported = runner.invoke(cli, [
+            "--store", str(tgt), "import", "--input", str(export_dir),
+            "--trust-unknown-identities",
+        ])
+        assert imported.exit_code == 0, imported.output
+
     def test_roundtrip(self, populated_store, tmp_stores, runner):
         src, tgt, _ = tmp_stores
         assert runner.invoke(cli, ["--store", str(src), "verify"]).exit_code == 0
