@@ -1,6 +1,6 @@
 import type { PortablePayload, VerifiedPortableView } from "./portable-verifier.ts";
 import { verifyPortablePayload } from "./portable-verifier.ts";
-import { toAlethechContext } from "./context-adapter.ts";
+import { toAlethechContext, type ContextSelectionOptions } from "./context-adapter.ts";
 import { createChatEnvelope, type AlethechWritebackProposal } from "./chat-adapter-contract.ts";
 import {
   toAnthropicCompatibleRequest,
@@ -34,7 +34,7 @@ export function preparePluginRequest(
   session: AlethechPluginSession,
   provider: PluginProviderKind,
   userInput: string,
-  options: { limit?: number } = {},
+  options: ContextSelectionOptions = {},
 ): PreparedProviderRequest {
   const context = toAlethechContext(session.view, options);
   const envelope = createChatEnvelope(context);
