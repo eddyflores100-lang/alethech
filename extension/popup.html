@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="popup.css">
+  <title>Alethech Memory</title>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="mark">A</div>
+      <div>
+        <h1>Alethech</h1>
+        <p>Portable verified memory</p>
+      </div>
+    </header>
+
+    <section id="drop" class="drop" tabindex="0">
+      <strong>Drop your .aleth memory</strong>
+      <span>or choose a file</span>
+      <input id="file" type="file" accept=".aleth,application/octet-stream">
+    </section>
+
+    <section class="unlock">
+      <label for="passphrase">Passphrase</label>
+      <input id="passphrase" type="password" autocomplete="off" spellcheck="false">
+      <button id="open" disabled>Unlock & verify</button>
+    </section>
+
+    <p id="filename" class="filename"></p>
+    <div id="status" class="status" aria-live="polite">No memory loaded.</div>
+
+    <section id="result" class="result" hidden>
+      <div class="verified">✓ Verified locally</div>
+      <dl>
+        <div><dt>HEAD</dt><dd id="head"></dd></div>
+        <div><dt>Memories</dt><dd id="count"></dd></div>
+      </dl>
+      <div id="memories" class="memories"></div>
+    </section>
+
+    <footer>No network access. Nothing is uploaded.</footer>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
