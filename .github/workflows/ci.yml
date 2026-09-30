@@ -368,6 +368,12 @@ jobs:
           if ((m.host_permissions || []).length) throw new Error("Extension must not request host permissions");
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
+          const html=fs.readFileSync("extension/dist/popup.html","utf8");
+          for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback"]) {
+            if (!html.includes(`id="${id}"`)) throw new Error(`provider bridge control missing: ${id}`);
+          }
+          const js=fs.readFileSync("extension/dist/popup.js","utf8");
+          if (!js.includes("alethech-writeback-proposal")) throw new Error("writeback contract missing from bundle");
           JS
 
       - name: Smoke-check extension package contents
