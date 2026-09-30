@@ -177,6 +177,45 @@ jobs:
           assert len([x for x in py["files"] if x.startswith("artifacts/")]) == 1
           PY
 
+      - name: Verify ALETH002 Python to TypeScript recovery interop
+        run: |
+          python - <<'PY'
+          import json
+          from alethech import Alethech
+          from alethech.container_v2 import _parse_v2
+
+          source=Alethech.open("/tmp/aleth-source")
+          path,recovery=source.seal_v2("/tmp/recovery-v2.aleth","v2-passphrase",create_recovery=True)
+          assert recovery is not None
+          open("/tmp/recovery-code.txt","w").write(recovery)
+          payload,header=_parse_v2(path.read_bytes(),passphrase="v2-passphrase")
+          with open("/tmp/v2-py-open.json","w") as f:
+              json.dump({
+                  "payload":payload,
+                  "container_id":header["container_id"],
+                  "slot_types":sorted(s["type"] for s in header["slots"]),
+              },f,sort_keys=True)
+          PY
+
+          npx --yes tsx alethech-ts/aleth-container-v2.ts open-pass /tmp/recovery-v2.aleth v2-passphrase > /tmp/v2-ts-pass.json
+          RECOVERY_CODE="$(cat /tmp/recovery-code.txt)"
+          npx --yes tsx alethech-ts/aleth-container-v2.ts open-recovery /tmp/recovery-v2.aleth "$RECOVERY_CODE" > /tmp/v2-ts-recovery.json
+
+          if npx --yes tsx alethech-ts/aleth-container-v2.ts open-pass /tmp/recovery-v2.aleth wrong-passphrase >/dev/null 2>&1; then
+            echo "TypeScript accepted wrong ALETH002 passphrase"; exit 1
+          fi
+
+          python - <<'PY'
+          import json
+          py=json.load(open("/tmp/v2-py-open.json"))
+          tsp=json.load(open("/tmp/v2-ts-pass.json"))
+          tsr=json.load(open("/tmp/v2-ts-recovery.json"))
+          assert py == tsp == tsr, (py.keys(),tsp.keys(),tsr.keys())
+          assert py["slot_types"] == ["passphrase","recovery-secret"]
+          assert "keys/root.key" not in py["payload"]["files"]
+          assert "keys/recovery.key" not in py["payload"]["files"]
+          PY
+
       - name: Verify passphrase rotation across runtimes
         run: |
           python - <<'PY'
