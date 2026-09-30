@@ -1,5 +1,6 @@
 import {
   base64UrlToBytes,
+  canonicalizeJson,
   deriveAgentId,
   sha256Hex,
   verify,
@@ -11,6 +12,23 @@ import {
 export interface PortablePayload {
   payload_version: number;
   files: Record<string, string>;
+}
+
+export interface PortableEvidenceCommit {
+  type: "EvidenceCommit";
+  version: number;
+  agent_id: string;
+  key_id: string;
+  timestamp: string;
+  event_type: string;
+  tool: string;
+  tool_version: string;
+  input_hash: string;
+  output_hash: string;
+  artifacts: Array<{name?: string; hash?: string; size?: number}>;
+  result: string;
+  commit_id: string;
+  signature: string;
 }
 
 export interface PortableMemoryEntry {
@@ -42,7 +60,7 @@ function safePath(path: string): boolean {
   const parts = path.split("/");
   if (parts.some(p => !p || p === "." || p === "..")) return false;
   if (path === "HEAD" || path === "keys/signing.key") return true;
-  return parts.length === 2 && ["identities", "commits", "artifacts"].includes(parts[0]);
+  return parts.length === 2 && ["identities", "commits", "evidence", "artifacts"].includes(parts[0]);
 }
 
 function pemToPkcs8(pem: string): Uint8Array {
@@ -81,6 +99,22 @@ async function verifyPortableSigningKey(files: Record<string,string>, identity: 
   }
 }
 
+async function verifySignedPortableRecord(
+  record: Record<string, unknown> & {commit_id: string; signature: string},
+  publicBytes: Uint8Array,
+): Promise<boolean> {
+  if (typeof record.signature !== "string" || !record.signature.startsWith("ed25519:")) return false;
+  const sigBytes = base64UrlToBytes(record.signature.slice(8));
+  if (sigBytes.length !== 64) return false;
+  const {signature, commit_id, ...body} = record;
+  const bodyBytes = new TextEncoder().encode(canonicalizeJson(body));
+  const expectedId = `sha256:${await sha256Hex(bodyBytes)}`;
+  if (commit_id !== expectedId) return false;
+  const signedBytes = new TextEncoder().encode(canonicalizeJson({...body, commit_id}));
+  const pubKey = await crypto.subtle.importKey("raw", publicBytes, {name:"Ed25519"}, false, ["verify"]);
+  return verify(pubKey, sigBytes, signedBytes);
+}
+
 async function verifyArtifacts(files: Record<string,string>): Promise<void> {
   for (const [path, encoded] of Object.entries(files)) {
     if (!path.startsWith("artifacts/")) continue;
@@ -112,8 +146,7 @@ function assertSupportedPayload(payload: PortablePayload): void {
       path === "root_authority.json" ||
       path.startsWith("control_events/") ||
       path.startsWith("migrations/") ||
-      path.startsWith("checkpoints/") ||
-      path.startsWith("evidence/")
+      path.startsWith("checkpoints/")
     ) {
       throw new Error(`unsupported browser verifier layer: ${path}`);
     }
@@ -196,6 +229,27 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
   await verifyPortableSigningKey(files, identity, pubBytes);
   await verifyArtifacts(files);
 
+  const evidencePaths=Object.keys(files).filter(p=>p.startsWith("evidence/") && p.endsWith(".json")).sort();
+  const evidence=new Map<string,PortableEvidenceCommit>();
+  for(const path of evidencePaths){
+    const ev=parseJsonFile<PortableEvidenceCommit>(files,path);
+    if(ev.type!=="EvidenceCommit" || ev.version!==1) throw new Error(`unsupported evidence: ${path}`);
+    if(ev.agent_id!==identity.agent_id || ev.key_id!==identity.key_id) throw new Error(`evidence identity mismatch: ${path}`);
+    if(evidence.has(ev.commit_id)) throw new Error(`duplicate evidence commit_id: ${ev.commit_id}`);
+    if(path!==`evidence/${ev.commit_id}.json`) throw new Error(`evidence filename mismatch: ${path}`);
+    if(!(await verifySignedPortableRecord(ev as unknown as Record<string,unknown> & {commit_id:string;signature:string},pubBytes))) {
+      throw new Error(`evidence verification failed: ${ev.commit_id}`);
+    }
+    for(const art of ev.artifacts ?? []){
+      if(typeof art.hash!=="string") throw new Error(`evidence artifact hash missing: ${ev.commit_id}`);
+      const encoded=files[`artifacts/${art.hash}`];
+      if(typeof encoded!=="string") throw new Error(`evidence artifact missing: ${art.hash}`);
+      const actual=`sha256:${await sha256Hex(base64UrlToBytes(encoded))}`;
+      if(actual!==art.hash) throw new Error(`evidence artifact hash mismatch: ${art.hash}`);
+    }
+    evidence.set(ev.commit_id,ev);
+  }
+
   const commitPaths=Object.keys(files).filter(p=>p.startsWith("commits/") && p.endsWith(".json")).sort();
   if(commitPaths.length===0) throw new Error("no commits");
   const commits=new Map<string,MemoryCommit>();
@@ -210,7 +264,11 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
     const evidenceRefs = Array.isArray((commit.provenance as any)?.evidence_refs)
       ? (commit.provenance as any).evidence_refs
       : [];
-    if (evidenceRefs.length > 0) throw new Error("browser verifier does not yet support evidence_refs");
+    for (const ref of evidenceRefs) {
+      if (typeof ref !== "string" || !evidence.has(ref)) {
+        throw new Error(`missing evidence reference: ${String(ref)}`);
+      }
+    }
     commits.set(commit.commit_id,commit);
   }
 
