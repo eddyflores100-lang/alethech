@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Alethech Portable Memory",
   "version": "0.9.1",
-  "description": "Capture reviewed chats and create, open and verify encrypted .aleth memory locally.",
+  "description": "Guarda y cifra conversaciones de IA como memoria port\u00e1til .aleth. Sin cuenta, sin red, sin servidor.",
   "action": {
     "default_title": "Alethech Memory",
     "default_popup": "popup.html",
@@ -21,18 +21,33 @@
     "128": "icon128.png"
   },
   "permissions": [
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "content_scripts": [
     {
       "matches": [
-        "<all_urls>"
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://poe.com/*",
+        "https://alethech.alicelabs.site/*"
       ],
       "js": [
         "brain.js"
       ],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vendor/scrypt-js.min.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

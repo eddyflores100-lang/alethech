@@ -367,7 +367,7 @@ async function loadScrypt(): Promise<any> {
   if (scryptLib) return scryptLib;
   await new Promise<void>((res, rej) => {
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/scrypt-js@3.0.1/scrypt.min.js";
+    s.src = chrome.runtime.getURL('vendor/scrypt-js.min.js');
     s.onload = () => res();
     s.onerror = () => rej(new Error("No se pudo cargar el módulo de cifrado. ¿Sin internet?"));
     document.head.appendChild(s);

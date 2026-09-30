@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/extension/dist"
-WASM_OUT="$OUT/vendor/wasm"
+WASM_OUT="$OUT/vendor"
 
 command -v wasm-bindgen >/dev/null || {
   echo "wasm-bindgen CLI is required (0.2.129)" >&2
@@ -29,7 +29,7 @@ npx --yes esbuild@0.25.10 "$ROOT/extension/src/popup.ts" \
   --external:./vendor/wasm/alethech_wasm.js \
   --outfile="$OUT/popup.js"
 
-# Build brain content script (IIFE, no WASM, self-contained)
+# Build brain content script (IIFE, no WASM, bundles scrypt-js locally)
 npx --yes esbuild@0.25.10 "$ROOT/extension/src/brain.ts" \
   --bundle \
   --platform=browser \
@@ -39,7 +39,8 @@ npx --yes esbuild@0.25.10 "$ROOT/extension/src/brain.ts" \
 cp "$ROOT/extension/manifest.json" "$OUT/manifest.json"
 cp "$ROOT/extension/popup.html" "$OUT/popup.html"
 cp "$ROOT/extension/popup.css" "$OUT/popup.css"
-cp "$ROOT/extension/icon.svg" "$OUT/icon.svg" 2>/dev/null || echo "warning: icon.svg not found"
+cp "$ROOT/extension/PRIVACY.md" "$OUT/PRIVACY.md"
+cp "$ROOT/extension/icon.svg" "$OUT/icon.svg" 2>/dev/null || true
 cp "$ROOT/extension/icon16.png" "$OUT/icon16.png" 2>/dev/null || true
 cp "$ROOT/extension/icon48.png" "$OUT/icon48.png" 2>/dev/null || true
 cp "$ROOT/extension/icon128.png" "$OUT/icon128.png" 2>/dev/null || true
