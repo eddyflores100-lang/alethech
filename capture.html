@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Alethech — Capturar y cifrar chat</title>
+<title>Alethech — Guardar y cifrar tu conversación</title>
 <style>
 :root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e8edf6;background:#09101c}
 *{box-sizing:border-box}
@@ -45,18 +45,18 @@ footer{text-align:center;color:#536279;font-size:11px;margin-top:24px}
 <div class="mark">A</div>
 <div>
 <h1>Alethech</h1>
-<p>Cifra tu chat como memoria portable — sin instalar nada</p>
+<p>Guarda tu conversación como memoria portable — sin instalar nada</p>
 </div>
 </header>
 
 <!-- Bookmarklet instructions -->
 <div class="bookmarklet-box">
-<p><strong style="color:#c6d0df;">¿Quieres capturar chats con un click?</strong></p>
+<p><strong style="color:#c6d0df;">¿Quieres cargar chats con un click?</strong></p>
 <p>Arrastra este botón a tu barra de marcadores:</p>
-<a href="javascript:(function(){var s='';var sel=window.getSelection();if(sel&&!sel.isCollapsed&&sel.rangeCount){s=sel.toString();}if(!s){var msgs=document.querySelectorAll('[data-message-author-role],[data-testid=user-message],[data-testid=assistant-message],[data-role],.font-user-message,.font-claude-message,user-query,model-response');if(msgs.length){var parts=[];msgs.forEach(function(m){var role=m.getAttribute('data-message-author-role')||m.getAttribute('data-role')||'unknown';var txt=m.innerText.trim();if(txt)parts.push(role+': '+txt);});s=parts.join('\n\n');}if(!s){s=document.body.innerText.slice(0,200000);}}var w=window.open('https://alethech.alicelabs.site/capture.html#content='+encodeURIComponent(s));if(!w){alert('Permite ventanas emergentes para capturar el chat. O copia el texto y pégalo en https://alethech.alicelabs.site/capture.html');}})();"
+<a href="javascript:(function(){var s='';var sel=window.getSelection();if(sel&&!sel.isCollapsed&&sel.rangeCount){s=sel.toString();}if(!s){var msgs=document.querySelectorAll('[data-message-author-role],[data-testid=user-message],[data-testid=assistant-message],[data-role],.font-user-message,.font-claude-message,user-query,model-response');if(msgs.length){var parts=[];msgs.forEach(function(m){var role=m.getAttribute('data-message-author-role')||m.getAttribute('data-role')||'unknown';var txt=m.innerText.trim();if(txt)parts.push(role+': '+txt);});s=parts.join('\n\n');}if(!s){s=document.body.innerText.slice(0,200000);}}var w=window.open('https://alethech.alicelabs.site/capture.html#content='+encodeURIComponent(s));if(!w){alert('Permite ventanas emergentes para guardar tu conversación. O copia el texto y pégalo en https://alethech.alicelabs.site/capture.html');}})();"
 class="bookmarklet"
-onclick="event.preventDefault();alert('Arrastra este botón a tu barra de marcadores (barra de favoritos). Luego ábrelo cuando estés en un chat de IA para capturar el contenido.');">
-💬 Guardar este chat
+onclick="event.preventDefault();alert('Arrastra este botón a tu barra de marcadores (barra de favoritos). Luego ábrelo cuando estés en un chat de IA para cargar el contenido.');">
+📚 Guardar conversación
 </a>
 <p class="hint">Funciona en ChatGPT, Claude, Gemini y cualquier página. Sin extensión. Sin cuenta. Sin red.</p>
 </div>
@@ -112,7 +112,7 @@ function loadFromHash() {
   if (location.hash.startsWith("#content=")) {
     const text = decodeURIComponent(location.hash.slice(9));
     content.value = text;
-    status.textContent = "Contenido capturado desde el chat. Revísalo y añade tu contraseña.";
+    status.textContent = "Conversación cargada. Revísalo y añade tu contraseña.";
     status.className = "status success";
     // Clear the hash so refresh doesn't re-fill
     history.replaceState(null, "", location.pathname);
