@@ -78,6 +78,16 @@
         <p class="hint">Provider output is unsigned until you explicitly accept it here. Re-enter the passphrase above before acceptance.</p>
       </section>
 
+      <section class="rekey">
+        <h2>Change file passphrase</h2>
+        <label for="new-passphrase">New passphrase</label>
+        <input id="new-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+        <label for="confirm-passphrase">Confirm new passphrase</label>
+        <input id="confirm-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+        <button id="rekey" disabled>Re-encrypt & download</button>
+        <p class="hint">Only the encryption layer changes. Signed memory history, HEAD, identities, and provenance stay unchanged.</p>
+      </section>
+
       <section id="continue" class="continue">
         <label for="new-memory">Continue this memory</label>
         <textarea id="new-memory" rows="4" placeholder="Add a memory to the verified history…"></textarea>
