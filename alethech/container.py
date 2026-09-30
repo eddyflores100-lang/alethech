@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from .canonical import canonical_json_bytes
 from .crypto import b64url, b64url_decode, sha256_hex
-from .store import Store
+from .store import Store, portable_fs_name, logical_id_from_fs_name
 from .verify import verify_store
 
 MAGIC = b"ALETH001"
@@ -35,6 +35,36 @@ def _allowed(rel: str) -> bool:
         return False
     return p.parts[0] in {"identities","commits","evidence","artifacts","control_events","migrations","checkpoints"}
 
+def _logical_rel_from_physical(rel: str) -> str:
+    """Map portable/legacy physical store paths to canonical .aleth logical paths."""
+    p = PurePosixPath(rel)
+    if len(p.parts) != 2:
+        return rel
+    directory, name = p.parts
+    if directory in {"identities", "commits", "evidence", "control_events", "migrations", "checkpoints"}:
+        if name.endswith(".json"):
+            stem = name[:-5]
+            return f"{directory}/{logical_id_from_fs_name(stem)}.json"
+    if directory == "artifacts":
+        return f"artifacts/{logical_id_from_fs_name(name)}"
+    return rel
+
+
+def _physical_rel_from_logical(rel: str) -> str:
+    """Map canonical .aleth logical paths to portable cross-platform filenames."""
+    p = PurePosixPath(rel)
+    if len(p.parts) != 2:
+        return rel
+    directory, name = p.parts
+    if directory in {"identities", "commits", "evidence", "control_events", "migrations", "checkpoints"}:
+        if name.endswith(".json"):
+            stem = name[:-5]
+            return f"{directory}/{portable_fs_name(stem)}.json"
+    if directory == "artifacts":
+        return f"artifacts/{portable_fs_name(name)}"
+    return rel
+
+
 def _collect(root: Path) -> dict[str, str]:
     files = {}
     total = 0
@@ -43,9 +73,10 @@ def _collect(root: Path) -> dict[str, str]:
             raise ContainerError(f"symlink not allowed: {path}")
         if not path.is_file():
             continue
-        rel = path.relative_to(root).as_posix()
-        if rel in {"keys/root.key", "keys/recovery.key"}:
+        physical_rel = path.relative_to(root).as_posix()
+        if physical_rel in {"keys/root.key", "keys/recovery.key"}:
             continue
+        rel = _logical_rel_from_physical(physical_rel)
         if not _allowed(rel):
             continue
         data = path.read_bytes()
@@ -180,7 +211,8 @@ def open_container(path: str | Path, destination: str | Path, passphrase: str) -
         decoded[rel] = data
     try:
         for rel, data in decoded.items():
-            target = destination / PurePosixPath(rel)
+            physical_rel = _physical_rel_from_logical(rel)
+            target = destination / PurePosixPath(physical_rel)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
         store = Store.open(destination)
