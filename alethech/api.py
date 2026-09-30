@@ -78,12 +78,17 @@ class Alethech:
         return head
 
     def commit(self, content: dict, *, memory_type: str = "semantic",
-               evidence_refs: Iterable[str] = (), session_id: str | None = None) -> MemoryCommit:
+               evidence_refs: Iterable[str] = (), session_id: str | None = None,
+               source: str = "agent_observation", confidence: float = 1.0) -> MemoryCommit:
         """Create, sign, persist and advance HEAD to a MemoryCommit."""
         if not isinstance(content, dict):
             raise AlethechError("content must be a dict")
         if memory_type not in {"semantic", "episodic", "procedural"}:
             raise AlethechError(f"unsupported memory_type: {memory_type}")
+        if not isinstance(source, str) or not source:
+            raise AlethechError("source must be a non-empty string")
+        if not isinstance(confidence, (int, float)) or isinstance(confidence, bool) or not 0 <= float(confidence) <= 1:
+            raise AlethechError("confidence must be between 0 and 1")
         try:
             signing = self.store.load_signing_key()
             commits = self.store.load_commits()
@@ -117,8 +122,8 @@ class Alethech:
             agent_id=agent_id, key_id=key_id, parents=[head],
             session_id=session_id or str(uuid.uuid4()), memory_type=memory_type,
             content=content,
-            provenance={"source": "agent_observation", "source_id": str(uuid.uuid4()),
-                        "evidence_refs": refs, "confidence": 1.0},
+            provenance={"source": source, "source_id": str(uuid.uuid4()),
+                        "evidence_refs": refs, "confidence": float(confidence)},
         )
         commit.sign(signing)
         self.store.write_commit(commit)
