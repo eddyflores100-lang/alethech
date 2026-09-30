@@ -6,17 +6,21 @@ format.
 Security boundary:
 
 1. WASM authenticates/decrypts the encrypted envelope locally.
-2. TypeScript verifies the supported Alethech protocol history.
-3. Only then is a neutral memory view rendered.
+2. TypeScript verifies the complete supported Alethech history before exposing memory.
+3. The popup may append a new MemoryCommit only with the portable operational signing key.
+4. The updated payload is verified again before WASM reseals a new encrypted .aleth file.
+5. Provider-neutral chat context is generated only from the verified memory view.
 
 The extension has **no host permissions and no network permissions**. It does
-not upload the file, passphrase, or plaintext. The passphrase is cleared after
-each unlock attempt.
+not upload the file, passphrase, plaintext, or signing key. The passphrase is
+cleared after each unlock/reseal operation. No browser storage APIs are used;
+decrypted state exists only in the lifetime of the extension popup.
 
-Current browser verifier scope is intentionally fail-closed: legacy V1 identity,
-MemoryCommit history, EvidenceCommit provenance, artifact hashes, DAG/HEAD, and
-portable signing-key binding are verified locally. V2 governance, migrations,
-and checkpoints are still rejected until their browser verifiers are implemented.
+Current browser verifier scope is fail-closed and covers legacy V1 identities,
+IdentityRecordV2 + RootAuthority, ControlEvent governance, bilateral migrations,
+MemoryCommit history, EvidenceCommit provenance, artifact hashes, DAG/HEAD,
+signed checkpoints, revoked-key cutoff ancestry, and portable signing-key
+binding. Root and recovery private keys are forbidden in portable payloads.
 
 Build:
 
@@ -35,3 +39,23 @@ verified memory view into a backend-neutral `alethech-context` object. It carrie
 memory content, provenance, timestamps, commit IDs, and the verified source HEAD,
 but never private keys or raw protocol files. Future chat/provider adapters should
 consume this verified context rather than parsing `.aleth` directly.
+
+
+## Continue memory locally
+
+After verification, the popup can append one new signed MemoryCommit to the
+current history and download a newly encrypted `.aleth`. The operation uses only
+the portable operational signing key already inside the encrypted payload; root
+and recovery authority remain separate. The updated payload must pass the full
+portable verifier before it can be resealed.
+
+The extension does not overwrite the original file. Each continuation produces a
+new downloadable `*-updated.aleth` container.
+
+## Cross-platform filenames
+
+Local filesystem stores use percent-encoded physical filenames such as
+`sha256%3A...` and `did%3Aalethech%3A...` so they are valid on Windows,
+macOS, and Linux. Signed protocol identifiers remain unchanged, and `.aleth`
+containers expose the canonical logical paths with `sha256:` / `did:alethech:`.
+Legacy stores that used raw colons remain readable.
