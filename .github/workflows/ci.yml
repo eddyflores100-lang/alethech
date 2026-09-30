@@ -83,6 +83,11 @@ jobs:
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
 
+      - name: Build browser WASM decryptor
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --manifest-path alethech-wasm/Cargo.toml --target wasm32-unknown-unknown --release
+
       - name: Run all three implementations
         run: python conformance/cross_language_check.py
 
@@ -123,6 +128,17 @@ jobs:
           assert len([x for x in py["files"] if x.startswith("commits/")]) == 2
           PY
 
+
+      - name: Verify dropped Python container with browser TypeScript verifier
+        run: |
+          npx --yes tsx alethech-ts/portable-verifier-test.ts /tmp/interop.aleth interop-passphrase > /tmp/browser-view.json
+          python - <<'PY'
+          import json
+          v=json.load(open("/tmp/browser-view.json"))
+          assert v["format"] == "alethech-memory-view"
+          assert v["version"] == 1
+          assert len(v["entries"]) == 1
+          PY
 
       - name: Seal store in TypeScript and open in Python
         run: |
