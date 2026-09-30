@@ -39,6 +39,12 @@
       </dl>
       <div id="memories" class="memories"></div>
 
+      <section class="context-export">
+        <button id="prepare-context">Prepare chat context</button>
+        <textarea id="chat-context" rows="6" readonly hidden aria-label="Verified chat context"></textarea>
+        <p id="context-hint" class="hint" hidden>Verified memory only. Select and copy this text into any chat or compatible plugin.</p>
+      </section>
+
       <section id="continue" class="continue">
         <label for="new-memory">Continue this memory</label>
         <textarea id="new-memory" rows="4" placeholder="Add a memory to the verified history…"></textarea>
