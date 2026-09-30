@@ -509,7 +509,7 @@ jobs:
           test -s extension/dist/vendor/wasm/alethech_wasm_bg.wasm
 
       - name: Upload extension package
-        uses: actions/upload-artifact@b4b0dc411a4cb8f50d1c6f6b1a08ce4a4e33c4f1 # v4.4.0
+        uses: actions/upload-artifact@v4
         with:
           name: alethech-browser-extension
           path: extension/dist/
