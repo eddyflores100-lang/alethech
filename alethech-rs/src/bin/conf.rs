@@ -16,7 +16,7 @@ use std::process::exit;
 use serde_json::Value;
 
 use alethech::canonical::canonical_json;
-use alethech::crypto::b64url_decode;
+use alethech::crypto::{b64url_decode, derive_agent_id};
 use alethech::objects::MemoryCommit;
 
 fn main() {
@@ -62,6 +62,43 @@ fn main() {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
+    if obj_type == "AgentIdDerivation" {
+        let pub_jwk = commit_data
+            .get("public_key")
+            .unwrap_or_else(|| {
+                eprintln!("error: public_key missing");
+                exit(1);
+            });
+        let x = pub_jwk
+            .get("x")
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| {
+                eprintln!("error: public_key.x missing");
+                exit(1);
+            });
+        let bytes = b64url_decode(x).unwrap_or_else(|_| {
+            eprintln!("error: invalid public key encoding");
+            exit(1);
+        });
+        if bytes.len() != 32 {
+            eprintln!("error: public key is {} bytes, expected 32", bytes.len());
+            exit(1);
+        }
+        let mut pk = [0u8; 32];
+        pk.copy_from_slice(&bytes);
+        let derived = derive_agent_id(&pk);
+        let expected_id = commit_data
+            .get("expected_agent_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if derived != expected_id {
+            eprintln!("error: agent_id mismatch: {}", derived);
+            exit(1);
+        }
+        print!("{}", derived);
+        exit(0);
+    }
+
     // Skip fixtures that test JCS canonicalization directly (not signed objects).
     if obj_type == "JCSNumberTest" || obj_type == "UnicodeDistinctness" {
         // Acknowledge the fixture but produce no canonical bytes —
@@ -77,7 +114,7 @@ fn main() {
 
     // Parse the commit
     let commit_json = serde_json::to_string(commit_data).unwrap_or_default();
-    let mut commit: MemoryCommit = match serde_json::from_str(&commit_json) {
+    let commit: MemoryCommit = match serde_json::from_str(&commit_json) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("error: cannot parse MemoryCommit: {}", e);
