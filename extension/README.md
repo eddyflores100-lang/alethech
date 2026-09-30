@@ -77,3 +77,15 @@ Selection rules:
 - unknown IDs fail closed;
 - memory type filters are validated;
 - selection never exposes raw protocol files or private keys.
+
+
+## Passphrase rotation
+
+After a container is unlocked and verified locally, the popup can re-encrypt the
+same verified payload under a new passphrase and download a new `.aleth`.
+
+This operation changes only the encryption envelope. It does not create a
+MemoryCommit, change HEAD, rotate agent keys, or modify provenance.
+
+The new passphrase is used only in memory for the local reseal operation and is
+not persisted by the extension.
