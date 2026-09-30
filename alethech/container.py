@@ -6,7 +6,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from .canonical import canonical_json_bytes
-from .crypto import b64url, b64url_decode
+from .crypto import b64url, b64url_decode, sha256_hex
 from .store import Store
 from .verify import verify_store
 
@@ -114,6 +114,15 @@ def _parse(blob: bytes, passphrase: str) -> dict:
     if payload.get("payload_version") != 1 or not isinstance(payload.get("files"), dict):
         raise ContainerError("unsupported payload")
     return payload
+
+def inspect_container(path: str | Path, passphrase: str) -> dict:
+    """Authenticate/decrypt without materializing; return stable interop metadata."""
+    payload = _parse(Path(path).read_bytes(), passphrase)
+    return {
+        "payload_version": payload["payload_version"],
+        "files": sorted(payload["files"].keys()),
+        "plaintext_sha256": sha256_hex(canonical_json_bytes(payload)),
+    }
 
 def open_container(path: str | Path, destination: str | Path, passphrase: str) -> Store:
     """Authenticate, decrypt, safely materialize, then verify a .aleth file."""
