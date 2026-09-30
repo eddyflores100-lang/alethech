@@ -190,7 +190,7 @@ alethech/                    # this repo — cryptographic protocol only
 ├── CITATION.cff             # academic citation
 ├── LICENSE                  # MIT
 ├── README.md                # this file
-└── pyproject.toml           # alethech 0.9.0, deps: cryptography + click only
+└── pyproject.toml           # alethech 0.9.1, deps: cryptography + click only
 ```
 
 ## cross-language validation

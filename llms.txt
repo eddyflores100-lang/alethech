@@ -10,7 +10,7 @@ alethech is a Python package that provides cryptographically verifiable memory c
 
 - **Language**: Python 3.10+
 - **License**: MIT
-- **Version**: 0.9.0
+- **Version**: 0.9.1
 - **Dependencies**: cryptography + click (only 2)
 - **Tests**: 230 passing, 8 mutation-guard paths
 - **PyPI**: https://pypi.org/project/alethech/
