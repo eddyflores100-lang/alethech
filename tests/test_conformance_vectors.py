@@ -70,6 +70,13 @@ def _run_vector(vector: dict) -> str:
         ok = _verify_commit(input_data["identity"], input_data["commit"])
         return "verify_ok" if ok else "verify_fail"
 
+    elif input_type == "AgentIdDerivation":
+        try:
+            derived = crypto.derive_agent_id(input_data["public_key"])
+            return "verify_ok" if derived == input_data["expected_agent_id"] else "verify_fail"
+        except Exception:
+            return "verify_fail"
+
     elif input_type == "Identity":
         try:
             ident = Identity.from_dict(input_data["identity"])
