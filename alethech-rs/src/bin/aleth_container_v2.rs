@@ -722,9 +722,11 @@ fn cmd_migrate(
         fail("invalid v1 salt or nonce size");
     }
 
-    // Derive passphrase KEK using scrypt(32768, 8, 1)
+    // Derive passphrase KEK using scrypt(log_n=15, r=8, p=1) — matches the v2 reader.
+    // Note: Params::new takes log_n (the logarithm base 2 of N), not N itself.
+    // scrypt N=32768 = 2^15, so log_n=15.
     let mut key = [0u8; 32];
-    let params = Params::new(32768, 8, 1, 32).unwrap();
+    let params = Params::new(15, 8, 1, 32).unwrap_or_else(|_| fail("invalid scrypt params"));
     scrypt(old_passphrase.as_bytes(), &salt, &params, &mut key)
         .unwrap_or_else(|_| fail("scrypt failed"));
     let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
