@@ -79,6 +79,21 @@ alethech key revoke --key-id <id>          # revoke a key
 alethech migrate --to v0.2                  # migrate identity layer
 ```
 
+## capture a chat, carry the file
+
+Use the Alethech toolbar icon to capture the loaded conversation, review it, and
+create an encrypted `.aleth` with a new local identity and recovery code. Carry
+that file to another device, chat or IDE. The extension imports it and inserts
+selected context into an empty chat editor only on request; it never sends.
+For any text-capable client, export `context.txt`. MCP clients can use the local
+read-only memory connector. A single offline `alethech.html` also opens/creates
+files without installing an extension or registering an account.
+
+See [the complete capture and transfer guide](docs/CHAT_CAPTURE_FLOW.md) and
+[IDE/MCP setup](docs/IDE_MEMORY.md). Capture requires only `activeTab` and
+`scripting`, with no global host or storage permission. Rendered chat capture
+cannot retrieve a provider's hidden memories or unloaded conversation history.
+
 ## portable encrypted memory (`.aleth`)
 
 Alethech 0.9 development adds a single encrypted file designed for drag-and-drop transfer:

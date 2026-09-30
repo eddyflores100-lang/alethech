@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Alethech Portable Memory",
-  "version": "0.9.0",
-  "description": "Open and verify encrypted .aleth AI memory locally.",
+  "version": "0.9.1",
+  "description": "Capture reviewed chats and create, open and verify encrypted .aleth memory locally.",
   "action": {
     "default_title": "Alethech Memory",
     "default_popup": "popup.html",
@@ -19,5 +19,9 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ]
 }

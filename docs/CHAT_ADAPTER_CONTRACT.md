@@ -59,8 +59,10 @@ A bridge MUST NOT:
 - claim provider output is verified Alethech memory;
 - auto-sign provider output.
 
-Provider-specific permissions belong in the provider bridge, not in the
-permissionless Alethech core extension.
+The optional browser page bridge requests only `activeTab` and `scripting` for
+user-activated capture/insertion. It has no global host or storage permission;
+the cryptographic core remains local. Page text is an unsigned capture until
+the user reviews and signs it locally.
 
 ### 3. Writeback proposal
 

@@ -41,3 +41,4 @@ alethech-rs/target/
 extension/dist/
 alethech-wasm/target/
 scripts/browser-tests/node_modules/
+standalone/dist/

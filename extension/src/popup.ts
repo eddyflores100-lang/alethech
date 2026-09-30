@@ -1,3 +1,6 @@
+import { canonicalizeJson } from "../../alethech-ts/index.ts";
+import { createPortableMemory, MAX_CAPTURE_CONTENT_BYTES } from "../../alethech-ts/portable-create.ts";
+import { captureChatFromPage, insertContextIntoPage } from "./chat-page-bridge.ts";
 import initWasm, { open_aleth_payload, seal_aleth_payload, seal_aleth_v2, open_aleth_v2_recovery, recover_aleth_v2, generate_recovery_secret, rewrite_aleth_payload } from "./vendor/wasm/alethech_wasm.js";
 import { verifyPortablePayload, type PortablePayload, type VerifiedPortableView } from "../../alethech-ts/portable-verifier.ts";
 import { appendPortableMemory, canonicalPortablePayloadBytes } from "../../alethech-ts/portable-editor.ts";
@@ -105,6 +108,7 @@ function clearVerifiedState(): void {
   newMemory.value = "";
   saveButton.disabled = true;
   chatContext.value = "";
+  clearContextFile();
   chatContext.hidden = true;
   contextHint.hidden = true;
   providerRequest.value = "";
@@ -151,6 +155,8 @@ function finishOperation(token: number): void {
   recoveryInput.value = "";
   recoverNewPass.value = "";
   recoverConfirmPass.value = "";
+  capturePassphrase.value = "";
+  captureConfirmPassphrase.value = "";
   updateButtons();
 }
 function updateButtons(): void {
@@ -159,6 +165,12 @@ function updateButtons(): void {
   acceptWritebackButton.disabled = busy || !pendingWriteback;
   updateRekeyButton();
   updateRecoveryButtons();
+  captureButton.disabled = busy;
+  captureSave.disabled = busy || !captureReview.value.trim();
+  captureAppend.disabled = busy || !verifiedPayload || !captureReview.value.trim();
+  for (const id of ["insert-context", "copy-context", "download-context", "prepare-context"]) {
+    el<HTMLButtonElement>(id).disabled = busy || !verifiedView;
+  }
 }
 function downloadBlob(blob: Uint8Array, suffix: string, token: number): void {
   assertCurrent(token);
@@ -221,6 +233,8 @@ async function downloadUpdatedAleth(payload: PortablePayload, secret: string, su
     providerRequest.value = "";
     chatContext.value = "";
     chatContext.hidden = true;
+    contextHint.hidden = true;
+    clearContextFile();
     renderView(view);
     return output;
   } finally {
@@ -254,6 +268,8 @@ function choose(file: File | null): void {
   currentBlob = null;
   clearVerifiedState();
   passphrase.value = "";
+  capturePassphrase.value = "";
+  captureConfirmPassphrase.value = "";
   recoveryInput.value = "";
   recoverNewPass.value = "";
   recoverConfirmPass.value = "";
@@ -273,7 +289,7 @@ function choose(file: File | null): void {
 }
 
 fileInput.addEventListener("change", () => choose(fileInput.files?.[0] ?? null));
-newMemory.addEventListener("input", () => { saveButton.disabled = !verifiedPayload || !newMemory.value.trim(); });
+newMemory.addEventListener("input", updateButtons);
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
 drop.addEventListener("drop", (e) => {
@@ -340,6 +356,7 @@ prepareContextButton.addEventListener("click", () => {
     return;
   }
   chatContext.value = toContextText(verifiedView, { include_ids: ids });
+  refreshContextFile(chatContext.value);
   chatContext.hidden = false;
   contextHint.hidden = false;
   chatContext.focus();
@@ -435,6 +452,9 @@ selectAllButton.addEventListener("click", () => {
     input.checked = true;
   }
   status.className = "status";
+  chatContext.value = "";
+  chatContext.hidden = true;
+  clearContextFile();
   status.textContent = "All visible memories selected.";
 });
 
@@ -444,6 +464,9 @@ clearSelectionButton.addEventListener("click", () => {
     input.checked = false;
   }
   status.className = "status";
+  chatContext.value = "";
+  chatContext.hidden = true;
+  clearContextFile();
   status.textContent = "Memory sharing selection cleared.";
 });
 
@@ -543,3 +566,251 @@ recoverButton.addEventListener("click", async () => {
 });
 
 providerResponse.addEventListener("input", () => { pendingWriteback = null; acceptWritebackButton.disabled = true; writebackSummary.textContent = ""; });
+
+
+// Only activeTab and scripting are required; capture always follows a user click.
+type BrowserApi = {
+  tabs: { query(options: {active: boolean; currentWindow: boolean}): Promise<Array<{id?: number}>> };
+  scripting: { executeScript(options: {target: {tabId: number}; func: (...args: any[]) => any; args?: any[]}): Promise<Array<{result?: any}>> };
+};
+const browserApi = (globalThis as unknown as {chrome?: BrowserApi}).chrome;
+const browserAvailable = !!browserApi?.tabs?.query && !!browserApi?.scripting?.executeScript;
+const captureButton = el<HTMLButtonElement>("capture-chat");
+const captureReview = el<HTMLTextAreaElement>("capture-review");
+const captureSave = el<HTMLButtonElement>("capture-save");
+const captureAppend = el<HTMLButtonElement>("capture-append");
+const capturePassphrase = el<HTMLInputElement>("capture-passphrase");
+const captureConfirmPassphrase = el<HTMLInputElement>("capture-confirm-passphrase");
+const captureName = el<HTMLInputElement>("capture-name");
+const captureWarning = el<HTMLElement>("capture-warning");
+const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
+let captureMetadata: Record<string, unknown> = {provider: "manual", scope: "user-supplied-transcript"};
+let contextFileUrl: string | null = null;
+
+function clearContextFile(): void {
+  if (contextFileUrl) URL.revokeObjectURL(contextFileUrl);
+  contextFileUrl = null;
+  const link = el<HTMLAnchorElement>("context-file-link");
+  link.hidden = true;
+  link.removeAttribute("href");
+}
+function refreshContextFile(text: string): void {
+  clearContextFile();
+  contextFileUrl = URL.createObjectURL(new Blob([text], {type: "text/plain;charset=utf-8"}));
+  const link = el<HTMLAnchorElement>("context-file-link");
+  link.href = contextFileUrl;
+  link.download = "context.txt";
+  link.hidden = false;
+}
+function downloadText(text: string, name: string): void {
+  const url = URL.createObjectURL(new Blob([text], {type: "text/plain;charset=utf-8"}));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function reviewedCapture(): Record<string, unknown> {
+  const text = captureReview.value.trim();
+  const encoder = new TextEncoder();
+  if (encoder.encode(text).byteLength > MAX_TRANSCRIPT_BYTES) throw new Error("La conversación revisada supera el límite de 2 MiB. Reduce el texto antes de guardarlo.");
+  const messages: Array<{role: string; content: string}> = [];
+  const headers = Array.from(text.matchAll(/^(user|assistant|unknown):\s*$/gm));
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i];
+    const end = headers[i + 1]?.index ?? text.length;
+    const content = text.slice(header.index! + header[0].length, end).trim();
+    if (content) messages.push({role: header[1], content});
+  }
+  if (!messages.length || (headers[0]?.index ?? 0) > 0) {
+    messages.splice(0, messages.length, {role: "unknown", content: text});
+  }
+  const snapshot = {text, messages, capture: {...captureMetadata, reviewed_at: new Date().toISOString(), user_reviewed: true, attribution: "user-reviewed snapshot; page origin is not provider verification"}};
+  if (encoder.encode(canonicalizeJson(snapshot)).byteLength > MAX_CAPTURE_CONTENT_BYTES) throw new Error("El contenido de la memoria supera el límite de 8 MiB. Reduce la conversación antes de guardarla.");
+  return snapshot;
+}
+async function activeChatTab(): Promise<number> {
+  if (!browserAvailable) throw new Error("Esta acción necesita la extensión. Copia el contexto o descarga context.txt.");
+  const [tab] = await browserApi!.tabs.query({active: true, currentWindow: true});
+  if (tab?.id === undefined) throw new Error("No se encontró una pestaña activa.");
+  return tab.id;
+}
+captureReview.addEventListener("input", () => {
+  captureMetadata = {...captureMetadata, edited: true};
+  captureWarning.textContent = "Texto editado por ti. El origen indica la página capturada; no acredita la autoría ni la verificación del proveedor.";
+  updateButtons();
+});
+captureButton.addEventListener("click", async () => {
+  const token = startOperation();
+  if (token === null) return;
+  status.textContent = "Leyendo los mensajes cargados en esta página…";
+  try {
+    const tabId = await activeChatTab();
+    assertCurrent(token);
+    const [execution] = await browserApi!.scripting.executeScript({target: {tabId}, func: captureChatFromPage});
+    assertCurrent(token);
+    const captured = execution?.result as ReturnType<typeof captureChatFromPage> | undefined;
+    if (!captured?.messages?.length) throw new Error("No se encontraron mensajes. Pega o importa la conversación para continuar.");
+    captureReview.value = captured.messages.map(message => `${message.role}:\n${message.content}`).join("\n\n");
+    captureMetadata = {title: captured.title, url: captured.url, provider: captured.provider, captured_at: captured.captured_at, scope: captured.scope, warning: captured.warning ?? null};
+    el<HTMLElement>("capture-meta").textContent = `${captured.provider} · ${captured.title} · ${captured.url} · ${captured.captured_at}`;
+    captureWarning.textContent = captured.warning || "Solo mensajes cargados en la página. Revisa el resultado: puede faltar historial.";
+    captureName.value = captured.title.slice(0, 100) || "mi-memoria";
+    status.textContent = "Captura lista para revisar. Edita el texto antes de guardarlo.";
+    captureReview.focus();
+  } catch (error) { report(error, token); }
+  finally { finishOperation(token); }
+});
+el<HTMLInputElement>("transcript-file").addEventListener("change", async event => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || busy) return;
+  const token = startOperation();
+  if (token === null) return;
+  try {
+    if (file.size > MAX_TRANSCRIPT_BYTES) throw new Error("La conversación debe ser menor de 2 MiB.");
+    const text = await file.text();
+    assertCurrent(token);
+    if (!text.trim()) throw new Error("La conversación está vacía.");
+    captureReview.value = text;
+    captureMetadata = {provider: "manual", scope: "user-supplied-transcript", source_filename: file.name, captured_at: new Date().toISOString()};
+    captureName.value = file.name.replace(/\.(txt|json)$/i, "");
+    el<HTMLElement>("capture-meta").textContent = `Importado: ${file.name}`;
+    captureWarning.textContent = "Conversación importada. Revisa el texto completo y elimina lo que no quieras guardar.";
+    status.textContent = "Importación lista para revisar.";
+  } catch (error) { report(error, token); }
+  finally { finishOperation(token); }
+});
+captureSave.addEventListener("click", async () => {
+  if (busy || !captureReview.value.trim()) return;
+  const secret = capturePassphrase.value;
+  if (!secret || secret !== captureConfirmPassphrase.value) { report(new Error("Introduce una contraseña y repítela exactamente."), generation); return; }
+  let content: Record<string, unknown>;
+  try { content = reviewedCapture(); }
+  catch (error) { report(error, generation); return; }
+  const name = (captureName.value.trim().replace(/\.aleth$/i, "").replace(/[<>:"/\\|?*\x00-\x1f]/g, "-").slice(0,100) || "mi-memoria") + ".aleth";
+  const token = startOperation()!;
+  status.textContent = "Creando identidad local, firmando y cifrando la memoria…";
+  let plaintext: Uint8Array | null = null;
+  let sealed: Uint8Array | null = null;
+  try {
+    const payload = await createPortableMemory(content);
+    const view = await verifyPortablePayload(payload);
+    await ensureWasm();
+    assertCurrent(token);
+    plaintext = canonicalPortablePayloadBytes(payload);
+    const output = JSON.parse(seal_aleth_v2(plaintext, secret, generate_recovery_secret())) as SealResult;
+    if (!output.recovery_code) throw new Error("No se pudo crear el código de recuperación.");
+    sealed = decodeBlob(output.blob);
+    // Install the new container only after signing, verification and sealing succeed.
+    selectedFile = new File([sealed], name, {type: "application/octet-stream"});
+    downloadBlob(sealed, "", token);
+    clearVerifiedState();
+    verifiedPayload = payload;
+    verifiedView = view;
+    recoveryCodeText.value = output.recovery_code;
+    recoveryCodeDisplay.hidden = false;
+    rotatedRecoveryText.value = "";
+    rotatedRecoveryDisplay.hidden = true;
+    renderView(view);
+    result.hidden = false;
+    status.textContent = "Archivo .aleth descargado. Guarda también el código de recuperación por separado.";
+  } catch (error) { report(error, token); }
+  finally { plaintext?.fill(0); sealed?.fill(0); finishOperation(token); }
+});
+captureAppend.addEventListener("click", async () => {
+  if (busy || !verifiedPayload || !captureReview.value.trim()) return;
+  const secret = passphrase.value;
+  if (!secret) { report(new Error("Vuelve a introducir la contraseña de la memoria abierta."), generation); return; }
+  let content: Record<string, unknown>;
+  try { content = reviewedCapture(); }
+  catch (error) { report(error, generation); return; }
+  const payload = verifiedPayload;
+  const token = startOperation()!;
+  try {
+    const appended = await appendPortableMemory(payload, content, {source: "browser_capture_reviewed"});
+    assertCurrent(token);
+    await downloadUpdatedAleth(appended.payload, secret, "-updated", token);
+    status.textContent = "Conversación añadida y archivo descargado. Recuperación conservada.";
+  } catch (error) { report(error, token); }
+  finally { finishOperation(token); }
+});
+function contextForSharing(): string {
+  if (!verifiedView) throw new Error("Abre y verifica una memoria primero.");
+  const ids = selectedMemoryIds();
+  if (!ids.length) throw new Error("Selecciona al menos una memoria para compartir.");
+  const text = toContextText(verifiedView, {include_ids: ids});
+  chatContext.value = text;
+  chatContext.hidden = false;
+  contextHint.hidden = false;
+  refreshContextFile(text);
+  return text;
+}
+el<HTMLButtonElement>("insert-context").addEventListener("click", async () => {
+  if (busy) return;
+  const token = startOperation()!;
+  try {
+    const text = contextForSharing();
+    const tabId = await activeChatTab();
+    assertCurrent(token);
+    const [execution] = await browserApi!.scripting.executeScript({target: {tabId}, func: insertContextIntoPage, args: [text]});
+    assertCurrent(token);
+    if (!execution?.result?.ok) throw new Error(execution?.result?.reason || "No se pudo insertar. Copia el contexto o adjunta context.txt.");
+    status.textContent = "Contexto insertado como borrador. Revísalo y envíalo desde la IA cuando quieras.";
+  } catch (error) { report(error, token); }
+  finally { finishOperation(token); }
+});
+el<HTMLButtonElement>("copy-context").addEventListener("click", () => {
+  if (busy) return;
+  try {
+    contextForSharing();
+    chatContext.focus();
+    chatContext.select();
+    status.textContent = document.execCommand("copy") ? "Contexto copiado. Pégalo en otra IA o IDE." : "Selecciona el texto y cópialo manualmente.";
+  } catch (error) { report(error, generation); }
+});
+el<HTMLButtonElement>("download-context").addEventListener("click", () => {
+  if (busy) return;
+  try { downloadText(contextForSharing(), "context.txt"); status.textContent = "context.txt descargado para adjuntar a otra IA o IDE."; }
+  catch (error) { report(error, generation); }
+});
+el<HTMLAnchorElement>("context-file-link").addEventListener("dragstart", event => {
+  if (!contextFileUrl || busy) { event.preventDefault(); return; }
+  event.dataTransfer?.setData("DownloadURL", `text/plain:context.txt:${contextFileUrl}`);
+});
+el<HTMLButtonElement>("download-recovery-code").addEventListener("click", () => {
+  if (recoveryCodeText.value) downloadText(recoveryCodeText.value + "\n", "aleth-recovery-code.txt");
+});
+el<HTMLButtonElement>("download-rotated-recovery").addEventListener("click", () => {
+  if (rotatedRecoveryText.value) downloadText(rotatedRecoveryText.value + "\n", "aleth-recovery-code.txt");
+});
+if (!browserAvailable) {
+  document.body.classList.add("standalone");
+  captureButton.hidden = true;
+  el<HTMLButtonElement>("insert-context").hidden = true;
+  captureWarning.textContent = "Pega o importa una conversación, revisa el contenido y crea tu archivo .aleth local.";
+}
+document.addEventListener("change", event => {
+  if ((event.target as HTMLElement)?.classList?.contains("memory-select")) {
+    chatContext.value = "";
+    chatContext.hidden = true;
+    clearContextFile();
+  }
+});
+window.addEventListener("pagehide", () => {
+  generation++;
+  currentBlob?.fill(0);
+  currentBlob = null;
+  clearVerifiedState();
+  captureReview.value = "";
+  capturePassphrase.value = "";
+  captureConfirmPassphrase.value = "";
+  passphrase.value = "";
+  recoveryInput.value = "";
+  recoverNewPass.value = "";
+  recoverConfirmPass.value = "";
+  recoveryCodeText.value = "";
+  rotatedRecoveryText.value = "";
+});
+updateButtons();

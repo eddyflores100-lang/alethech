@@ -54,8 +54,9 @@ The build requires Rust, the `wasm32-unknown-unknown` target, Node.js and
 4. Save the downloaded file. Subsequent operations in that popup use the latest
    downloaded envelope and its current passphrase.
 
-All operations are local. No network/host permissions or browser storage are
-requested. Editing a v2 file preserves its version, container ID and recovery
+All operations are local. Current-tab capture/insertion uses `activeTab` and
+`scripting` only after user activation. No global host or browser storage
+permissions are requested. See [capture and transfer](CHAT_CAPTURE_FLOW.md). Editing a v2 file preserves its version, container ID and recovery
 slot. Choosing a different file invalidates unfinished operations and clears
 displayed secrets. Old independent file copies retain their original access
 credentials after a new file is created or rotated.

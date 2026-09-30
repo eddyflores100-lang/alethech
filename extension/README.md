@@ -118,3 +118,13 @@ Files larger than 512 MiB are rejected before reading them into memory.
 Rotation affects the newly downloaded file. Earlier copies remain decryptable
 with their earlier passphrases or recovery codes; local downloads cannot revoke
 existing copies. Closing the popup clears all in-memory state.
+
+## Capture and carry (0.9.1)
+
+The toolbar popup now captures the currently loaded conversation after a click,
+shows an editable review, creates a new independent `.aleth`, and downloads its
+recovery code separately. Only `activeTab` and `scripting` are requested; no global
+host permission, storage or automatic sending. The offline single HTML viewer
+works without the extension for import/paste, file creation and local verification.
+See [the full flow](../docs/CHAT_CAPTURE_FLOW.md). Earlier permissionless-client
+descriptions apply to the cryptographic file operations, before page capture.

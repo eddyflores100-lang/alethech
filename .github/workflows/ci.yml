@@ -54,8 +54,11 @@ jobs:
 
 
   windows-portability:
-    name: Windows portable memory
-    runs-on: windows-latest
+    name: Portable memory (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -64,8 +67,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
-      - name: Verify Windows seal, open, recovery and atomic output
-        run: python -m pytest tests/test_api.py tests/test_container.py tests/test_container_v2.py tests/test_container_atomic.py tests/test_container_cli.py tests/test_v2_public_boundaries.py tests/test_container_v2_golden.py -q
+      - name: Verify portable seal, open, recovery and IDE bridge
+        run: python -m pytest tests/test_api.py tests/test_container.py tests/test_container_v2.py tests/test_container_atomic.py tests/test_container_cli.py tests/test_v2_public_boundaries.py tests/test_container_v2_golden.py tests/test_mcp_memory.py -q
 
   cross-language:
     name: cross-language conformance
@@ -96,6 +99,9 @@ jobs:
 
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
+
+      - name: Verify browser-only creation across Python and TypeScript
+        run: npx --yes tsx@4.20.5 alethech-ts/portable-create-test.ts
 
       - name: Audit TypeScript ALETH002 writers
         run: npx --yes tsx alethech-ts/aleth-v2-writer-test.ts
@@ -517,13 +523,18 @@ jobs:
       - name: Build extension
         run: bash scripts/build_extension.sh
 
-      - name: Validate permissionless package
+      - name: Build offline desktop HTML and browser bridge fixture bundle
+        run: |
+          python scripts/build_standalone.py
+          npx --yes esbuild@0.25.10 extension/src/chat-page-bridge.ts --bundle --platform=browser --format=iife --global-name=AlethechChatBridge --outfile=extension/dist/chat-page-bridge-test.js
+
+      - name: Validate explicit current-tab permissions
         run: |
           node - <<'JS'
           const fs=require("fs");
           const m=JSON.parse(fs.readFileSync("extension/dist/manifest.json","utf8"));
           if (m.manifest_version !== 3) throw new Error("Manifest V3 required");
-          if ((m.permissions || []).length) throw new Error("Extension must not request permissions");
+          if (JSON.stringify([...(m.permissions || [])].sort()) !== JSON.stringify(["activeTab", "scripting"])) throw new Error("Only explicit current-tab capture permissions are allowed");
           if ((m.host_permissions || []).length) throw new Error("Extension must not request host permissions");
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
@@ -540,8 +551,20 @@ jobs:
           find extension/dist -maxdepth 3 -type f -print | sort
           test -s extension/dist/vendor/wasm/alethech_wasm_bg.wasm
 
-      - name: Exercise recovery in the actual browser extension
-        run: npm test --prefix scripts/browser-tests
+      - name: Exercise capture, transfer, desktop HTML and recovery in Chrome
+        run: |
+          node scripts/browser-tests/chat-page-bridge.mjs
+          npm test --prefix scripts/browser-tests
+
+      - name: Remove test fixture bundle from deliverable
+        run: rm extension/dist/chat-page-bridge-test.js
+
+      - name: Upload independent desktop HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: alethech-offline-desktop
+          path: standalone/dist/alethech.html
+          retention-days: 30
 
       - name: Upload extension package
         uses: actions/upload-artifact@v4

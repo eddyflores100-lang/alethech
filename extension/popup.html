@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -12,13 +12,34 @@
       <div class="mark">A</div>
       <div>
         <h1>Alethech</h1>
-        <p>Portable verified memory</p>
+        <p>Tu memoria, entre chats y herramientas</p>
       </div>
     </header>
 
+    <section class="capture-workspace">
+      <h2>¿Guardar este chat como memoria?</h2>
+      <p class="hint">Sin cuenta. Tú revisas el contenido y eliges qué guardar en tu archivo cifrado.</p>
+      <button id="capture-chat" type="button">Capturar el chat actual</button>
+      <p id="capture-meta" class="hint">Origen: conversación pegada o importada por ti.</p>
+      <p id="capture-warning" class="hint">Solo se captura el contenido cargado en la página. Revisa el resultado; puede faltar historial.</p>
+      <label for="transcript-file">O importa una conversación (.txt / .json, hasta 2 MiB)</label>
+      <input id="transcript-file" type="file" accept=".txt,.json,text/plain,application/json">
+      <label for="capture-review">Revisa, edita o pega aquí la conversación</label>
+      <textarea id="capture-review" rows="7" placeholder="Pega una conversación de cualquier IA (hasta 2 MiB)…"></textarea>
+      <label for="capture-name">Nombre del archivo</label>
+      <input id="capture-name" value="mi-memoria" maxlength="100">
+      <label for="capture-passphrase">Contraseña para el nuevo archivo</label>
+      <input id="capture-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+      <label for="capture-confirm-passphrase">Repite la contraseña</label>
+      <input id="capture-confirm-passphrase" type="password" autocomplete="new-password" spellcheck="false">
+      <button id="capture-save" type="button" disabled>Cifrar y descargar nuevo .aleth</button>
+      <button id="capture-append" type="button" disabled>Añadir a la memoria abierta</button>
+      <p class="hint">Para añadir a una memoria, ábrela abajo y vuelve a introducir su contraseña. El código de recuperación se conserva.</p>
+    </section>
+
     <section id="drop" class="drop" tabindex="0">
-      <strong>Drop your .aleth memory</strong>
-      <span>or choose a file</span>
+      <strong>Abre tu memoria .aleth</strong>
+      <span>Arrastra el archivo o selecciónalo</span>
       <input id="file" type="file" accept=".aleth,application/octet-stream">
     </section>
 
@@ -62,9 +83,13 @@
       <div id="memories" class="memories"></div>
 
       <section class="context-export">
-        <button id="prepare-context">Prepare chat context</button>
+        <button id="prepare-context">Preparar contexto seleccionado</button>
+        <button id="insert-context" type="button">Insertar contexto en el chat actual</button>
+        <button id="copy-context" type="button">Copiar contexto para otra IA o IDE</button>
+        <button id="download-context" type="button">Descargar context.txt</button>
+        <a id="context-file-link" draggable="true" hidden>Arrastra context.txt a una herramienta compatible</a>
         <textarea id="chat-context" rows="6" readonly hidden aria-label="Verified chat context"></textarea>
-        <p id="context-hint" class="hint" hidden>Verified memory only. Select and copy this text into any chat or compatible plugin.</p>
+        <p id="context-hint" class="hint" hidden>Texto sin cifrar: revisa qué compartes. La inserción solo prepara el borrador; pulsa Enviar en la IA cuando quieras. Para otras herramientas, copia o adjunta context.txt.</p>
       </section>
 
       <section class="provider-bridge">
@@ -100,7 +125,7 @@
         <div id="recovery-code-display" class="recovery-code" hidden>
           <label for="recovery-code-text">Your recovery code (shown once)</label>
           <textarea id="recovery-code-text" rows="3" readonly aria-label="Recovery code"></textarea>
-          <button id="copy-recovery-code" type="button">Copy</button>
+          <button id="copy-recovery-code" type="button">Copiar</button><button id="download-recovery-code" type="button">Descargar código .txt</button>
           <p class="hint">Save this somewhere safe. Anyone with this code can decrypt your memory.</p>
         </div>
         <button id="rotate-recovery" disabled>Rotate recovery code</button>
@@ -108,7 +133,7 @@
         <div id="rotated-recovery-display" class="recovery-code" hidden>
           <label for="rotated-recovery-text">New recovery code (shown once)</label>
           <textarea id="rotated-recovery-text" rows="3" readonly aria-label="New recovery code"></textarea>
-          <button id="copy-rotated-recovery" type="button">Copy</button>
+          <button id="copy-rotated-recovery" type="button">Copiar</button><button id="download-rotated-recovery" type="button">Descargar código .txt</button>
         </div>
       </section>
 
@@ -130,7 +155,7 @@
       </section>
     </section>
 
-    <footer>No network access. Nothing is uploaded.</footer>
+    <footer>Procesamiento local. Ningún contenido se envía automáticamente.</footer>
   </main>
   <script type="module" src="popup.js"></script>
 </body>
