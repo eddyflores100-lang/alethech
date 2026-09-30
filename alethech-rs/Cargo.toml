@@ -18,6 +18,8 @@ base64ct = { version = "1.6", features = ["alloc"] }
 hex = "0.4"
 thiserror = "1.0"
 rand = "0.8"
+aes-gcm = "0.10"
+scrypt = "0.11"
 
 [dev-dependencies]
 serde_json = "1.0"
@@ -25,3 +27,8 @@ serde_json = "1.0"
 [[bin]]
 name = "alethech-conf"
 path = "src/bin/conf.rs"
+
+
+[[bin]]
+name = "alethech-container"
+path = "src/bin/aleth_container.rs"
