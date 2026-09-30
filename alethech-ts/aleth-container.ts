@@ -60,8 +60,11 @@ async function collectFiles(root: string): Promise<Record<string,string>> {
   return files;
 }
 
-export async function sealAlethDirectory(source: string, output: string, passphrase: string): Promise<void> {
+export async function sealAlethPayload(payload: AlethPayload, output: string, passphrase: string): Promise<void> {
   if (!passphrase) throw new Error("passphrase must be non-empty");
+  if (payload.payload_version !== 1 || typeof payload.files !== "object" || payload.files === null) {
+    throw new Error("unsupported payload");
+  }
   const salt = randomBytes(16);
   const nonce = randomBytes(12);
   const header = {
@@ -70,8 +73,8 @@ export async function sealAlethDirectory(source: string, output: string, passphr
     scrypt_n:32768, scrypt_p:1, scrypt_r:8, version:1
   };
   const hb = Buffer.from(canonicalizeJson(header), "utf8");
-  const payload = { files: await collectFiles(source), payload_version: 1 };
   const plain = Buffer.from(canonicalizeJson(payload), "utf8");
+  if (plain.length > MAX_CONTAINER) throw new Error("payload too large");
   const keyBytes = await scrypt(passphrase, salt, 32, { N:32768, r:8, p:1, maxmem:64*1024*1024 }) as Buffer;
   const key = await subtle.importKey("raw", keyBytes, {name:"AES-GCM"}, false, ["encrypt"]);
   const encrypted = Buffer.from(await subtle.encrypt(
@@ -80,7 +83,14 @@ export async function sealAlethDirectory(source: string, output: string, passphr
     plain
   ));
   const len = Buffer.alloc(4); len.writeUInt32BE(hb.length, 0);
-  await writeFile(output, Buffer.concat([MAGIC, len, hb, encrypted]));
+  const blob=Buffer.concat([MAGIC, len, hb, encrypted]);
+  if(blob.length>MAX_CONTAINER) throw new Error("container too large");
+  await writeFile(output, blob);
+}
+
+export async function sealAlethDirectory(source: string, output: string, passphrase: string): Promise<void> {
+  const payload = { files: await collectFiles(source), payload_version: 1 };
+  await sealAlethPayload(payload, output, passphrase);
 }
 
 export async function openAleth(path: string, passphrase: string): Promise<AlethOpened> {
