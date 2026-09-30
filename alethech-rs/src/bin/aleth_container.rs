@@ -51,6 +51,36 @@ fn allowed_path(rel: &str) -> bool {
         )
 }
 
+fn decode_portable_name(name: &str) -> String {
+    // Python's urllib.parse.quote(value, safe="-._~") currently needs only
+    // these escapes for protocol IDs used as filenames. Preserve unknown
+    // escapes verbatim for backward compatibility.
+    name.replace("%3A", ":")
+        .replace("%3a", ":")
+        .replace("%25", "%")
+}
+
+fn logicalize_physical_path(rel: &str) -> String {
+    let parts: Vec<&str> = rel.split('/').collect();
+    if parts.len() != 2 {
+        return rel.to_string();
+    }
+    let dir = parts[0];
+    let name = parts[1];
+    if matches!(
+        dir,
+        "identities" | "commits" | "evidence" | "control_events" | "migrations" | "checkpoints"
+    ) && name.ends_with(".json")
+    {
+        let stem = &name[..name.len() - 5];
+        return format!("{dir}/{}.json", decode_portable_name(stem));
+    }
+    if dir == "artifacts" {
+        return format!("artifacts/{}", decode_portable_name(name));
+    }
+    rel.to_string()
+}
+
 fn walk_files(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
     let entries = fs::read_dir(dir).unwrap_or_else(|_| fail("failed to read source directory"));
     for entry in entries {
@@ -76,15 +106,16 @@ fn collect_files(root: &Path) -> Value {
     let mut files = Map::new();
     let mut total = 0usize;
     for path in paths {
-        let rel = path
+        let physical_rel = path
             .strip_prefix(root)
             .unwrap_or_else(|_| fail("source path escaped root"))
             .to_string_lossy()
             .replace(std::path::MAIN_SEPARATOR, "/");
 
-        if matches!(rel.as_str(), "keys/root.key" | "keys/recovery.key") {
+        if matches!(physical_rel.as_str(), "keys/root.key" | "keys/recovery.key") {
             continue;
         }
+        let rel = logicalize_physical_path(&physical_rel);
         if !allowed_path(&rel) {
             continue;
         }
