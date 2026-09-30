@@ -217,6 +217,18 @@ jobs:
           assert a["stale_rejected"] is True
           PY
 
+      - name: Verify local-only provider writeback acceptance
+        run: |
+          npx --yes tsx alethech-ts/provider-writeback-test.ts /tmp/interop.aleth interop-passphrase > /tmp/provider-writeback.json
+          python - <<'PY'
+          import json
+          w=json.load(open("/tmp/provider-writeback.json"))
+          assert w["commits_added"]==2
+          assert w["entries_after"]==w["entries_before"]+2
+          assert w["after_head"]!=w["before_head"]
+          assert w["stale_rejected"] is True
+          PY
+
       - name: Verify V2 portable memory in browser TypeScript verifier
         run: |
           python scripts/make_v2_portable_fixture.py /tmp/aleth-v2 /tmp/v2.aleth
