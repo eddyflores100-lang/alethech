@@ -28,7 +28,7 @@ fn fail(msg: &str) -> ! {
 
 fn allowed_path(rel: &str) -> bool {
     if rel.is_empty()
-        || rel.contains('\')
+        || rel.contains('\\')
         || rel.starts_with('/')
         || rel.split('/').any(|p| p.is_empty() || p == "." || p == "..")
     {
