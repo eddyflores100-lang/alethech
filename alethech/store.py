@@ -16,6 +16,7 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 from . import crypto
 from .objects import Identity, MemoryCommit, EvidenceCommit, Checkpoint
@@ -23,6 +24,37 @@ from .objects import Identity, MemoryCommit, EvidenceCommit, Checkpoint
 
 class StoreError(Exception):
     pass
+
+
+def portable_fs_name(value: str) -> str:
+    """Encode a protocol identifier into a filename safe across Windows/macOS/Linux.
+
+    Protocol identifiers (e.g. sha256:<hex>, did:alethech:...) remain unchanged
+    inside signed objects and .aleth logical paths. Only the local filesystem
+    representation is encoded.
+    """
+    if not isinstance(value, str) or not value:
+        raise StoreError("filesystem identifier must be a non-empty string")
+    return quote(value, safe="-._~")
+
+
+def logical_id_from_fs_name(value: str) -> str:
+    """Decode a portable filesystem name back into its logical protocol identifier."""
+    return unquote(value)
+
+
+def _id_path(directory: Path, identifier: str, suffix: str = "") -> Path:
+    """Return the preferred portable physical path for one protocol identifier."""
+    return directory / (portable_fs_name(identifier) + suffix)
+
+
+def _existing_id_path(directory: Path, identifier: str, suffix: str = "") -> Path:
+    """Resolve portable filename first, then legacy raw-ID filename for compatibility."""
+    portable = _id_path(directory, identifier, suffix)
+    if portable.exists():
+        return portable
+    legacy = directory / (identifier + suffix)
+    return legacy
 
 
 @dataclass
@@ -54,7 +86,7 @@ class Store:
     # ---------- identities ----------
 
     def write_identity(self, identity: Identity) -> None:
-        path = self.root / "identities" / f"{identity.agent_id}.json"
+        path = _id_path(self.root / "identities", identity.agent_id, ".json")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(identity.to_dict(), indent=2), encoding="utf-8")
 
@@ -121,7 +153,7 @@ class Store:
     # ---------- commits ----------
 
     def write_commit(self, commit: MemoryCommit) -> None:
-        path = self.root / "commits" / f"{commit.commit_id}.json"
+        path = _id_path(self.root / "commits", commit.commit_id, ".json")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(commit.to_signed_dict(), indent=2),
@@ -152,7 +184,7 @@ class Store:
     # ---------- evidence ----------
 
     def write_evidence(self, ev: EvidenceCommit) -> None:
-        path = self.root / "evidence" / f"{ev.commit_id}.json"
+        path = _id_path(self.root / "evidence", ev.commit_id, ".json")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(ev.to_signed_dict(), indent=2),
@@ -178,14 +210,14 @@ class Store:
     def write_artifact(self, data: bytes) -> str:
         """Write artifact bytes, return its hash identifier."""
         h = "sha256:" + crypto.sha256_hex(data)
-        path = self.root / "artifacts" / h
+        path = _id_path(self.root / "artifacts", h)
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
             path.write_bytes(data)
         return h
 
     def read_artifact(self, hash_id: str) -> bytes | None:
-        path = self.root / "artifacts" / hash_id
+        path = _existing_id_path(self.root / "artifacts", hash_id)
         if not path.is_file():
             return None
         return path.read_bytes()
@@ -194,7 +226,7 @@ class Store:
         adir = self.root / "artifacts"
         if not adir.is_dir():
             return set()
-        return {p.name for p in adir.iterdir() if p.is_file()}
+        return {logical_id_from_fs_name(p.name) for p in adir.iterdir() if p.is_file()}
 
 
 # ============================================================================
@@ -216,7 +248,7 @@ def load_root_authority(self) -> "RootAuthority":
 
 def write_identity_record_v2(self, identity: "IdentityRecordV2") -> None:
     """Store the IdentityRecordV2."""
-    path = self.root / "identities" / f"{identity.agent_id}.json"
+    path = _id_path(self.root / "identities", identity.agent_id, ".json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(identity.to_signed_dict(), indent=2), encoding="utf-8")
 
@@ -240,7 +272,7 @@ def load_identity_records_v2(self) -> dict:
 
 def write_control_event(self, event: "ControlEvent") -> None:
     """Store a ControlEvent."""
-    path = self.root / "control_events" / f"{event.commit_id}.json"
+    path = _id_path(self.root / "control_events", event.commit_id, ".json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(event.to_signed_dict(), indent=2), encoding="utf-8")
 
@@ -262,7 +294,7 @@ def load_control_events(self) -> dict:
 
 def write_migration_record(self, mig: "MigrationRecord") -> None:
     """Store a MigrationRecord."""
-    path = self.root / "migrations" / f"{mig.commit_id}.json"
+    path = _id_path(self.root / "migrations", mig.commit_id, ".json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(mig.to_signed_dict(), indent=2), encoding="utf-8")
 
