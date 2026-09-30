@@ -304,3 +304,34 @@ Do not implement ALETH002 until this contract is reviewed against:
 
 ALETH001 remains supported and valid. ALETH002 is an additive envelope version,
 not a reinterpretation of v1.
+
+
+## 15. Implementation gate review — PASS
+
+Reviewed against the current runtimes before implementation:
+
+- **Python**: the existing `cryptography` dependency already provides
+  HKDF-SHA256 and AES-GCM. No new Python dependency is required.
+- **Browser / TypeScript**: Web Crypto provides HKDF deriveBits/deriveKey and
+  AES-GCM in secure contexts. The extension already uses Web Crypto and remains
+  dependency-free at the JavaScript layer.
+- **Rust**: existing AES-GCM/scrypt/sha2 support is sufficient except for HKDF.
+  Use the RustCrypto `hkdf` crate rather than a custom implementation.
+- **Resource limits**: v2 inherits the v1 header/container/file-count/decoded
+  payload limits unless a later conformance revision tightens them.
+- **Downgrade handling**: readers dispatch strictly by 8-byte magic
+  (`ALETH001` vs `ALETH002`). A failed v2 parse MUST NOT retry the bytes as
+  v1.
+- **Migration**: v1 remains supported. v1 -> v2 is explicit and requires a
+  successful v1 unlock + protocol verification.
+
+Implementation order:
+
+1. Python reference + adversarial tests.
+2. Stable golden v2 fixture.
+3. TypeScript/WebCrypto open + seal + recovery.
+4. Rust open + seal + recovery.
+5. Browser extension recovery UX.
+6. Three-runtime conformance/mutation matrix.
+
+No protocol-object schema changes are required for ALETH002.
