@@ -428,7 +428,7 @@ fn open(path: &Path, mode: &str, credential: &str) {
 
 fn encode_recovery_secret(secret: &[u8]) -> String {
     assert!(secret.len() == 32, "recovery secret must be 32 bytes");
-    format!("{}{}", RECOVERY_PREFIX, Base64UrlUnpadded::encode_vec(secret).unwrap())
+    format!("{}{}", RECOVERY_PREFIX, Base64UrlUnpadded::encode_string(&secret))
 }
 
 fn wrap_dek(
@@ -471,13 +471,13 @@ fn build_passphrase_slot(
     json!({
         "id": slot_id,
         "kdf": "scrypt",
-        "nonce": Base64UrlUnpadded::encode_vec(&nonce).unwrap(),
-        "salt": Base64UrlUnpadded::encode_vec(&salt).unwrap(),
+        "nonce": Base64UrlUnpadded::encode_string(&nonce),
+        "salt": Base64UrlUnpadded::encode_string(&salt),
         "scrypt_n": 32768,
         "scrypt_p": 1,
         "scrypt_r": 8,
         "type": "passphrase",
-        "wrapped_key": Base64UrlUnpadded::encode_vec(&wrapped).unwrap(),
+        "wrapped_key": Base64UrlUnpadded::encode_string(&wrapped),
     })
 }
 
@@ -498,10 +498,10 @@ fn build_recovery_slot(
     json!({
         "id": slot_id,
         "kdf": "HKDF-SHA256",
-        "nonce": Base64UrlUnpadded::encode_vec(&nonce).unwrap(),
-        "salt": Base64UrlUnpadded::encode_vec(&salt).unwrap(),
+        "nonce": Base64UrlUnpadded::encode_string(&nonce),
+        "salt": Base64UrlUnpadded::encode_string(&salt),
         "type": "recovery-secret",
-        "wrapped_key": Base64UrlUnpadded::encode_vec(&wrapped).unwrap(),
+        "wrapped_key": Base64UrlUnpadded::encode_string(&wrapped),
     })
 }
 
@@ -530,7 +530,7 @@ fn seal_payload_v2(
             buf.to_vec()
         }
     };
-    let container_id_str = Base64UrlUnpadded::encode_vec(&cid).unwrap();
+    let container_id_str = Base64UrlUnpadded::encode_string(&cid);
 
     let mut dek = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut dek);
@@ -549,7 +549,7 @@ fn seal_payload_v2(
         "container_id": container_id_str,
         "format": "aleth",
         "payload_cipher": "AES-256-GCM",
-        "payload_nonce": Base64UrlUnpadded::encode_vec(&payload_nonce).unwrap(),
+        "payload_nonce": Base64UrlUnpadded::encode_string(&payload_nonce),
         "slots": slots,
         "version": 2,
     });
