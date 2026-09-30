@@ -1,6 +1,9 @@
 # ALETH Container Recovery / Unlock v2 — Draft
 
-Status: **design contract only; not implemented yet**.
+Status: **partially implemented**. Python supports seal, open, migration and
+recovery; TypeScript and Rust have envelope readers. Browser recovery/reseal UX
+and TypeScript/Rust writers remain pending. See
+[implementation status](ALETH002_PROGRESS.md) for verified scope.
 
 This document defines the next container-envelope evolution needed for
 passphrase recovery and future device unlock. It does not change the Alethech

@@ -1,7 +1,7 @@
 # alethech — Protocol Specification
 
 **Status**: CURRENT (rev 2 + rev 3 identity layer)
-**Version**: 0.8.5
+**Version**: 0.9.0
 **License**: MIT
 
 ## Overview

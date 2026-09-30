@@ -24,16 +24,15 @@ from alethech.store import Store
 
 
 @pytest.fixture
-def tmp_dirs():
+def tmp_dirs(tmp_path):
     """Create temp source and target directories."""
-    src = Path(tempfile.mkdtemp(prefix="alethech-import-src-"))
-    target = Path(tempfile.mkdtemp(prefix="alethech-import-tgt-")) / "alethech"
+    src = tmp_path / "source"
+    src.mkdir()
+    target = tmp_path / "target" / "alethech"
     # Initialize target store
     runner = CliRunner()
     runner.invoke(cli, ["--store", str(target), "init"])
     yield src, target
-    shutil.rmtree(src.parent, ignore_errors=True)
-    shutil.rmtree(target.parent.parent, ignore_errors=True)
 
 
 @pytest.fixture

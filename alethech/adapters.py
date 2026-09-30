@@ -122,11 +122,11 @@ def context_from_aleth(path: str, passphrase: str) -> dict[str, Any]:
     """
     import tempfile
     from pathlib import Path
-    from .container import open_container
+    from .api import Alethech
 
     with tempfile.TemporaryDirectory(prefix="alethech-drop-") as tmp:
-        store = open_container(path, Path(tmp) / "store", passphrase)
-        return build_memory_view(store).to_dict()
+        agent = Alethech.open_aleth(path, Path(tmp) / "store", passphrase)
+        return agent.context()
 
 
 def create_chat_envelope(view: VerifiedMemoryView) -> dict[str, Any]:

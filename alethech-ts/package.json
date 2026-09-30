@@ -1,6 +1,6 @@
 {
   "name": "alethech-ts",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "description": "Verifiable agent continuity protocol — Ed25519-signed memory commits, hash-linked DAG, key rotation with reachability guarantee. Zero dependencies. Web Crypto API only.",
   "main": "index.ts",
   "types": "index.ts",
