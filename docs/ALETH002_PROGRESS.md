@@ -24,7 +24,7 @@ recovery-code access. ALETH001 remains supported. See
 
 ## Validation
 
-The final local Python suite passes all 320 tests. TypeScript verification and
+The final local Python suite passes all 321 tests. TypeScript verification and
 writer regressions pass locally. Linux Python and the real browser extension
 passed the initial completion CI run; Rust compiled and passed its unit and CLI
 security tests. Final CI repeats all checks, including Windows, native WASM and
@@ -37,9 +37,9 @@ the independent rereview reported no residual critical or important findings.
 
 ## Operational boundaries
 
-Rust writer/recovery/migration commands require Python with the Alethech package
+Rust ALETH002 CLI read/write/recovery/migration commands require Python with the Alethech package
 for full protocol verification; missing verification support fails closed.
-The native Rust reader remains independent of Python. Browser operations are
+The ALETH001 envelope reader remains independent of Python. Browser operations are
 local and do not request network or storage permissions.
 
 Container recovery is distinct from identity/root governance. Old copies remain

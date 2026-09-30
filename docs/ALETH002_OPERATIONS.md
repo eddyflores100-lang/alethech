@@ -6,7 +6,16 @@ receive selected verified memories, not the encrypted envelope's credentials.
 
 ## Python CLI
 
-Install the package, then use `alethech container --help`. Commands prompt for
+Install the current repository version, then create your local identity:
+
+```bash
+git clone --branch codex/v090-completion https://github.com/eddyflores100-lang/alethech.git
+cd alethech
+python -m pip install .
+python -m alethech.cli --store ./memory-store init
+```
+
+No account registration is required. Use `alethech container --help`. Commands prompt for
 credentials without displaying them. For automation, pass credential files
 using the options listed by each command's `--help`.
 
@@ -59,11 +68,11 @@ recovery secret; `recover --rotate-recovery` and `migrate --replace-source` are
 explicit operations. SDK envelope readers authenticate/decode; writer
 operations verify signed history before any output replacement.
 
-TypeScript uses the portable protocol verifier. The Rust v2 writer invokes
+TypeScript uses the portable protocol verifier. The Rust v2 CLI invokes
 the matching installed/local Python Alethech verifier through a fixed local
 subprocess with payload on stdin. Python 3 and the package are required for
-Rust writer/recovery/migration operations; missing verification fails closed.
-The Rust envelope reader remains native. This dependency is explicit until
+Rust v2 reader/writer/recovery/migration operations; missing verification fails closed.
+The ALETH001 envelope reader remains native. This dependency is explicit until
 the Rust protocol verifier covers governance, migrations and checkpoints.
 
 ## Verification

@@ -262,6 +262,9 @@ function choose(file: File | null): void {
   recoveryCodeDisplay.hidden = true;
   rotatedRecoveryDisplay.hidden = true;
   selectedFile = file && file.size <= MAX_FILE_SIZE ? file : null;
+  // Reset native selection so choosing the same original file again emits change.
+  // The File object is retained above; generated outputs become the active source.
+  fileInput.value = "";
   filename.textContent = file ? file.name : "";
   result.hidden = true;
   status.className = file && !selectedFile ? "status error" : "status";

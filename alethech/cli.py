@@ -1084,8 +1084,6 @@ def import_(input_path: str, target_path: str | None,
     click.echo(f"continuity: {continuity}")
 
 
-if __name__ == "__main__":
-    cli()
 
 
 # ============================================================================
@@ -1640,3 +1638,7 @@ def container_upgrade(source, output, old_passphrase_file, new_passphrase_file, 
                 create_recovery=not no_recovery, replace_source=replace_source))
         click.echo(f'Upgraded {result}')
     _container_call(run)
+
+
+if __name__ == "__main__":
+    cli()

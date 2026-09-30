@@ -71,3 +71,20 @@ def test_recovery_save_failure_never_publishes_container(tmp_path, monkeypatch):
         '--recovery-output', str(code_file)], env={'ALETHECH_PASSPHRASE': 'secret'})
     assert result.exit_code != 0 and 'recovery save failed' in result.output
     assert output.read_bytes() == b'accepted output'
+
+
+def test_module_entrypoint_exposes_all_registered_commands():
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run([sys.executable, '-m', 'alethech.cli', '--help'],
+        capture_output=True, encoding="utf-8", env=env, check=False)
+    assert result.returncode == 0, result.stderr
+    for command in ('container', 'identity', 'key', 'migrate'):
+        assert command in result.stdout, result.stdout
+    result = subprocess.run([sys.executable, '-m', 'alethech.cli', 'container', '--help'],
+        capture_output=True, encoding="utf-8", env=env, check=False)
+    assert result.returncode == 0, result.stderr
+    for command in ('seal', 'open', 'rekey', 'recover', 'upgrade'):
+        assert command in result.stdout, result.stdout

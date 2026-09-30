@@ -131,6 +131,9 @@ try {
 
   // Recovery is reachable while locked, preserves the credential by default.
   await page.locator("#file").setInputFiles(join(temp, "v2.aleth"));
+  // Native selection is reset while the File object is held in memory, allowing
+  // the same original file to be explicitly selected again after a download.
+  assert.equal(await page.locator("#file").inputValue(), "");
   await page.locator("#recovery-input").fill(fixture.code);
   await page.locator("#recover-new-pass").fill("recovered-pass");
   await page.locator("#recover-confirm-pass").fill("recovered-pass");
