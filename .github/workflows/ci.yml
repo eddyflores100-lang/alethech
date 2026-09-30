@@ -74,8 +74,8 @@ jobs:
       - name: Install Python package
         run: pip install -e .
 
-      - name: Build Rust conformance helper
-        run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf
+      - name: Build Rust helpers
+        run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf --bin alethech-container
 
       - name: Run all three implementations
         run: python conformance/cross_language_check.py
@@ -83,22 +83,36 @@ jobs:
       - name: Generate Python portable container
         run: |
           python - <<'PY'
+          import json
           from alethech import Alethech
+          from alethech.container import inspect_container
           a = Alethech.initialize("/tmp/aleth-source")
-          a.commit({"interop": "python-to-typescript"})
+          a.commit({"interop": "python-to-typescript-rust"})
           a.seal("/tmp/interop.aleth", "interop-passphrase")
+          with open("/tmp/py-payload.json", "w") as f:
+              json.dump(inspect_container("/tmp/interop.aleth", "interop-passphrase"), f, sort_keys=True)
           PY
 
       - name: Open Python container in TypeScript
         run: |
           npx --yes tsx alethech-ts/aleth-container.ts /tmp/interop.aleth interop-passphrase > /tmp/ts-payload.json
+
+      - name: Open Python container in Rust
+        run: |
+          ./alethech-rs/target/release/alethech-container /tmp/interop.aleth interop-passphrase > /tmp/rs-payload.json
+
+      - name: Compare decrypted payload across Python, TypeScript, and Rust
+        run: |
           python - <<'PY'
           import json
-          p=json.load(open("/tmp/ts-payload.json"))
-          assert p["payload_version"] == 1
-          assert "HEAD" in p["files"]
-          assert "keys/signing.key" in p["files"]
-          assert "keys/root.key" not in p["files"]
-          assert "keys/recovery.key" not in p["files"]
-          assert len([x for x in p["files"] if x.startswith("commits/")]) == 2
+          py=json.load(open("/tmp/py-payload.json"))
+          ts=json.load(open("/tmp/ts-payload.json"))
+          rs=json.load(open("/tmp/rs-payload.json"))
+          assert py == ts == rs, (py, ts, rs)
+          assert py["payload_version"] == 1
+          assert "HEAD" in py["files"]
+          assert "keys/signing.key" in py["files"]
+          assert "keys/root.key" not in py["files"]
+          assert "keys/recovery.key" not in py["files"]
+          assert len([x for x in py["files"] if x.startswith("commits/")]) == 2
           PY
