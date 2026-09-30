@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Alethech Portable Memory",
-  "version": "0.9.1",
-  "description": "Guarda y cifra conversaciones de IA como memoria port\u00e1til .aleth. Sin cuenta, sin red, sin servidor.",
+  "version": "0.9.2",
+  "description": "Guarda y cifra conversaciones de IA como memoria portátil .aleth. Sin cuenta, sin red, sin servidor.",
   "action": {
-    "default_title": "Alethech Memory",
+    "default_title": "🧠 Guardar este chat como memoria",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
@@ -112,14 +112,8 @@
       "run_at": "document_idle"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "vendor/scrypt-js.min.js"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ]
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
 }

@@ -17,6 +17,8 @@
 
 [hidden]{display:none!important}.capture-workspace{padding:14px;background:#111d30;border:1px solid #344863;border-radius:14px;margin-bottom:18px}.capture-workspace h2{font-size:16px;margin:0 0 8px}.capture-workspace label{display:block;font-size:12px;color:#b5c4da;margin:12px 0 6px}.capture-workspace input,.capture-workspace textarea{width:100%;border:1px solid #425573;border-radius:8px;background:#08111e;color:#eef3fb;padding:10px;font:inherit;font-size:12px}.capture-workspace textarea{resize:vertical}.capture-workspace button{width:100%;border:0;border-radius:9px;background:#765cff;color:white;font-weight:700;padding:12px;margin-top:10px;cursor:pointer}.capture-workspace button:disabled{opacity:.45;cursor:not-allowed}.capture-workspace .hint,.context-export .hint{color:#a6b5cc;font-size:11px;line-height:1.5}.capture-workspace input:focus-visible,.capture-workspace textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #a995ff;outline-offset:2px}#capture-append{background:#284c43}#context-file-link{display:block;padding:10px;color:#b9aaff;font-size:12px}body.standalone{width:auto;min-width:320px}body.standalone main{max-width:720px;margin:auto}body.standalone .capture-workspace{margin-top:24px}
 
+.capture-summary{font-size:12px;line-height:1.5;color:#9ce8b7;padding:10px;background:#0a1921;border-radius:8px}details{margin:14px 0;border:1px solid #29384c;border-radius:10px;padding:10px}summary{cursor:pointer;font-size:12px;color:#b8c6db}details .drop{margin-top:12px}#capture-chat{background:#23364c;font-size:11px;padding:8px}#save-current-chat{font-size:15px;background:#1a9163}#capture-save{background:#1a9163}#existing-memory>summary{font-weight:600}body.standalone #capture-review{min-height:160px}
+
 body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
   <title>Alethech Memory</title>
 </head>
@@ -26,31 +28,38 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
       <div class="mark">A</div>
       <div>
         <h1>Alethech</h1>
-        <p>Tu memoria, entre chats y herramientas</p>
+        <p>Guardar el chat abierto · versión 0.9.2</p>
       </div>
     </header>
 
     <section class="capture-workspace">
-      <h2>¿Guardar este chat como memoria?</h2>
-      <p class="hint">Sin cuenta. Tú revisas el contenido y eliges qué guardar en tu archivo cifrado.</p>
-      <button id="capture-chat" type="button">Capturar el chat actual</button>
+      <h2 id="capture-heading">✋ ¿Quieres guardar este chat?</h2>
+      <p id="first-memory-help" class="hint">No necesitas un archivo previo. Al abrir el icono, leemos el chat de esta pestaña. Elige una contraseña y descargamos tu primera memoria cifrada.</p>
+      <p id="capture-summary" class="capture-summary" aria-live="polite">Preparando la captura del chat abierto…</p>
+      <button id="save-current-chat" type="button">Sí, guardar este chat</button>
+      <button id="capture-chat" type="button">Actualizar captura del chat</button>
       <p id="capture-meta" class="hint">Origen: conversación pegada o importada por ti.</p>
       <p id="capture-warning" class="hint">Solo se captura el contenido cargado en la página. Revisa el resultado; puede faltar historial.</p>
-      <label for="transcript-file">O importa una conversación (.txt / .json, hasta 2 MiB)</label>
-      <input id="transcript-file" type="file" accept=".txt,.json,text/plain,application/json">
+      <details id="manual-transcript">
+        <summary>Alternativa: importar una conversación exportada</summary>
+        <label for="transcript-file">Conversación (.txt / .json, hasta 2 MiB)</label>
+        <input id="transcript-file" type="file" accept=".txt,.json,text/plain,application/json">
+      </details>
       <label for="capture-review">Revisa, edita o pega aquí la conversación</label>
-      <textarea id="capture-review" rows="7" placeholder="Pega una conversación de cualquier IA (hasta 2 MiB)…"></textarea>
+      <textarea id="capture-review" rows="4" placeholder="Aquí aparecerá automáticamente el chat abierto. Puedes revisar y editar lo que guardarás."></textarea>
       <label for="capture-name">Nombre del archivo</label>
       <input id="capture-name" value="mi-memoria" maxlength="100">
       <label for="capture-passphrase">Contraseña para el nuevo archivo</label>
       <input id="capture-passphrase" type="password" autocomplete="new-password" spellcheck="false">
       <label for="capture-confirm-passphrase">Repite la contraseña</label>
       <input id="capture-confirm-passphrase" type="password" autocomplete="new-password" spellcheck="false">
-      <button id="capture-save" type="button" disabled>Cifrar y descargar nuevo .aleth</button>
+      <button id="capture-save" type="button" disabled>Cifrar este chat y descargar mi memoria</button>
       <button id="capture-append" type="button" disabled>Añadir a la memoria abierta</button>
       <p class="hint">Para añadir a una memoria, ábrela abajo y vuelve a introducir su contraseña. El código de recuperación se conserva.</p>
     </section>
 
+    <details id="existing-memory">
+      <summary>Ya tengo una memoria .aleth: abrir o recuperar</summary>
     <section id="drop" class="drop" tabindex="0">
       <strong>Abre tu memoria .aleth</strong>
       <span>Arrastra el archivo o selecciónalo</span>
@@ -64,7 +73,6 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     </section>
 
     <p id="filename" class="filename"></p>
-    <div id="status" class="status" aria-live="polite">No memory loaded.</div>
 
       <section class="recover-access">
         <h2>Recover access</h2>
@@ -79,7 +87,8 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
         <button id="recover-btn" disabled>Recover & download new .aleth</button>
         <p class="hint">The downloaded file will have the same memory history, signed by the same identity. Only the encryption changes.</p>
       </section>
-
+    </details>
+    <div id="status" class="status" aria-live="polite">Crea tu primera memoria desde el chat abierto; no necesitas seleccionar un archivo.</div>
 
     <section id="result" class="result" hidden>
       <div class="verified">✓ Verified locally</div>
@@ -329,6 +338,9 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     };
   }
   async function createCommit(agentId, keyId, parents, content, kp) {
+    parents = [...parents];
+    content = structuredClone(content);
+    const privateKey = kp.privateKey;
     const timestamp = utcNow();
     const signable = {
       type: "MemoryCommit",
@@ -349,13 +361,15 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     const signableWithId = { ...signable, commit_id: commitId };
     const canonicalWithId = canonicalizeJson(signableWithId);
     const signableBytes = new TextEncoder().encode(canonicalWithId);
-    const sig = await sign(kp.privateKey, signableBytes);
+    const sig = await sign(privateKey, signableBytes);
     return {
       ...signableWithId,
       signature: `ed25519:${bytesToBase64Url(sig)}`
     };
   }
   async function verifyCommit(commit, publicKeyBytes) {
+    commit = structuredClone(commit);
+    publicKeyBytes = new Uint8Array(publicKeyBytes);
     if (!commit.signature.startsWith("ed25519:")) return false;
     const sigB64 = commit.signature.slice(8);
     const sigBytes = base64UrlToBytes(sigB64);
@@ -597,7 +611,7 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     }
     return ordered;
   }
-  async function verifyPortableLegacyPayload(payload) {
+  async function verifyPortableLegacySnapshot(payload) {
     assertSupportedPayload(payload);
     const files = payload.files;
     const identityPaths = Object.keys(files).filter((p) => p.startsWith("identities/") && p.endsWith(".json"));
@@ -683,7 +697,7 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     }
     return { format: "alethech-memory-view", version: 1, head, entries };
   }
-  async function verifyPortableV2Payload(payload) {
+  async function verifyPortableV2Snapshot(payload) {
     assertSupportedPayload(payload);
     const files = payload.files;
     if (typeof files["root_authority.json"] !== "string") throw new Error("missing root authority");
@@ -880,6 +894,7 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
     return { format: "alethech-memory-view", version: 1, head, entries };
   }
   async function verifyPortablePayload(payload) {
+    payload = structuredClone(payload);
     const identityPaths = Object.keys(payload.files ?? {}).filter((p) => p.startsWith("identities/") && p.endsWith(".json"));
     const types = identityPaths.map((p) => {
       try {
@@ -888,8 +903,8 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
         return "";
       }
     });
-    if (types.includes("IdentityRecordV2")) return verifyPortableV2Payload(payload);
-    return verifyPortableLegacyPayload(payload);
+    if (types.includes("IdentityRecordV2")) return verifyPortableV2Snapshot(payload);
+    return verifyPortableLegacySnapshot(payload);
   }
 
   // alethech-ts/portable-editor.ts
@@ -966,6 +981,9 @@ body{width:auto;max-width:760px;margin:auto}main{padding:24px}</style>
   }
   async function appendPortableMemory(payload, content, options = {}) {
     if (!content || typeof content !== "object" || Array.isArray(content)) throw new Error("content must be an object");
+    payload = structuredClone(payload);
+    content = structuredClone(content);
+    options = structuredClone(options);
     const before = await verifyPortablePayload(payload);
     const privateKey = await importSigningKey(payload.files);
     const signer = await resolveCurrentSigner(payload, privateKey);
@@ -1876,6 +1894,8 @@ ${padded.match(/.{1,64}/g).join("\n")}
 
   // alethech-ts/provider-writeback.ts
   async function acceptWritebackProposal(payload, proposal) {
+    payload = structuredClone(payload);
+    proposal = structuredClone(proposal);
     validateWritebackProposal(proposal);
     const before = await verifyPortablePayload(payload);
     assertWritebackCurrent(proposal, before.head);
@@ -1912,6 +1932,15 @@ ${padded.match(/.{1,64}/g).join("\n")}
   }
 
   // alethech-ts/plugin-api.ts
+  function freezeSession(session) {
+    function freeze(value) {
+      if (!value || typeof value !== "object" || Object.isFrozen(value)) return;
+      for (const child of Object.values(value)) freeze(child);
+      Object.freeze(value);
+    }
+    freeze(session);
+    return session;
+  }
   function preparePluginRequest(session, provider, userInput, options = {}) {
     const context = toAlethechContext(session.view, options);
     const envelope2 = createChatEnvelope(context);
@@ -1924,10 +1953,10 @@ ${padded.match(/.{1,64}/g).join("\n")}
   }
   async function acceptPluginWriteback(session, proposal) {
     const accepted = await acceptWritebackProposal(session.payload, proposal);
-    return { payload: accepted.payload, view: accepted.view };
+    return freezeSession({ payload: accepted.payload, view: accepted.view });
   }
 
-  // extension/src/tmpnvdf5f58.ts
+  // extension/src/tmpmtihycde.ts
   var selectedFile = null;
   var wasmReady = null;
   var verifiedPayload = null;
@@ -2072,6 +2101,10 @@ ${padded.match(/.{1,64}/g).join("\n")}
     updateRekeyButton();
     updateRecoveryButtons();
     captureButton.disabled = busy;
+    el("save-current-chat").disabled = busy;
+    captureReview.readOnly = busy;
+    capturePassphrase.disabled = busy;
+    captureConfirmPassphrase.disabled = busy;
     captureSave.disabled = busy || !captureReview.value.trim();
     captureAppend.disabled = busy || !verifiedPayload || !captureReview.value.trim();
     for (const id of ["insert-context", "copy-context", "download-context", "prepare-context"]) {
@@ -2182,6 +2215,7 @@ ${padded.match(/.{1,64}/g).join("\n")}
     recoveryCodeDisplay.hidden = true;
     rotatedRecoveryDisplay.hidden = true;
     selectedFile = file && file.size <= MAX_FILE_SIZE ? file : null;
+    if (file) el("existing-memory").open = true;
     fileInput.value = "";
     filename.textContent = file ? file.name : "";
     result.hidden = true;
@@ -2568,30 +2602,54 @@ ${padded.match(/.{1,64}/g).join("\n")}
     captureWarning.textContent = "Texto editado por ti. El origen indica la p\xE1gina capturada; no acredita la autor\xEDa ni la verificaci\xF3n del proveedor.";
     updateButtons();
   });
-  captureButton.addEventListener("click", async () => {
+  function installCapturedChat(captured) {
+    if (!captured?.messages?.length) throw new Error("No se encontraron mensajes. Pega o importa la conversaci\xF3n para continuar.");
+    captureReview.value = captured.messages.map((message) => `${message.role}:
+${message.content}`).join("\n\n");
+    captureMetadata = { title: captured.title, url: captured.url, provider: captured.provider, captured_at: captured.captured_at, scope: captured.scope, warning: captured.warning ?? null };
+    el("capture-meta").textContent = `${captured.provider} \xB7 ${captured.title} \xB7 ${captured.url} \xB7 ${captured.captured_at}`;
+    captureWarning.textContent = captured.warning || "Solo mensajes cargados en la p\xE1gina. Revisa el resultado: puede faltar historial.";
+    captureName.value = captured.title.slice(0, 100) || "mi-memoria";
+    el("capture-summary").textContent = `\u2713 ${captured.messages.length} mensajes capturados de \xAB${captured.title}\xBB. No necesitas ning\xFAn archivo previo.`;
+    status.textContent = "Chat capturado. Revisa el texto, elige una contrase\xF1a y pulsa \xABCifrar este chat y descargar mi memoria\xBB.";
+  }
+  async function captureCurrentChat(automatic = false) {
     const token = startOperation();
-    if (token === null) return;
+    if (token === null) return false;
     status.textContent = "Leyendo los mensajes cargados en esta p\xE1gina\u2026";
     try {
-      const tabId = await activeChatTab();
+      const [tab] = await browserApi.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error("No se encontr\xF3 una pesta\xF1a de chat abierta.");
+      if (tab.url && /^(chrome-extension:|chrome:|edge:|about:)/.test(tab.url)) {
+        throw new Error("Abre tu conversaci\xF3n de IA y pulsa el icono \u270B de Alethech en esa pesta\xF1a. No necesitas crear ni seleccionar un archivo.");
+      }
+      const tabId = tab.id;
       assertCurrent(token);
       const [execution] = await browserApi.scripting.executeScript({ target: { tabId }, func: captureChatFromPage });
       assertCurrent(token);
       const captured = execution?.result;
-      if (!captured?.messages?.length) throw new Error("No se encontraron mensajes. Pega o importa la conversaci\xF3n para continuar.");
-      captureReview.value = captured.messages.map((message) => `${message.role}:
-${message.content}`).join("\n\n");
-      captureMetadata = { title: captured.title, url: captured.url, provider: captured.provider, captured_at: captured.captured_at, scope: captured.scope, warning: captured.warning ?? null };
-      el("capture-meta").textContent = `${captured.provider} \xB7 ${captured.title} \xB7 ${captured.url} \xB7 ${captured.captured_at}`;
-      captureWarning.textContent = captured.warning || "Solo mensajes cargados en la p\xE1gina. Revisa el resultado: puede faltar historial.";
-      captureName.value = captured.title.slice(0, 100) || "mi-memoria";
-      status.textContent = "Captura lista para revisar. Edita el texto antes de guardarlo.";
-      captureReview.focus();
+      if (!captured) throw new Error("No se recibi\xF3 la captura de la p\xE1gina.");
+      installCapturedChat(captured);
+      if (!automatic) captureReview.focus();
+      return true;
     } catch (error) {
       report(error, token);
+      if (token === generation) el("capture-summary").textContent = "No se pudo leer este chat. Puedes volver a capturarlo o pegar aqu\xED su conversaci\xF3n.";
+      return false;
     } finally {
       finishOperation(token);
     }
+  }
+  captureButton.addEventListener("click", () => {
+    void captureCurrentChat();
+  });
+  el("save-current-chat").addEventListener("click", async () => {
+    if (busy) return;
+    if (!captureReview.value.trim() && !await captureCurrentChat()) return;
+    capturePassphrase.focus();
+    capturePassphrase.scrollIntoView({ block: "center", behavior: "smooth" });
+    status.className = "status";
+    status.textContent = "Solo falta elegir una contrase\xF1a y repetirla. Despu\xE9s pulsa \xABCifrar este chat y descargar mi memoria\xBB.";
   });
   el("transcript-file").addEventListener("change", async (event) => {
     const input = event.target;
@@ -2610,6 +2668,7 @@ ${message.content}`).join("\n\n");
       captureName.value = file.name.replace(/\.(txt|json)$/i, "");
       el("capture-meta").textContent = `Importado: ${file.name}`;
       captureWarning.textContent = "Conversaci\xF3n importada. Revisa el texto completo y elimina lo que no quieras guardar.";
+      el("capture-summary").textContent = "Conversaci\xF3n importada: lista para crear tu primera memoria.";
       status.textContent = "Importaci\xF3n lista para revisar.";
     } catch (error) {
       report(error, token);
@@ -2756,8 +2815,13 @@ ${message.content}`).join("\n\n");
   if (!browserAvailable) {
     document.body.classList.add("standalone");
     captureButton.hidden = true;
+    el("save-current-chat").hidden = true;
     el("insert-context").hidden = true;
     captureWarning.textContent = "Pega o importa una conversaci\xF3n, revisa el contenido y crea tu archivo .aleth local.";
+    el("capture-heading").textContent = "\u270B Crea tu primera memoria";
+    el("first-memory-help").textContent = "Este archivo HTML no puede leer otra pesta\xF1a. Para capturar el chat autom\xE1ticamente, usa el icono de la extensi\xF3n en tu conversaci\xF3n. Aqu\xED puedes pegar un chat y cifrarlo sin tener ning\xFAn archivo previo.";
+    el("capture-summary").textContent = "Pega aqu\xED tu conversaci\xF3n para crear y descargar su memoria cifrada.";
+    captureReview.placeholder = "Pega aqu\xED tu chat. No necesitas un archivo de memoria previo.";
   }
   document.addEventListener("change", (event) => {
     if (event.target?.classList?.contains("memory-select")) {
@@ -2782,6 +2846,25 @@ ${message.content}`).join("\n\n");
     rotatedRecoveryText.value = "";
   });
   updateButtons();
+  if (browserAvailable) {
+    const pendingCapture = new URLSearchParams(location.hash.slice(1)).get("capture");
+    if (pendingCapture) {
+      const token = startOperation();
+      void (async () => {
+        try {
+          const response = await browserApi.runtime.sendMessage({ type: "alethech.take-capture", token: pendingCapture });
+          assertCurrent(token);
+          if (!response?.ok || !response.capture) throw new Error("La captura ya no est\xE1 disponible. Vuelve al chat y pulsa su cerebro flotante.");
+          installCapturedChat(response.capture);
+          history.replaceState(null, "", location.pathname);
+        } catch (error) {
+          report(error, token);
+        } finally {
+          finishOperation(token);
+        }
+      })();
+    } else void captureCurrentChat(true);
+  }
 })();
 </script>
 </body>

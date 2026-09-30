@@ -10,6 +10,21 @@ This is the TypeScript SDK that mirrors the Python and Rust implementations. All
 npm install alethech-ts
 ```
 
+## Portable integration scope
+
+The npm package currently ships the core `index.ts` primitives. The portable
+container, verifier, editor, provider writeback and plugin modules are repository
+integration sources used by the browser builds; they are not included in the npm
+package manifest.
+
+Async verification, commit signing, portable appends and accepted writeback use
+snapshots captured before their first await. Changes to caller-owned payloads,
+content, options or proposals after invocation do not change the operation.
+Plugin sessions returned by creation or acceptance are deeply frozen so their
+verified view stays paired with the retained payload. Create a new session or
+accept a proposal to advance it; editing the returned session throws in strict
+mode. Writeback still requires explicit user approval before acceptance.
+
 ## Quick start
 
 ```typescript

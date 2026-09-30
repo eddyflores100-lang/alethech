@@ -1,4 +1,4 @@
-# Alethech Browser Extension — development shell
+# Alethech Browser Extension — portable memory client
 
 This is the first local-only drag-and-drop client for the portable `.aleth`
 format.
@@ -11,11 +11,21 @@ Security boundary:
 4. The updated payload is verified again before WASM reseals a new encrypted .aleth file.
 5. Provider-neutral chat context is generated only from the verified memory view.
 
-The extension has **no global host or storage permissions**. Chat capture and
-insertion use only temporary `activeTab` access and `scripting` after user activation. It does
-not upload the file, passphrase, plaintext, or signing key. The passphrase is
-cleared after each unlock/reseal operation. No browser storage APIs are used;
-decrypted state exists only in the lifetime of the extension popup.
+The extension declares `activeTab` and `scripting` for explicit toolbar capture
+and insertion. Its manifest also registers an automatic content script on the
+listed URL patterns to display the floating brain. These site matches grant
+content-script access independently of temporary `activeTab`; they include chat,
+development sites, GitHub routes and localhost. There is no `storage` permission
+or global `host_permissions` entry, but this is not a permissionless extension.
+
+Conversation capture occurs on an explicit click. The brain opens an isolated
+extension page for review and file creation; passwords are entered only in the
+extension interface. File cryptography, history verification, signing and recovery
+run locally with WebCrypto and the bundled WASM. No browser storage APIs or upload
+services are used. Credentials are cleared after operations, and decrypted state
+exists only while the extension interface remains open. Downloads persist at the
+user's chosen destination. Sharing context with a provider is an explicit user
+choice and follows that provider's privacy policy. See [PRIVACY.md](PRIVACY.md).
 
 Current browser verifier scope is fail-closed and covers legacy V1 identities,
 IdentityRecordV2 + RootAuthority, ControlEvent governance, bilateral migrations,
@@ -120,12 +130,23 @@ Rotation affects the newly downloaded file. Earlier copies remain decryptable
 with their earlier passphrases or recovery codes; local downloads cannot revoke
 existing copies. Closing the popup clears all in-memory state.
 
-## Capture and carry (0.9.1)
+## Capture and carry (0.9.2)
 
-The toolbar popup now captures the currently loaded conversation after a click,
-shows an editable review, creates a new independent `.aleth`, and downloads its
-recovery code separately. Only `activeTab` and `scripting` are requested; no global
-host permission, storage or automatic sending. The offline single HTML viewer
-works without the extension for import/paste, file creation and local verification.
-See [the full flow](../docs/CHAT_CAPTURE_FLOW.md). Earlier permissionless-client
-descriptions apply to the cryptographic file operations, before page capture.
+The toolbar popup captures the currently loaded conversation after a click,
+shows an editable review, creates a new independent signed and verified `.aleth`,
+and offers its recovery code separately. Clicking the floating brain also captures
+the loaded page and opens an isolated extension page; it does not collect passwords
+inside the chat page. A new capture creates its own memory identity and history;
+appending to an already opened memory is a separate explicit operation.
+
+The manifest's URL patterns configure where the overlay appears. They do not
+certify tested integration with every named platform, and matching desktop IDE
+marketing sites does not give access to native IDE applications. Captures depend
+on loaded DOM content and provider layout; selected text or paste/import are
+fallbacks. The offline single HTML viewer supports import/paste, file creation,
+recovery, local verification and context export without the extension. It cannot
+read another tab. For desktop clients, use exported text or explicitly configure
+the local MCP bridge in [IDE_MEMORY.md](../docs/IDE_MEMORY.md).
+
+See [the full flow](../docs/CHAT_CAPTURE_FLOW.md). Site permission declarations
+are defined by the current manifest, including automatic overlay injection.

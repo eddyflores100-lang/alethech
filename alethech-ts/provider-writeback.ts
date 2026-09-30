@@ -36,6 +36,10 @@ export async function acceptWritebackProposal(
   payload: PortablePayload,
   proposal: AlethechWritebackProposal,
 ): Promise<AcceptedWriteback> {
+  // Snapshot before validation or any await: later provider/caller mutations
+  // must not replace the proposal that the user explicitly accepted.
+  payload=structuredClone(payload);
+  proposal=structuredClone(proposal);
   validateWritebackProposal(proposal);
 
   const before = await verifyPortablePayload(payload);

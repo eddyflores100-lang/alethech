@@ -29,12 +29,11 @@ npx --yes esbuild@0.25.10 "$ROOT/extension/src/popup.ts" \
   --external:./vendor/wasm/alethech_wasm.js \
   --outfile="$OUT/popup.js"
 
-# Build brain content script (IIFE, no WASM, bundles scrypt-js locally)
+# Content capture and isolated extension service worker, bundled locally.
 npx --yes esbuild@0.25.10 "$ROOT/extension/src/brain.ts" \
-  --bundle \
-  --platform=browser \
-  --format=iife \
-  --outfile="$OUT/brain.js"
+  --bundle --platform=browser --format=iife --outfile="$OUT/brain.js"
+npx --yes esbuild@0.25.10 "$ROOT/extension/src/background.ts" \
+  --bundle --platform=browser --format=esm --outfile="$OUT/background.js"
 
 cp "$ROOT/extension/manifest.json" "$OUT/manifest.json"
 cp "$ROOT/extension/popup.html" "$OUT/popup.html"
@@ -46,6 +45,3 @@ cp "$ROOT/extension/icon48.png" "$OUT/icon48.png" 2>/dev/null || true
 cp "$ROOT/extension/icon128.png" "$OUT/icon128.png" 2>/dev/null || true
 
 echo "Extension built at $OUT"
-
-# Copy scrypt-js for content script (brain.ts loads it via chrome.runtime.getURL)
-cp "$ROOT/extension/src/vendor/scrypt-js.min.js" "$OUT/vendor/scrypt-js.min.js"

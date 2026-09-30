@@ -3,208 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Alethech — Guardar conversación</title>
+<title>Alethech — Capturar y guardar un chat</title>
+<meta name="description" content="Guía para crear archivos .aleth cifrados y verificables con la extensión o el visor independiente.">
 <style>
-:root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e8edf6;background:#09101c}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:linear-gradient(180deg,#0b1322,#07101b);display:flex;justify-content:center;padding:20px}
-main{max-width:600px;width:100%}
-header{display:flex;gap:12px;align-items:center;margin-bottom:20px}
-.mark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:800;background:#7c5cff;color:white;box-shadow:0 0 30px #7c5cff55;flex-shrink:0}
-h1{font-size:18px;margin:0}
-header p{margin:2px 0 0;color:#8492a8;font-size:12px}
-label{display:block;font-size:13px;color:#94a1b5;margin-bottom:6px;margin-top:16px}
-textarea,input{width:100%;border-radius:10px;border:1px solid #29384c;background:#08111e;color:white;padding:12px;outline:none;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
-textarea{resize:vertical;min-height:180px}
-input{height:42px}
-textarea:focus,input:focus{border-color:#755dff}
-button{width:100%;height:46px;margin-top:12px;border:0;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s}
-.btn-primary{background:#7c5cff;color:white}
-.btn-primary:hover{background:#8a6fff}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}
-.btn-paste{background:#1d2a3d;color:#7de2a8;border:1px solid #29384c}
-.btn-paste:hover{border-color:#755dff}
-.status{margin-top:12px;border-radius:10px;padding:12px;background:#0d1726;font-size:13px;color:#aeb9ca;min-height:20px}
-.status.error{color:#ff9b9b;border:1px solid #6f3030}
-.status.success{color:#7de2a8;border:1px solid #1d9b6533}
-.hint{font-size:12px;color:#65758d;line-height:1.5;margin:8px 0 0}
-.step{display:flex;gap:10px;align-items:flex-start;margin:10px 0;padding:10px;background:#0d1726;border-radius:10px}
-.step-num{background:#7c5cff;color:white;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0}
-.step-text{font-size:13px;color:#aeb9ca;line-height:1.5}
-.step-text strong{color:#dce4f1}
-code{color:#7de2a8;background:#08111e;padding:2px 6px;border-radius:4px;font-size:12px}
-.result{margin-top:16px;padding:16px;background:#0d1726;border-radius:12px;border:1px solid #1d9b6544;display:none}
-.result.show{display:block}
-footer{text-align:center;color:#536279;font-size:11px;margin-top:20px}
+:root{font-family:system-ui,sans-serif;color:#e8edf6;background:#09101c;color-scheme:dark}*{box-sizing:border-box}body{margin:0;padding:32px 20px}main{max-width:680px;margin:auto}h1{font-size:28px}h2{font-size:20px;margin-top:32px}p,li{line-height:1.65;color:#b7c4d8}li{margin-bottom:10px}a{color:#a797ff}a:focus-visible{outline:3px solid #7de2a8;outline-offset:4px}.download{display:inline-block;padding:12px 18px;background:#7c5cff;color:white;border-radius:10px;text-decoration:none}code{color:#7de2a8}
 </style>
 </head>
-<body>
-<main>
-<header>
-<div class="mark">A</div>
-<div>
-<h1>Alethech</h1>
-<p>Guarda tu conversación como memoria cifrada</p>
-</div>
-</header>
-
-<div class="step">
-<div class="step-num">1</div>
-<div class="step-text">Ve a tu chat de IA. Selecciona todo el texto: <strong>Ctrl+A</strong> (oCmd+A en Mac). Copia: <strong>Ctrl+C</strong>.</div>
-</div>
-<div class="step">
-<div class="step-num">2</div>
-<div class="step-text">Vuelve aquí y pega el texto abajo. O click en <strong>"Pegar texto del portapapeles"</strong>.</div>
-</div>
-<div class="step">
-<div class="step-num">3</div>
-<div class="step-text">Pon una contraseña y descarga tu archivo <code>.aleth</code> cifrado.</div>
-</div>
-
-<label for="content">Tu conversación</label>
-<textarea id="content" placeholder="Pega aquí el texto de tu conversación con la IA…&#10;&#10;Puedes pegar desde ChatGPT, Claude, Gemini, o cualquier otra IA."></textarea>
-<button id="paste-btn" class="btn-paste" type="button">📋 Pegar texto del portapapeles</button>
-
-<label for="filename">Nombre del archivo</label>
-<input id="filename" value="mi-memoria" maxlength="100">
-
-<label for="passphrase">Contraseña (mínimo 8 caracteres)</label>
-<input id="passphrase" type="password" autocomplete="new-password" placeholder="Tu contraseña">
-
-<label for="confirm">Repite la contraseña</label>
-<input id="confirm" type="password" autocomplete="new-password" placeholder="Repite la contraseña">
-
-<button id="encrypt-btn" class="btn-primary" disabled>🔒 Cifrar y descargar .aleth</button>
-
-<div id="status" class="status">Esperando tu conversación…</div>
-
-<div id="result" class="result">
-<div style="color:#7de2a8;font-size:14px;font-weight:700;margin-bottom:8px;">✓ Listo. Tu memoria está cifrada.</div>
-<p class="hint">Tu archivo <code id="result-name"></code> está en tu carpeta de descargas.</p>
-<p class="hint">Guárdalo donde quieras — escritorio, USB, email. Ábrelo desde esta página o desde la extensión de Chrome.</p>
-<p class="hint"><strong style="color:#ff9b9b;">Si pierdes la contraseña, no hay forma de recuperar el archivo.</strong> Guárdala bien.</p>
-</div>
-
-<footer>Todo se cifra en tu navegador. Nada se envía a internet.</footer>
-</main>
-<script>
-const MAGIC = new TextEncoder().encode("ALETH001");
-const MAX_CONTAINER = 512 * 1024 * 1024;
-
-const $ = id => document.getElementById(id);
-const content = $("content"), filename = $("filename"), pass = $("passphrase"), confirm = $("confirm");
-const btn = $("encrypt-btn"), status = $("status"), result = $("result"), resultName = $("result-name");
-
-function updateBtn() {
-  btn.disabled = !content.value.trim() || pass.value.length < 8 || pass.value !== confirm.value;
-}
-[content, pass, confirm].forEach(e => e.addEventListener("input", updateBtn));
-
-$("paste-btn").addEventListener("click", async () => {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      content.value = text;
-      status.textContent = "Texto pegado. Revísalo y pon tu contraseña.";
-      status.className = "status success";
-      updateBtn();
-    } else {
-      status.textContent = "El portapapeles está vacío. Copia el texto de tu chat primero (Ctrl+C).";
-      status.className = "status error";
-    }
-  } catch (e) {
-    status.textContent = "No se pudo acceder al portapapeles. Pega manualmente con Ctrl+V.";
-    status.className = "status error";
-    content.focus();
-  }
-});
-
-function b64url(bytes) {
-  let s = "";
-  for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function canon(obj) {
-  if (obj === null) return "null";
-  if (typeof obj !== "object") return JSON.stringify(obj);
-  if (Array.isArray(obj)) return "[" + obj.map(canon).join(",") + "]";
-  return "{" + Object.keys(obj).sort().map(k => JSON.stringify(k) + ":" + canon(obj[k])).join(",") + "}";
-}
-
-let scryptLib = null;
-async function loadScrypt() {
-  if (scryptLib) return scryptLib;
-  await new Promise((res, rej) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/scrypt-js@3.0.1/scrypt.min.js";
-    s.onload = res; s.onerror = () => rej(new Error("No se pudo cargar el módulo de cifrado. ¿Sin internet?"));
-    document.head.appendChild(s);
-  });
-  scryptLib = window.scrypt;
-  return scryptLib;
-}
-
-btn.addEventListener("click", async () => {
-  const text = content.value.trim();
-  if (!text || pass.value.length < 8 || pass.value !== confirm.value) return;
-
-  btn.disabled = true;
-  status.className = "status";
-  status.textContent = "Cifrando… (unos segundos)";
-
-  try {
-    const payload = {
-      payload_version: 1,
-      files: {
-        "HEAD": b64url(new TextEncoder().encode("sha256:memory")),
-        "commits/memory.json": b64url(new TextEncoder().encode(JSON.stringify({
-          type: "MemoryCommit", version: 1, agent_id: "did:alethech:browser",
-          key_id: "key-browser", parents: [], timestamp: new Date().toISOString(),
-          session_id: crypto.randomUUID(), memory_type: "episodic",
-          content: { conversation: text.slice(0, 500000) },
-          provenance: { source: "browser", source_id: null, evidence_refs: [], confidence: 1.0 }
-        })))
-      }
-    };
-
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const nonce = crypto.getRandomValues(new Uint8Array(12));
-    const header = { cipher: "AES-256-GCM", format: "aleth", kdf: "scrypt", nonce: b64url(nonce), salt: b64url(salt), scrypt_n: 32768, scrypt_p: 1, scrypt_r: 8, version: 1 };
-    const headerBytes = new TextEncoder().encode(canon(header));
-    const payloadBytes = new TextEncoder().encode(canon(payload));
-
-    const scrypt = await loadScrypt();
-    const keyBytes = new Uint8Array(scrypt(new TextEncoder().encode(pass.value), salt, { N: 32768, r: 8, p: 1, dkLen: 32, maxmem: 64 * 1024 * 1024 }));
-
-    const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
-    const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce, additionalData: headerBytes, tagLength: 128 }, cryptoKey, payloadBytes));
-
-    const hlen = new Uint8Array(4);
-    new DataView(hlen.buffer).setUint32(0, headerBytes.length, false);
-
-    const blob = new Uint8Array(8 + 4 + headerBytes.length + encrypted.length);
-    blob.set(MAGIC, 0); blob.set(hlen, 8); blob.set(headerBytes, 12); blob.set(encrypted, 12 + headerBytes.length);
-
-    keyBytes.fill(0);
-
-    const name = (filename.value.trim() || "mi-memoria") + ".aleth";
-    const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
-    const a = document.createElement("a");
-    a.href = url; a.download = name; a.click();
-    URL.revokeObjectURL(url);
-
-    status.className = "status success";
-    status.textContent = "✓ Listo. Archivo descargado.";
-    resultName.textContent = name;
-    result.classList.add("show");
-    pass.value = ""; confirm.value = ""; updateBtn();
-  } catch (e) {
-    status.className = "status error";
-    status.textContent = "Error: " + (e.message || String(e));
-    btn.disabled = false;
-  }
-});
-</script>
-</body>
+<body><main>
+<p><a href="index.html">← Alethech</a></p>
+<h1>Tu conversación, en un archivo independiente</h1>
+<p>Un <code>.aleth</code> guarda el contenido que revisas, cifrado con tu contraseña y con un historial firmado que se verifica localmente. Esta página es una guía; no recibe conversaciones ni contraseñas.</p>
+<h2>Capturar desde el navegador</h2>
+<p><a class="download" href="downloads/alethech-extension-v0.9.2.zip" download>Descargar extensión v0.9.2</a></p>
+<ol>
+<li>Extrae el ZIP. En Chrome abre <code>chrome://extensions</code> (en Edge, <code>edge://extensions</code>), activa el modo desarrollador y carga la carpeta descomprimida.</li>
+<li>Abre tu chat. En los sitios configurados aparece un cerebro flotante; al pulsarlo se captura el contenido cargado y se abre una página aislada de la extensión. También puedes usar la captura del icono de la barra.</li>
+<li>Revisa el contenido, elige un nombre y escribe la contraseña en la interfaz de la extensión. Crea y descarga tu <code>.aleth</code> y guarda su código de recuperación por separado.</li>
+</ol>
+<p>La captura depende de la página y solo incluye contenido cargado. Los patrones de sitios configurados no certifican integraciones probadas. La extensión no accede a aplicaciones de escritorio ni al historial privado del proveedor.</p>
+<h2>Pegar o importar sin extensión</h2>
+<p><a class="download" href="downloads/alethech.html" download>Descargar visor HTML independiente</a></p>
+<p>Guarda <code>alethech.html</code> y ábrelo en un navegador moderno con WebCrypto Ed25519. Pega una conversación o importa texto, revísalo y crea tu archivo. El visor incluye el código y WASM necesarios para cifrar y verificar sin descargar código externo. También permite abrir un <code>.aleth</code>, recuperar su acceso y exportar contexto. No puede leer otras pestañas.</p>
+<p>Compartir contexto con otra IA requiere insertarlo, copiarlo o adjuntarlo desde el visor o la extensión y enviarlo tú. La firma prueba integridad y aceptación por tu identidad local; no prueba que el proveedor firmó el chat ni que el contenido sea verdadero.</p>
+<p><a href="docs/CHAT_CAPTURE_FLOW.md">Flujo completo y límites</a> · <a href="extension/PRIVACY.md">Privacidad y permisos</a></p>
+</main></body>
 </html>

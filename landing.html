@@ -20,7 +20,7 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="alethech — verifiable agent continuity protocol">
-<meta property="og:description" content="Ed25519-signed memory commits, hash-linked Merkle DAG, key rotation with reachability guarantee. 230 tests, 8 mutation-guard paths. MIT licensed.">
+<meta property="og:description" content="Ed25519-signed memory commits, hash-linked Merkle DAG, key rotation with reachability guarantee. Local verification and portable encrypted files. MIT licensed.">
 <meta property="og:url" content="https://alethech.alicelabs.site/">
 <meta property="og:site_name" content="alethech">
 <meta property="og:image" content="https://alethech.alicelabs.site/assets/screenshots/alethech-hero.png">
@@ -41,11 +41,11 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "alethech",
-  "description": "Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.",
+  "description": "Verifiable agent continuity protocol \u2014 Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.",
   "url": "https://alethech.alicelabs.site/",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Cross-platform",
-  "softwareVersion": "0.8.5",
+  "softwareVersion": "0.9.2",
   "license": "https://opensource.org/licenses/MIT",
   "programmingLanguage": "Python",
   "codeRepository": "https://github.com/eddyflores100-lang/alethech",
@@ -66,13 +66,7 @@
     "Reachability guarantee with mutation testing",
     "Offline verification (no network, no LLM)",
     "Atomic import (verify-then-write)"
-  ],
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "80",
-    "bestRating": "100",
-    "ratingCount": "1"
-  }
+  ]
 }
 </script>
 
@@ -1149,9 +1143,9 @@
     <p class="tagline">verifiable agent continuity protocol</p>
 
     <div class="stats">
-      <span>230 tests</span><span class="sep">·</span>
-      <span>8 mutation paths</span><span class="sep">·</span>
-      <span>v0.9.1</span><span class="sep">·</span>
+      <span>local verification</span><span class="sep">·</span>
+      <span>portable memory</span><span class="sep">·</span>
+      <span>v0.9.2</span><span class="sep">·</span>
       <span>MIT</span>
     </div>
 
@@ -1162,12 +1156,12 @@
     </div>
 
     <div style="margin-top:24px;">
-      <a href="downloads/alethech-extension-v0.9.1.zip" download
+      <a href="downloads/alethech-extension-v0.9.2.zip" download
          style="display:flex;align-items:center;gap:12px;padding:16px 24px;background:#7c5cff;color:white;border-radius:14px;text-decoration:none;font-weight:700;font-size:15px;width:fit-content;">
         <img src="downloads/alethech-icon-128.png" width="32" height="32" style="border-radius:8px;">
         <div>
           <div>Descargar extensión</div>
-          <div style="font-size:11px;font-weight:400;opacity:0.8;">Click → instala el icono en tu navegador</div>
+          <div style="font-size:11px;font-weight:400;opacity:0.8;">ZIP → extrae y carga en modo desarrollador</div>
         </div>
       </a>
     </div>
@@ -1176,15 +1170,15 @@
       <strong style="color:#aeb9ca;">Cómo usar la extensión:</strong><br>
       1. Click en <strong style="color:#7de2a8;">"Descargar extensión"</strong> — se baja un archivo ZIP<br>
       2. Descomprime el ZIP (click derecho → Extraer todo)<br>
-      3. Abre <code style="color:#7de2a8;">chrome://extensions</code> en Chrome o Edge<br>
+      3. Abre <code style="color:#7de2a8;">chrome://extensions</code> en Chrome o <code style="color:#7de2a8;">edge://extensions</code> en Edge<br>
       4. Activar <strong style="color:#aeb9ca;">Modo desarrollador</strong> (arriba a la derecha)<br>
       5. Click <strong style="color:#aeb9ca;">Cargar descomprimida</strong> → elegir la carpeta descomprimida<br>
       6. El icono <img src="downloads/alethech-icon-128.png" width="16" height="16" style="border-radius:3px;vertical-align:middle;"> aparece en la barra del navegador. Fíjalo (click en el pin).<br>
-      7. Abre cualquier chat de IA (ChatGPT, Claude, Gemini)<br>
-      8. Click en el icono → <strong style="color:#7de2a8;">"Guardar esta conversación"</strong><br>
-      9. Revisa el texto, pon contraseña, descarga tu <code style="color:#7de2a8;">.aleth</code> cifrado<br>
+      7. Abre tu chat de IA; la captura depende del contenido cargado y de la estructura del sitio<br>
+      8. Pulsa el cerebro flotante para abrir la captura en una página aislada de la extensión, o usa la captura del icono de la barra<br>
+      9. En la interfaz de la extensión revisa el texto, pon contraseña y descarga tu <code style="color:#7de2a8;">.aleth</code> cifrado<br>
       <br>
-      <em style="color:#536279;">¿No quieres instalar nada? <a href="capture.html" style="color:#7de2a8;">Pega tu conversación aquí</a> y cífrala sin extensión.</em>
+      <em style="color:#8492a8;">Sin extensión: <a href="downloads/alethech.html" download style="color:#7de2a8;">descarga el visor HTML independiente</a> para pegar/importar, cifrar y verificar localmente. <a href="capture.html" style="color:#7de2a8;">Ver guía y límites</a>.</em>
     </div>
   </div>
 </section>
@@ -1518,7 +1512,7 @@ result: OK"></pre>
 
     <aside class="marginalia" style="margin-top:2rem; max-width:100%;">
       <b>this is real Ed25519 + SHA-256 + JCS, running in your browser via Web Crypto API</b>
-      No backend, no simulation. Every command runs actual cryptography — real Ed25519 keypairs, real SHA-256 commits, real signature verification. Click the terminal and type. Export a bundle, paste it back into <code>alethech import</code>, and watch the verifier check every signature from public keys alone.
+      This standalone teaching demo uses WebCrypto for Ed25519 signatures and SHA-256 hashes. Click the terminal and type, or export and import its demo bundles. Its command set and verifier are limited to the demo format; it does not create encrypted .aleth files or implement the complete current portable-history verifier. Use the extension or independent HTML viewer for portable memory files.
     </aside>
   </div>
 </section>
@@ -1550,23 +1544,20 @@ result: OK"></pre>
       <div>
         <span class="merge-section__label">by the numbers</span>
         <dl class="stats-grid" id="stats-grid">
-          <div><dt>230</dt><dd>tests passing</dd></div>
-          <div><dt>8</dt><dd>mutation-guard paths</dd></div>
-          <div><dt>56</dt><dd>JCS conformance vectors</dd></div>
-          <div><dt>15</dt><dd>adversarial conformance vectors</dd></div>
-          <div><dt>9</dt><dd>CLI commands</dd></div>
-          <div><dt>4</dt><dd>cryptographic primitives (Ed25519, SHA-256, JCS, base32)</dd></div>
-          <div><dt>0</dt><dd>open issues</dd></div>
-          <div><dt>1</dt><dd>branch (main)</dd></div>
+          <div><dt>Ed25519</dt><dd>signed history</dd></div>
+          <div><dt>SHA-256</dt><dd>content addressing</dd></div>
+          <div><dt>JCS</dt><dd>canonical JSON</dd></div>
+          <div><dt>.aleth</dt><dd>encrypted portable container</dd></div>
+          <div><dt>local</dt><dd>file verification</dd></div>
           <div><dt>MIT</dt><dd>license</dd></div>
-          <div><dt>0.8.5</dt><dd>current version</dd></div>
+          <div><dt>0.9.2</dt><dd>extension download</dd></div>
         </dl>
       </div>
     </div>
 
     <aside class="marginalia" style="margin-top:2rem; max-width:100%;">
       <b>by design</b>
-      Every NOT here is a deliberate non-goal. alethech is a narrow tool — its strength is what it refuses to promise. The 0 open issues is a snapshot, not a promise. The 4 primitives are the entire cryptographic surface — nothing else is trusted.
+      These non-goals describe the continuity protocol. Portable .aleth containers add local encryption at rest. The repository includes tests; test counts and hosting issue totals are not live release guarantees. Verification establishes signed history and integrity, not the truth of its content.
     </aside>
   </div>
 </section>

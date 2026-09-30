@@ -8,10 +8,13 @@ no hay cuenta ni aplicación central obligatoria.
 ## Desde esta conversación
 
 1. Instala la extensión y fija su icono Alethech en la barra del navegador.
-2. Abre el chat y pulsa el icono. Elige **Capturar chat de esta pestaña**.
+2. Abre el chat y pulsa el cerebro flotante: captura el contenido cargado y abre una página aislada de la extensión. También puedes usar el icono de la barra: captura automáticamente al abrirlo; **Actualizar captura del chat** vuelve a leerlo.
 3. Revisa los mensajes capturados. Puedes borrar o editar contenido antes de guardarlo.
-4. Escribe un nombre, una contraseña y su confirmación. Pulsa **Crear y descargar .aleth**.
+4. En la interfaz aislada de la extensión escribe un nombre, una contraseña y su confirmación. Pulsa **Cifrar este chat y descargar mi memoria**. No debes seleccionar ningún archivo previo.
 5. Guarda el archivo en el escritorio y descarga el código de recuperación por separado.
+
+Cada captura nueva crea una identidad local y un historial independiente, firmado y
+verificado antes de cifrar. No se integra automáticamente en otro archivo abierto.
 
 La captura lee los mensajes renderizados y cargados en la pestaña. Reconoce
 estructuras de ChatGPT, Claude y Gemini y ofrece texto seleccionado o el contenido
@@ -42,7 +45,7 @@ su caja de adjuntos no le da capacidad de descifrarlo.
 
 ## Sin extensión: archivo HTML independiente
 
-Descarga `alethech.html`, guárdalo en el escritorio y ábrelo en un navegador moderno
+Descarga [alethech.html](../downloads/alethech.html), guárdalo en el escritorio y ábrelo en un navegador moderno
 con WebCrypto Ed25519. Contiene su interfaz y WASM; no descarga código ni contacta
 servidores. Arrastra un `.aleth`, o pega/importa una conversación para crear uno.
 Puedes verificar, continuar, recuperar y exportar contexto sin instalar extensión.
@@ -58,11 +61,20 @@ ni modifica el archivo. Un cliente debe ofrecer soporte MCP o aceptar texto.
 
 ## Permisos y procedencia
 
-La extensión declara únicamente `activeTab` y `scripting`: acceso temporal para
-capturar o insertar cuando activas su icono. No solicita permisos globales de
-sitios, almacenamiento ni lectura automática de otras pestañas. No hay servicios
-de red en el núcleo. El permiso de captura sustituye la antigua declaración de
-extensión sin permisos; el cifrado y la verificación siguen siendo locales.
+La extensión declara `activeTab` y `scripting` para captura e inserción desde
+el icono de la barra después de activarlo. También registra un `content_script`
+automático para mostrar el cerebro en los patrones del [manifiesto](../extension/manifest.json).
+Estos patrones autorizan acceso al sitio y no equivalen a acceso exclusivamente
+temporal de `activeTab`. No se usa almacenamiento del navegador; las descargas
+se guardan donde el usuario elige. El cifrado, la firma, la recuperación ALETH002
+y la verificación se ejecutan localmente, sin servicios de red en el núcleo.
+
+La lista de patrones de URL configura la aparición del cerebro; no acredita
+integraciones probadas con cada servicio. Incluye sitios de desarrollo, rutas
+de GitHub y localhost, que pueden contener páginas sin chat. Acceder al dominio
+web de un IDE no da acceso a su aplicación nativa: para ella se requiere texto
+exportado o configurar expresamente el conector MCP local. Las contraseñas nunca
+se piden en un formulario insertado dentro de la página del proveedor.
 
 La firma prueba que esta identidad local aceptó el contenido revisado y que el
 archivo conserva su integridad. No prueba que el proveedor firmó sus respuestas

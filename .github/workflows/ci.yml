@@ -100,6 +100,9 @@ jobs:
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
 
+      - name: Reject asynchronous caller mutations in verified SDK sessions
+        run: npx --yes tsx alethech-ts/async-snapshot-test.ts
+
       - name: Verify browser-only creation across Python and TypeScript
         run: npx --yes tsx@4.20.5 alethech-ts/portable-create-test.ts
 
@@ -539,6 +542,8 @@ jobs:
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
           if (!fs.existsSync("extension/dist/brain.js")) throw new Error("brain content script missing");
+          if (m.background?.service_worker !== "background.js" || !fs.existsSync("extension/dist/background.js")) throw new Error("isolated capture worker missing");
+          if ((m.web_accessible_resources || []).length) throw new Error("No page-accessible crypto resources allowed");
           const html=fs.readFileSync("extension/dist/popup.html","utf8");
           for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback","select-all-memories","clear-memory-selection","new-passphrase","confirm-passphrase","rekey","create-recovery","recovery-code-text","rotate-recovery","recovery-input","recover-new-pass","recover-confirm-pass","recover-btn"]) {
             if (!html.includes(`id="${id}"`)) throw new Error(`provider bridge control missing: ${id}`);
@@ -554,8 +559,21 @@ jobs:
 
       - name: Exercise capture, transfer, desktop HTML and recovery in Chrome
         run: |
+          node scripts/browser-tests/background.mjs
           node scripts/browser-tests/chat-page-bridge.mjs
           npm test --prefix scripts/browser-tests
+
+      - name: Verify publicly downloadable extension and desktop HTML in Chrome
+        run: |
+          python - <<'PY'
+          import os, json
+          from pathlib import Path
+          from zipfile import ZipFile
+          version=json.loads(Path("extension/manifest.json").read_text())["version"]
+          with ZipFile(f"downloads/alethech-extension-v{version}.zip") as archive:
+              archive.extractall(Path(os.environ["RUNNER_TEMP"])/"alethech-release-extension")
+          PY
+          ALETHECH_EXTENSION_DIR="$RUNNER_TEMP/alethech-release-extension" ALETHECH_STANDALONE_HTML="$GITHUB_WORKSPACE/downloads/alethech.html" node scripts/browser-tests/e2e.mjs
 
       - name: Remove test fixture bundle from deliverable
         run: rm extension/dist/chat-page-bridge-test.js
