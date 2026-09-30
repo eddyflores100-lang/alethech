@@ -95,7 +95,7 @@ jobs:
 
       - name: Open Python container in TypeScript
         run: |
-          npx --yes tsx alethech-ts/aleth-container.ts /tmp/interop.aleth interop-passphrase > /tmp/ts-payload.json
+          npx --yes tsx alethech-ts/aleth-container.ts open /tmp/interop.aleth interop-passphrase > /tmp/ts-payload.json
 
       - name: Open Python container in Rust
         run: |
@@ -115,4 +115,19 @@ jobs:
           assert "keys/root.key" not in py["files"]
           assert "keys/recovery.key" not in py["files"]
           assert len([x for x in py["files"] if x.startswith("commits/")]) == 2
+          PY
+
+
+      - name: Seal store in TypeScript and open in Python
+        run: |
+          npx --yes tsx alethech-ts/aleth-container.ts seal /tmp/aleth-source /tmp/ts-produced.aleth interop-passphrase
+          python - <<'PY'
+          from alethech import Alethech
+          source = Alethech.open("/tmp/aleth-source")
+          restored = Alethech.open_aleth("/tmp/ts-produced.aleth", "/tmp/from-ts", "interop-passphrase")
+          assert restored.head == source.head
+          assert restored.verify().ok
+          assert not (restored.path / "keys" / "root.key").exists()
+          assert not (restored.path / "keys" / "recovery.key").exists()
+          assert (restored.path / "keys" / "signing.key").exists()
           PY
