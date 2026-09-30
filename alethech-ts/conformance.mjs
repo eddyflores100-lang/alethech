@@ -12,7 +12,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { canonicalizeJson, verifyCommit } from "./index.ts";
+import { canonicalizeJson, verifyCommit, deriveAgentId } from "./index.ts";
 
 async function main() {
   const fixturePath = process.argv[2];
@@ -44,6 +44,22 @@ async function main() {
   const identityData = input.identity || {};
 
   const objType = commitData.type || "";
+
+  if (objType === "AgentIdDerivation") {
+    const pubJwk = commitData.public_key || {};
+    const pubBytes = base64UrlToBytes(pubJwk.x || "");
+    if (pubBytes.length !== 32) {
+      console.error(`error: public key is ${pubBytes.length} bytes, expected 32`);
+      process.exit(1);
+    }
+    const derived = await deriveAgentId(pubBytes);
+    if (derived !== commitData.expected_agent_id) {
+      console.error(`error: agent_id mismatch: ${derived}`);
+      process.exit(1);
+    }
+    process.stdout.write(derived);
+    process.exit(0);
+  }
 
   // Skip fixtures that test JCS canonicalization directly.
   if (objType === "JCSNumberTest" || objType === "UnicodeDistinctness") {
