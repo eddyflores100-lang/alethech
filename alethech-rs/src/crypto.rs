@@ -5,6 +5,7 @@ use sha2::{Sha256, Digest};
 use base64ct::{Base64UrlUnpadded, Encoding};
 use hex;
 use thiserror::Error;
+use crate::canonical::canonical_json;
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
@@ -122,7 +123,14 @@ pub fn b32lower_encode(data: &[u8]) -> String {
 /// Derive agent_id from a public key.
 /// agent_id = "did:alethech:" + base32(sha256(canonical_jwk(pk))[:16])
 pub fn derive_agent_id(public_key: &[u8; 32]) -> String {
-    let hash = sha256(public_key);
+    let x = b64url_encode(public_key);
+    let jwk = serde_json::json!({
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": x,
+    });
+    let canonical = canonical_json(&jwk);
+    let hash = sha256(canonical.as_bytes());
     let b32 = b32lower_encode(&hash[..16]);
     format!("did:alethech:{}", b32)
 }
@@ -184,6 +192,7 @@ mod tests {
         let id2 = derive_agent_id(&pk);
         assert_eq!(id1, id2);
         assert!(id1.starts_with("did:alethech:"));
+        assert_eq!(id1, "did:alethech:jcsjojphm7rtqmxq2hrrf7ooni");
     }
 
     #[test]
