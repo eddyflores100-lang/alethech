@@ -1,56 +1,48 @@
-# ALETH002 continuation — 2026-09-30
+# ALETH002 implementation — 2026-09-30
 
-Goal: one encrypted portable memory file, moved between devices and AI/chat
-adapters by drag and drop. No central application or key escrow is required.
+ALETH002 supports one encrypted portable memory file with local passphrase and
+recovery-code access. ALETH001 remains supported. See
+[operations](ALETH002_OPERATIONS.md) for CLI, SDK and browser usage.
 
-Baseline reviewed: `e401df3acd4791a4ad37d5c9a6d3b02a560e67da`.
+## Completed scope
 
-## Implemented in this continuation
+- Python, TypeScript and Rust readers, seal/recovery writers and explicit v1
+  migration. Migration protects source paths, symlinks and hard-link aliases.
+- Full verified-history checks before publishing writer/recovery output,
+  including non-HEAD ancestors, evidence and signing-key binding when present.
+- Same-directory atomic encrypted-file replacement, private staged files and
+  failed-write cleanup. Successful publication is not reported as failed because
+  an optional post-commit directory sync is unavailable.
+- Strict bounded parsing, canonical base64url, exact schemas, path restrictions
+  and rejection of malformed UTF-8. Recovery rejects ambiguous slot layouts.
+- Permissionless browser extension: locked recovery, explicit recovery setup
+  and rotation, v2-preserving append/writeback/rekey, and local context sharing.
+  File changes invalidate stale asynchronous operations.
+- Frozen reader/mutation matrix, three-writer interoperability matrix, Rust CLI
+  adversarial tests, native WASM tests and real Chromium extension tests in CI.
+- Windows portability regression coverage and a dedicated Windows CI job.
 
-- `drop_context` now uses the public version dispatcher for ALETH001/ALETH002.
-- Recovery performs full store verification before writing the replacement.
-  Regression tests reject an authenticated envelope carrying a forged commit
-  and prove both source and existing destination survive rejection.
-- Two historical test fixtures used parent-directory cleanup that deleted
-  `/tmp`. Both now use pytest-owned directories without broad cleanup.
-- A frozen synthetic ALETH002 vector covers passphrase/recovery reads, exact
-  payload equality, wrong credentials, tampering and truncation. CI requires
-  all three readers; pytest checks the recovered protocol history as well.
-- Updated the recovery specification's stale implementation status.
+## Validation
 
-## Evidence and decisions
+The final local Python suite passes all 320 tests. TypeScript verification and
+writer regressions pass locally. Linux Python and the real browser extension
+passed the initial completion CI run; Rust compiled and passed its unit and CLI
+security tests. Final CI repeats all checks, including Windows, native WASM and
+the complete cross-runtime matrices after the Node 20 test-launch correction.
+The pull request checks are the source of the final CI result.
 
-- Initial unmodified suite: 106 passed, 11 failed, 155 setup errors after the
-  unsafe fixture deleted `/tmp`. After repairing both fixtures: 272 passed.
-- New boundary regression tests: 3 failed and 1 passed before production
-  fixes; all 4 passed after fixes. Existing recovery tests also pass.
-- Final local suite: `python -m pytest -q` — 277 passed, no skips.
-- Frozen vector: Python 6/6 and TypeScript 6/6 accepted/rejected as expected.
-  TypeScript ran using Node 24 type stripping because the tsx CLI could not
-  create its IPC socket here. Rust is not installed locally; the all-runtime
-  CI gate is required before claiming Rust validation for this change.
-- Ruling: reuse `Alethech.open_aleth` in the drop adapter so version dispatch
-  stays in one place. The import is function-local to avoid import cycles.
-- Ruling: verify recovery with the same temporary-store verifier already used
-  by migration. This adds local disk I/O but enforces the documented contract.
-- Ruling: use a committed, frozen random envelope rather than replace secure
-  randomness in production with a deterministic test mode.
-- Publication review rejected the initial synthetic fixture because it carried
-  a disposable private signing key. The publication version excludes every
-  `keys/` entry and uses a public all-0xff recovery test value. It tests verified
-  read access, not signing continuity; no private signing keys are published.
-- Independent review: no critical/important findings. Minor deferred: make the
-  forged-history test explicitly target a non-HEAD ancestor; its current
-  selection proves verification is required but does not guarantee that case.
+Independent review identified atomic-publication, slot-preservation, snapshot,
+migration-alias, UTF-8 and platform issues. Regression fixes are implemented;
+the independent rereview reported no residual critical or important findings.
 
-## Remaining work
+## Operational boundaries
 
-1. TypeScript and Rust ALETH002 seal/recovery writers and cross-writer vectors.
-2. Browser extension recovery setup, unlock and local reseal UX without network
-   permissions, followed by browser end-to-end tests.
-3. Expanded mutation matrix for slots, schemas and size limits across readers.
-4. Atomic replacement/crash tests for encrypted output writes.
+Rust writer/recovery/migration commands require Python with the Alethech package
+for full protocol verification; missing verification support fails closed.
+The native Rust reader remains independent of Python. Browser operations are
+local and do not request network or storage permissions.
 
-These items are pending, not certified by the new reader matrix. Container
-recovery remains distinct from identity/root governance. Old file copies
-remain decryptable using their original credentials after rotation.
+Container recovery is distinct from identity/root governance. Old copies remain
+decryptable with their original credentials after rotation. Public conformance
+fixtures exclude private signing keys; signing tests create disposable keys at
+runtime. Context sharing is explicit and excludes private keys.

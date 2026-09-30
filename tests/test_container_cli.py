@@ -12,7 +12,10 @@ def test_cli_seal_open_rekey_recover_with_env_credentials(tmp_path):
         '--recovery-output', str(code_file)], env={'ALETHECH_PASSPHRASE': 'initial secret'})
     assert result.exit_code == 0, result.output
     code = code_file.read_text().strip()
-    assert code_file.stat().st_mode & 0o777 == 0o600
+    import os
+    assert code_file.is_file()
+    if os.name == "posix":
+        assert code_file.stat().st_mode & 0o777 == 0o600
     assert code not in result.output and 'initial secret' not in result.output
     rotated = tmp_path / 'rotated.aleth'
     result = runner.invoke(cli, ['container', 'rekey', str(source), str(rotated)], env={

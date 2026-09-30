@@ -99,11 +99,27 @@ try {
   assert.equal(appendedMeta.version, 2);
   assert.equal(appendedMeta.container_id, before.container_id);
   assert.notEqual(appendedMeta.head, before.head);
+  // A real unsigned provider proposal becomes signed only on explicit acceptance.
+  await page.locator("#provider-response").fill(JSON.stringify({
+    alethech_writeback: [{ memory_type: "semantic", content: { text: "accepted provider memory" }, confidence: 0.9 }],
+  }));
+  await page.locator("#review-writeback").click();
+  assert.equal(await page.locator("#accept-writeback").isEnabled(), true);
+  await page.locator("#passphrase").fill("initial-pass");
+  const writeback = await download("#accept-writeback");
+  const writebackMeta = inspect(writeback, "initial-pass", recovery);
+  assert.equal(writebackMeta.version, 2);
+  assert.equal(writebackMeta.container_id, before.container_id);
+  assert.notEqual(writebackMeta.head, appendedMeta.head);
+  assert.equal(writebackMeta.entries.length, appendedMeta.entries.length + 1);
+  assert(writebackMeta.entries.some(entry => entry.content.text === "accepted provider memory"));
+  assert.equal(await page.locator("#accept-writeback").isEnabled(), false);
+  assert.equal(await page.locator("#provider-response").inputValue(), "");
   await page.locator("#passphrase").fill("initial-pass");
   await page.locator("#new-passphrase").fill("next-pass");
   await page.locator("#confirm-passphrase").fill("next-pass");
   const rekeyed = await download("#rekey");
-  assert.equal(inspect(rekeyed, "next-pass", recovery).head, appendedMeta.head);
+  assert.equal(inspect(rekeyed, "next-pass", recovery).head, writebackMeta.head);
   await page.locator("#passphrase").fill("next-pass");
   const rotated = await download("#rotate-recovery");
   const newRecovery = await page.locator("#rotated-recovery-text").inputValue();
@@ -121,6 +137,37 @@ try {
   const recovered = await download("#recover-btn");
   assert.equal(inspect(recovered, "recovered-pass", fixture.code).head, fixture.head);
 
+  // Explicit locked recovery rotation retains identity/history and rejects the old code.
+  const originalV2 = inspect(join(temp, "v2.aleth"), "initial-pass", fixture.code);
+  await page.locator("#file").setInputFiles(join(temp, "v2.aleth"));
+  assert.equal(await page.locator("#result").isVisible(), false);
+  await page.locator("#recovery-input").fill(fixture.code);
+  await page.locator("#recover-new-pass").fill("rotated-recovered-pass");
+  await page.locator("#recover-confirm-pass").fill("rotated-recovered-pass");
+  await page.locator("#recover-rotate").check();
+  const recoveredRotated = await download("#recover-btn");
+  const rotatedCode = await page.locator("#rotated-recovery-text").inputValue();
+  assert.match(rotatedCode, /^aleth-recovery-v1:/);
+  assert.notEqual(rotatedCode, fixture.code);
+  const recoveredRotatedMeta = inspect(recoveredRotated, "rotated-recovered-pass", rotatedCode);
+  assert.equal(recoveredRotatedMeta.container_id, originalV2.container_id);
+  assert.equal(recoveredRotatedMeta.head, originalV2.head);
+  assert.deepEqual(recoveredRotatedMeta.entries, originalV2.entries);
+  assert.equal(python(`
+import sys,json
+from alethech.container import ContainerError
+from alethech.container_v2 import inspect_container_v2
+try:
+ inspect_container_v2(sys.argv[1],recovery_code=sys.argv[2])
+except ContainerError:
+ print(json.dumps(True))
+else:
+ print(json.dumps(False))
+`, [recoveredRotated, fixture.code]), true);
+  // Rotation does not revoke a previously retained file copy.
+  assert.equal(inspect(join(temp, "v2.aleth"), "initial-pass", fixture.code).head, fixture.head);
+  await page.locator("#recover-rotate").uncheck();
+
   // An authenticated but forged history must produce no downloadable output.
   await page.locator("#file").setInputFiles(join(temp, "forged.aleth"));
   await page.locator("#recovery-input").fill(fixture.badcode);
@@ -136,7 +183,7 @@ try {
   page.off("download", detect);
   assert.deepEqual(externalRequests, []);
   assert.equal(await page.locator("#recovery-input").inputValue(), "");
-  console.log("Browser: upgrade, append, passphrase rotation, recovery rotation, locked recovery, sharing and forged-history rejection passed");
+  console.log("Browser: upgrade, append, accepted provider writeback, passphrase rotation, recovery rotation, locked recovery preservation/rotation, old-code rejection, sharing and forged-history rejection passed");
 } finally {
   await context?.close();
   await rm(temp, { recursive: true, force: true });

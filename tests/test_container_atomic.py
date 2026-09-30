@@ -27,6 +27,7 @@ def test_encrypted_publication_failure_preserves_output(tmp_path, monkeypatch, o
     assert output.read_bytes() == b'accepted previous output'
     assert set(tmp_path.iterdir()) == before
 
+@pytest.mark.skipif(os.name != 'posix', reason='POSIX permission bits are not Windows ACLs')
 @pytest.mark.parametrize('v2', [False, True])
 def test_seal_publishes_private_file(tmp_path, v2):
     agent = Alethech.initialize(tmp_path / 'store')
@@ -173,7 +174,7 @@ def test_committed_output_returns_recovery_when_directory_fsync_fails(tmp_path, 
 
 def test_container_seal_and_open_without_posix_fchmod(tmp_path, monkeypatch):
     agent = Alethech.initialize(tmp_path / 'store')
-    monkeypatch.delattr(os, 'fchmod')
+    monkeypatch.delattr(os, 'fchmod', raising=False)
     source, code = agent.seal_v2(tmp_path / 'memory.aleth', 'secret')
     assert agent.open_aleth_v2(source, tmp_path / 'opened', recovery_code=code).head == agent.head
 
@@ -219,3 +220,31 @@ def test_recovery_rejects_authenticated_extra_slots_without_output_loss(tmp_path
     with pytest.raises(ContainerError, match='exactly one passphrase and one recovery'):
         Alethech.recover_aleth_v2(source, output, code, 'new')
     assert output.read_bytes() == b'accepted output'
+
+
+@pytest.mark.parametrize('v2', [False, True])
+@pytest.mark.parametrize('fail_replace', [False, True])
+def test_windows_existing_empty_destination_publication(tmp_path, monkeypatch, v2, fail_replace):
+    agent = Alethech.initialize(tmp_path / 'store')
+    source = tmp_path / 'memory.aleth'
+    if v2: agent.seal_v2(source, 'secret')
+    else: agent.seal(source, 'secret')
+    destination = tmp_path / 'opened'
+    destination.mkdir()
+    monkeypatch.setattr(container.sys, 'platform', 'win32')
+    real_replace = os.replace
+    def windows_replace(stage, target):
+        if target == destination:
+            assert not destination.exists(), 'Windows rename requires an absent destination'
+            if fail_replace:
+                raise OSError('Windows publication failure')
+        return real_replace(stage, target)
+    monkeypatch.setattr(os, 'replace', windows_replace)
+    before = set(tmp_path.iterdir())
+    if fail_replace:
+        with pytest.raises(OSError, match='Windows publication failure'):
+            agent.open_aleth(source, destination, 'secret')
+        assert destination.is_dir() and list(destination.iterdir()) == []
+        assert set(tmp_path.iterdir()) == before
+    else:
+        assert agent.open_aleth(source, destination, 'secret').head == agent.head

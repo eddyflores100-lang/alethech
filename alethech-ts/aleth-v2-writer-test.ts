@@ -105,7 +105,7 @@ try{
   await assert.rejects(sealAlethV2(payload,dir,"new-pass"));
   assert.equal((await readdir(dir)).filter(n=>n.includes(".tmp")).length,0);
   const payloadPath=join(dir,"payload.json");await writeFile(payloadPath,JSON.stringify(payload));
-  const cli=(...args:string[])=>JSON.parse(execFileSync(process.execPath,["--experimental-strip-types",new URL("./aleth-container-v2.ts",import.meta.url).pathname,...args],{encoding:"utf8"}));
+  const cli=(...args:string[])=>JSON.parse(execFileSync(process.execPath,[...process.execArgv,new URL("./aleth-container-v2.ts",import.meta.url).pathname,...args],{encoding:"utf8"}));
   for(const arg of [secret.toString("base64url"),vector.recovery_code]){
     const result=cli("seal",payloadPath,out,"cli-pass",arg);assert.equal(result.recoveryCode,vector.recovery_code);
   }

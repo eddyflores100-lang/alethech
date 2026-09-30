@@ -1,6 +1,6 @@
 """Encrypted portable .aleth container (draft v1 reference implementation)."""
 from __future__ import annotations
-import json, os, struct, shutil, tempfile
+import json, os, struct, shutil, tempfile, sys
 from pathlib import Path, PurePosixPath
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -330,7 +330,18 @@ def _materialize_payload(payload: dict, destination: Path) -> Store:
             raise ContainerError("decrypted store failed verification: " + report.summary())
         if "keys/signing.key" in decoded:
             _verify_portable_signing_key(store)
-        os.replace(stage, destination)
+        removed_empty_destination = False
+        if sys.platform == "win32" and destination.exists():
+            # Windows cannot replace an existing directory, even when empty.
+            # Remove it only after full validation; restore it on rename failure.
+            destination.rmdir()
+            removed_empty_destination = True
+        try:
+            os.replace(stage, destination)
+        except Exception:
+            if removed_empty_destination and not destination.exists():
+                destination.mkdir()
+            raise
         return Store.open(destination)
     finally:
         if stage.exists():
