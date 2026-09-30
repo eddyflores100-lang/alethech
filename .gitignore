@@ -36,3 +36,7 @@ htmlcov/
 *.alethech.tar
 *.checkpoint.json
 alethech-rs/target/
+
+# generated browser artifacts
+extension/dist/
+alethech-wasm/target/
