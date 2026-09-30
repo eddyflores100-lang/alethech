@@ -58,6 +58,20 @@ export interface PortableControlEvent {
   signature: string;
 }
 
+export interface PortableCheckpoint {
+  type: "Checkpoint";
+  version: number;
+  agent_id: string;
+  head_commit_id: string;
+  commit_count: number;
+  evidence_count: number;
+  sequence: number;
+  key_id: string;
+  created_at: string;
+  checkpoint_id: string;
+  signature: string;
+}
+
 export interface PortableMigrationRecord {
   type: "MigrationRecord";
   version: number;
@@ -202,6 +216,34 @@ async function verifyPortableSigningKeyV2(
   throw new Error("portable signing key does not match an active identity key");
 }
 
+async function verifyCheckpointRecord(
+  checkpoint: PortableCheckpoint,
+  publicBytes: Uint8Array,
+): Promise<boolean> {
+  if(!checkpoint.signature?.startsWith("ed25519:") || !checkpoint.checkpoint_id) return false;
+  const {signature,checkpoint_id,...body}=checkpoint as any;
+  const bodyBytes=new TextEncoder().encode(canonicalizeJson(body));
+  const expected=`sha256:${await sha256Hex(bodyBytes)}`;
+  if(checkpoint_id!==expected) return false;
+  // SignedObject.canonical_bytes_for_signing always inserts commit_id,
+  // although Checkpoint.to_signed_dict serializes that id as checkpoint_id.
+  const signedBytes=new TextEncoder().encode(canonicalizeJson({...body,commit_id:checkpoint_id}));
+  const sig=base64UrlToBytes(signature.slice(8));
+  if(sig.length!==64) return false;
+  const pub=await crypto.subtle.importKey("raw",publicBytes,{name:"Ed25519"},false,["verify"]);
+  return verify(pub,sig,signedBytes);
+}
+
+function checkpointCausallyCovered(
+  checkpoint: PortableCheckpoint,
+  currentHead: string,
+  commits: Map<string,MemoryCommit>,
+): boolean {
+  if(!commits.has(checkpoint.head_commit_id) || !commits.has(currentHead)) return false;
+  if(checkpoint.head_commit_id===currentHead) return true;
+  return ancestryCheck(checkpoint.head_commit_id,currentHead,commits);
+}
+
 async function verifyMigrationRecord(
   migration: PortableMigrationRecord,
   legacyBytes: Uint8Array,
@@ -268,11 +310,6 @@ function assertSupportedPayload(payload: PortablePayload): void {
   for (const path of Object.keys(payload.files)) {
     if (path === "keys/root.key" || path === "keys/recovery.key") {
       throw new Error("forbidden authority key in portable payload");
-    }
-    if (
-      path.startsWith("checkpoints/")
-    ) {
-      throw new Error(`unsupported browser verifier layer: ${path}`);
     }
     if (!safePath(path)) throw new Error(`invalid portable path: ${path}`);
   }
@@ -400,6 +437,17 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
 
   const head=decodeText(files.HEAD ?? "").trim();
   if(!head || !commits.has(head)) throw new Error("HEAD invalid");
+
+  const checkpointPaths=Object.keys(files).filter(p=>p.startsWith("checkpoints/")&&p.endsWith(".json")).sort();
+  for(const path of checkpointPaths){
+    const cp=parseJsonFile<PortableCheckpoint>(files,path);
+    if(cp.type!=="Checkpoint"||cp.version!==2) throw new Error(`unsupported checkpoint: ${path}`);
+    if(cp.agent_id!==identity.agent_id||cp.key_id!==identity.key_id) throw new Error(`checkpoint identity mismatch: ${path}`);
+    if(!(await verifyCheckpointRecord(cp,pubBytes))) throw new Error(`checkpoint signature invalid: ${path}`);
+    if(cp.commit_count>commits.size) throw new Error(`checkpoint commit count regression: ${path}`);
+    if(cp.evidence_count>evidence.size) throw new Error(`checkpoint evidence count regression: ${path}`);
+    if(!checkpointCausallyCovered(cp,head,commits)) throw new Error(`checkpoint continuity failed: ${path}`);
+  }
 
   const ordered=reachableParentFirst(head,commits);
   const entries:PortableMemoryEntry[]=[];
@@ -593,6 +641,26 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
 
   const head=decodeText(files.HEAD??"").trim();
   if(!head||!commits.has(head)) throw new Error("HEAD invalid");
+
+  const checkpointPaths=Object.keys(files).filter(p=>p.startsWith("checkpoints/")&&p.endsWith(".json")).sort();
+  for(const path of checkpointPaths){
+    const cp=parseJsonFile<PortableCheckpoint>(files,path);
+    if(cp.type!=="Checkpoint"||cp.version!==2||!cp.key_id) throw new Error(`unsupported checkpoint: ${path}`);
+    let checkpointPub:Uint8Array|undefined;
+    if(cp.agent_id===identity.agent_id){
+      const state=keyState.get(cp.key_id);
+      if(state) checkpointPub=jwkPublicBytes(state.public_key);
+    }else{
+      const legacy=legacyIdentities.get(cp.agent_id);
+      if(legacy?.key_id===cp.key_id) checkpointPub=jwkPublicBytes(legacy.public_key);
+    }
+    if(!checkpointPub) throw new Error(`checkpoint unknown signer: ${path}`);
+    if(!(await verifyCheckpointRecord(cp,checkpointPub))) throw new Error(`checkpoint signature invalid: ${path}`);
+    if(cp.commit_count>commits.size) throw new Error(`checkpoint commit count regression: ${path}`);
+    if(cp.evidence_count>evidence.size) throw new Error(`checkpoint evidence count regression: ${path}`);
+    if(!checkpointCausallyCovered(cp,head,commits)) throw new Error(`checkpoint continuity failed: ${path}`);
+  }
+
   const ordered=reachableParentFirst(head,commits);
   const entries:PortableMemoryEntry[]=[];
   for(const id of ordered){
