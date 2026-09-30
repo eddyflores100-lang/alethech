@@ -7,7 +7,7 @@ from alethech import crypto
 from alethech.api import Alethech
 from alethech.canonical import canonical_json_bytes
 from alethech.container import seal_store
-from alethech.objects import ControlEvent, IdentityRecordV2, MemoryCommit, RootAuthority
+from alethech.objects import Checkpoint, ControlEvent, IdentityRecordV2, MemoryCommit, RootAuthority
 from alethech.store import Store
 from alethech.verify import verify_store
 
@@ -95,6 +95,23 @@ def main() -> None:
         {"interop": "v2-browser"},
         evidence_refs=[ev.commit_id],
         session_id="v2-fixture",
+    )
+
+    checkpoint = Checkpoint(
+        agent_id=agent_id,
+        head_commit_id=store.read_head() or "",
+        commit_count=len(store.load_commits()),
+        evidence_count=len(store.load_evidence()),
+        sequence=1,
+        key_id="key-001",
+    )
+    checkpoint.sign(signing_key)
+    checkpoints_dir = store.root / "checkpoints"
+    checkpoints_dir.mkdir(exist_ok=True)
+    import json
+    (checkpoints_dir / "v2.checkpoint.json").write_text(
+        json.dumps(checkpoint.to_signed_dict(), indent=2),
+        encoding="utf-8",
     )
 
     report = verify_store(store)
