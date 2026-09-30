@@ -1,7 +1,7 @@
 // Portable .aleth v1 reader for Node.js.
 // Decrypts the exact container produced by the Python reference implementation.
 import { readFile } from "node:fs/promises";
-import { scrypt as scryptCb, webcrypto } from "node:crypto";
+import { createHash, scrypt as scryptCb, webcrypto } from "node:crypto";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCb);
@@ -19,7 +19,12 @@ export interface AlethPayload {
   files: Record<string, string>;
 }
 
-export async function openAleth(path: string, passphrase: string): Promise<AlethPayload> {
+export interface AlethOpened {
+  payload: AlethPayload;
+  plaintext_sha256: string;
+}
+
+export async function openAleth(path: string, passphrase: string): Promise<AlethOpened> {
   const blob = await readFile(path);
   if (blob.length > MAX_CONTAINER) throw new Error("container too large");
   if (blob.length < 12 || !blob.subarray(0, 8).equals(MAGIC)) throw new Error("invalid .aleth magic");
@@ -54,16 +59,17 @@ export async function openAleth(path: string, passphrase: string): Promise<Aleth
   if (payload.payload_version !== 1 || typeof payload.files !== "object" || payload.files === null) {
     throw new Error("unsupported payload");
   }
-  return payload;
+  return { payload, plaintext_sha256: createHash("sha256").update(Buffer.from(plain)).digest("hex") };
 }
 
 async function main(): Promise<void> {
   const [path, passphrase] = process.argv.slice(2);
   if (!path || !passphrase) throw new Error("usage: aleth-container.ts <file.aleth> <passphrase>");
-  const payload = await openAleth(path, passphrase);
+  const opened = await openAleth(path, passphrase);
   process.stdout.write(JSON.stringify({
-    payload_version: payload.payload_version,
-    files: Object.keys(payload.files).sort(),
+    payload_version: opened.payload.payload_version,
+    files: Object.keys(opened.payload.files).sort(),
+    plaintext_sha256: opened.plaintext_sha256,
   }));
 }
 
