@@ -79,3 +79,26 @@ jobs:
 
       - name: Run all three implementations
         run: python conformance/cross_language_check.py
+
+      - name: Generate Python portable container
+        run: |
+          python - <<'PY'
+          from alethech import Alethech
+          a = Alethech.initialize("/tmp/aleth-source")
+          a.commit({"interop": "python-to-typescript"})
+          a.seal("/tmp/interop.aleth", "interop-passphrase")
+          PY
+
+      - name: Open Python container in TypeScript
+        run: |
+          npx --yes tsx alethech-ts/aleth-container.ts /tmp/interop.aleth interop-passphrase > /tmp/ts-payload.json
+          python - <<'PY'
+          import json
+          p=json.load(open("/tmp/ts-payload.json"))
+          assert p["payload_version"] == 1
+          assert "HEAD" in p["files"]
+          assert "keys/signing.key" in p["files"]
+          assert "keys/root.key" not in p["files"]
+          assert "keys/recovery.key" not in p["files"]
+          assert len([x for x in p["files"] if x.startswith("commits/")]) == 2
+          PY
