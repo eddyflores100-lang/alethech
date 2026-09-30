@@ -77,6 +77,13 @@ jobs:
       - name: Build Rust helpers
         run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf --bin alethech-container
 
+      - name: Emit generated Rust lockfile for synchronization
+        run: |
+          echo "ALETHECH_LOCK_BEGIN"
+          base64 -w0 alethech-rs/Cargo.lock
+          echo
+          echo "ALETHECH_LOCK_END"
+
       - name: Run Rust SDK tests
         run: cargo test --manifest-path alethech-rs/Cargo.toml
 
