@@ -1,9 +1,10 @@
 """Real newline JSON-RPC subprocess tests for the local MCP memory bridge."""
 import json
 from pathlib import Path
-import select
+import queue
 import subprocess
 import sys
+import threading
 
 import pytest
 
@@ -31,13 +32,31 @@ class Client:
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         self.next_id = 0
+        self.responses = queue.Queue()
+        # Windows select() accepts sockets, not subprocess pipe handles. A
+        # single reader owns stdout on every platform and preserves line order.
+        self.reader = threading.Thread(target=self._read_responses, daemon=True)
+        self.reader.start()
+
+    def _read_responses(self):
+        try:
+            while True:
+                response = self.process.stdout.readline()
+                self.responses.put(response)
+                if not response:
+                    return
+        except Exception as exc:
+            self.responses.put(exc)
 
     def raw(self, line):
         self.process.stdin.write(line)
         self.process.stdin.flush()
-        ready, _, _ = select.select([self.process.stdout], [], [], 20)
-        assert ready, "MCP response timed out"
-        response = self.process.stdout.readline()
+        try:
+            response = self.responses.get(timeout=20)
+        except queue.Empty:
+            pytest.fail("MCP response timed out")
+        if isinstance(response, Exception):
+            pytest.fail("MCP response reader failed")
         assert response, "MCP process exited without a response"
         return json.loads(response)
 
@@ -55,10 +74,20 @@ class Client:
 
     def close(self):
         self.process.stdin.close()
-        self.process.wait(timeout=20)
-        stderr = self.process.stderr.read()
-        self.process.stdout.close()
-        self.process.stderr.close()
+        timed_out = False
+        try:
+            self.process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            self.process.kill()
+            self.process.wait(timeout=20)
+        finally:
+            self.reader.join(timeout=20)
+            stderr = self.process.stderr.read()
+            self.process.stdout.close()
+            self.process.stderr.close()
+        assert not timed_out, "MCP process did not exit after stdin closed"
+        assert not self.reader.is_alive(), "MCP response reader did not stop"
         assert self.process.returncode == 0
         assert stderr == b""
 

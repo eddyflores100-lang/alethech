@@ -11,7 +11,8 @@ Security boundary:
 4. The updated payload is verified again before WASM reseals a new encrypted .aleth file.
 5. Provider-neutral chat context is generated only from the verified memory view.
 
-The extension has **no host permissions and no network permissions**. It does
+The extension has **no global host or storage permissions**. Chat capture and
+insertion use only temporary `activeTab` access and `scripting` after user activation. It does
 not upload the file, passphrase, plaintext, or signing key. The passphrase is
 cleared after each unlock/reseal operation. No browser storage APIs are used;
 decrypted state exists only in the lifetime of the extension popup.

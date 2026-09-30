@@ -15,16 +15,21 @@ recovery-code access. ALETH001 remains supported. See
   an optional post-commit directory sync is unavailable.
 - Strict bounded parsing, canonical base64url, exact schemas, path restrictions
   and rejection of malformed UTF-8. Recovery rejects ambiguous slot layouts.
-- Permissionless browser extension: locked recovery, explicit recovery setup
+- Local browser extension: locked recovery, explicit recovery setup
   and rotation, v2-preserving append/writeback/rekey, and local context sharing.
   File changes invalidate stale asynchronous operations.
 - Frozen reader/mutation matrix, three-writer interoperability matrix, Rust CLI
   adversarial tests, native WASM tests and real Chromium extension tests in CI.
 - Windows portability regression coverage and a dedicated Windows CI job.
 
+- Toolbar chat capture with editable review and browser-only creation of a new
+  independent encrypted file; explicit context insertion and text export.
+- Single offline HTML viewer with embedded WASM and a bound read-only MCP bridge
+  for IDE clients. See [capture and transfer](CHAT_CAPTURE_FLOW.md).
+
 ## Validation
 
-The final local Python suite passes all 321 tests. TypeScript verification and
+The final local Python suite passes all 338 tests. TypeScript verification and
 writer regressions pass locally. Linux Python and the real browser extension
 passed the initial completion CI run; Rust compiled and passed its unit and CLI
 security tests. Final CI repeats all checks, including Windows, native WASM and
@@ -40,7 +45,8 @@ the independent rereview reported no residual critical or important findings.
 Rust ALETH002 CLI read/write/recovery/migration commands require Python with the Alethech package
 for full protocol verification; missing verification support fails closed.
 The ALETH001 envelope reader remains independent of Python. Browser operations are
-local and do not request network or storage permissions.
+local. Chat capture/insertion requests only activeTab and scripting after user
+activation; no global host or storage permission is requested.
 
 Container recovery is distinct from identity/root governance. Old copies remain
 decryptable with their original credentials after rotation. Public conformance
