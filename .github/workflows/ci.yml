@@ -168,3 +168,40 @@ jobs:
           assert not (restored.path / "keys" / "recovery.key").exists()
           assert (restored.path / "keys" / "signing.key").exists()
           PY
+
+
+  browser-extension:
+    name: browser extension package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Install pinned wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
+
+      - name: Build extension
+        run: bash scripts/build_extension.sh
+
+      - name: Validate permissionless package
+        run: |
+          node - <<'JS'
+          const fs=require("fs");
+          const m=JSON.parse(fs.readFileSync("extension/dist/manifest.json","utf8"));
+          if (m.manifest_version !== 3) throw new Error("Manifest V3 required");
+          if ((m.permissions || []).length) throw new Error("Extension must not request permissions");
+          if ((m.host_permissions || []).length) throw new Error("Extension must not request host permissions");
+          if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
+          if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
+          JS
+
+      - name: Smoke-check extension package contents
+        run: |
+          find extension/dist -maxdepth 3 -type f -print | sort
+          test -s extension/dist/vendor/wasm/alethech_wasm_bg.wasm
