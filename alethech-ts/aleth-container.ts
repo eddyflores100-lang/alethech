@@ -1,10 +1,11 @@
 // Portable .aleth v1 reader for Node.js.
 // Decrypts the exact container produced by the Python reference implementation.
 import { readFile } from "node:fs/promises";
-import { scrypt as scryptCb } from "node:crypto";
+import { scrypt as scryptCb, webcrypto } from "node:crypto";
 import { promisify } from "node:util";
 
 const scrypt = promisify(scryptCb);
+const subtle = globalThis.crypto?.subtle ?? webcrypto.subtle;
 const MAGIC = Buffer.from("ALETH001", "ascii");
 const MAX_HEADER = 16 * 1024;
 const MAX_CONTAINER = 512 * 1024 * 1024;
@@ -37,11 +38,11 @@ export async function openAleth(path: string, passphrase: string): Promise<Aleth
   if (encrypted.length < 16) throw new Error("truncated ciphertext");
 
   const keyBytes = await scrypt(passphrase, salt, 32, { N:32768, r:8, p:1, maxmem:64*1024*1024 }) as Buffer;
-  const key = await crypto.subtle.importKey("raw", keyBytes, {name:"AES-GCM"}, false, ["decrypt"]);
+  const key = await subtle.importKey("raw", keyBytes, {name:"AES-GCM"}, false, ["decrypt"]);
   // Python cryptography appends the 16-byte GCM tag to ciphertext; WebCrypto expects the same concatenation.
   let plain: ArrayBuffer;
   try {
-    plain = await crypto.subtle.decrypt(
+    plain = await subtle.decrypt(
       {name:"AES-GCM", iv:nonce, additionalData:hb, tagLength:128},
       key,
       encrypted
