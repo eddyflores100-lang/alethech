@@ -18,7 +18,7 @@ cargo build --manifest-path "$ROOT/alethech-wasm/Cargo.toml" --target wasm32-unk
 
 wasm-bindgen   "$ROOT/alethech-wasm/target/wasm32-unknown-unknown/release/alethech_wasm.wasm"   --target web   --out-dir "$WASM_OUT"
 
-npx --yes esbuild "$ROOT/extension/src/popup.ts"   --bundle   --platform=browser   --format=esm   --external:./vendor/wasm/alethech_wasm.js   --outfile="$OUT/popup.js"
+npx --yes esbuild@0.25.10 "$ROOT/extension/src/popup.ts"   --bundle   --platform=browser   --format=esm   --external:./vendor/wasm/alethech_wasm.js   --outfile="$OUT/popup.js"
 
 cp "$ROOT/extension/manifest.json" "$OUT/manifest.json"
 cp "$ROOT/extension/popup.html" "$OUT/popup.html"
