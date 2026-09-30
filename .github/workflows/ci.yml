@@ -496,7 +496,7 @@ jobs:
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
           const html=fs.readFileSync("extension/dist/popup.html","utf8");
-          for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback","select-all-memories","clear-memory-selection","new-passphrase","confirm-passphrase","rekey"]) {
+          for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback","select-all-memories","clear-memory-selection","new-passphrase","confirm-passphrase","rekey","create-recovery","recovery-code-text","rotate-recovery","recovery-input","recover-new-pass","recover-confirm-pass","recover-btn"]) {
             if (!html.includes(`id="${id}"`)) throw new Error(`provider bridge control missing: ${id}`);
           }
           const js=fs.readFileSync("extension/dist/popup.js","utf8");
@@ -507,3 +507,10 @@ jobs:
         run: |
           find extension/dist -maxdepth 3 -type f -print | sort
           test -s extension/dist/vendor/wasm/alethech_wasm_bg.wasm
+
+      - name: Upload extension package
+        uses: actions/upload-artifact@b4b0dc411a4cb8f50d1c6f6b1a08ce4a4e33c4f1 # v4.4.0
+        with:
+          name: alethech-browser-extension
+          path: extension/dist/
+          retention-days: 30
