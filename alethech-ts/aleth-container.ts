@@ -57,9 +57,19 @@ export async function openAleth(path: string, passphrase: string): Promise<Aleth
   return payload;
 }
 
-if (process.argv[1]?.endsWith("aleth-container.ts")) {
+async function main(): Promise<void> {
   const [path, passphrase] = process.argv.slice(2);
   if (!path || !passphrase) throw new Error("usage: aleth-container.ts <file.aleth> <passphrase>");
   const payload = await openAleth(path, passphrase);
-  process.stdout.write(JSON.stringify({payload_version:payload.payload_version, files:Object.keys(payload.files).sort()}));
+  process.stdout.write(JSON.stringify({
+    payload_version: payload.payload_version,
+    files: Object.keys(payload.files).sort(),
+  }));
+}
+
+if (process.argv[1]?.endsWith("aleth-container.ts")) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
 }
