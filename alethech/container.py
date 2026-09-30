@@ -118,12 +118,35 @@ def _verify_portable_signing_key(store: Store) -> None:
         raise ContainerError("signing key does not match identity")
 
 
-def _seal_payload_bytes(payload: dict, passphrase: str) -> bytes:
-    """Encrypt one already-formed logical payload as an ALETH001 container."""
+def _decode_payload_files(payload: dict) -> dict[str, bytes]:
+    """Validate the logical v1 payload and decode every file fail-closed."""
     if payload.get("payload_version") != 1 or not isinstance(payload.get("files"), dict):
         raise ContainerError("unsupported payload")
-    if len(payload["files"]) > MAX_FILES:
+    files = payload["files"]
+    if len(files) > MAX_FILES:
         raise ContainerError("too many files")
+
+    decoded: dict[str, bytes] = {}
+    total = 0
+    for rel, encoded in files.items():
+        if not isinstance(rel, str) or not isinstance(encoded, str) or not _allowed(rel):
+            raise ContainerError(f"invalid payload path: {rel!r}")
+        try:
+            data = b64url_decode(encoded)
+        except Exception as exc:
+            raise ContainerError(f"invalid payload encoding: {rel}") from exc
+        if len(data) > MAX_FILE:
+            raise ContainerError(f"file too large: {rel}")
+        total += len(data)
+        if total > MAX_TOTAL:
+            raise ContainerError("payload too large")
+        decoded[rel] = data
+    return decoded
+
+
+def _seal_payload_bytes(payload: dict, passphrase: str) -> bytes:
+    """Encrypt one already-formed logical payload as an ALETH001 container."""
+    _decode_payload_files(payload)
     salt, nonce = os.urandom(16), os.urandom(12)
     header = {"cipher":"AES-256-GCM","format":"aleth","kdf":"scrypt",
               "nonce":b64url(nonce),"salt":b64url(salt),
@@ -163,7 +186,7 @@ def rekey_container(
     The old container is fully authenticated before any output is written.
     The decrypted logical payload is re-encrypted in memory with fresh scrypt
     salt + AES-GCM nonce. Protocol objects, signatures, commit IDs and HEAD are
-    preserved byte-for-byte at the logical payload level.
+    preserved at the logical payload level (same canonical payload content).
 
     This is a container-layer operation: it does not repair or reinterpret
     protocol history. A protocol-invalid but correctly authenticated container
@@ -239,24 +262,7 @@ def open_container(path: str | Path, destination: str | Path, passphrase: str) -
     if destination.exists() and any(destination.iterdir()):
         raise ContainerError("destination must be empty")
     destination.mkdir(parents=True, exist_ok=True)
-    files = payload["files"]
-    if len(files) > MAX_FILES:
-        raise ContainerError("too many files")
-    decoded = {}
-    total = 0
-    for rel, encoded in files.items():
-        if not isinstance(rel, str) or not isinstance(encoded, str) or not _allowed(rel):
-            raise ContainerError(f"invalid payload path: {rel!r}")
-        try:
-            data = b64url_decode(encoded)
-        except Exception as exc:
-            raise ContainerError(f"invalid payload encoding: {rel}") from exc
-        if len(data) > MAX_FILE:
-            raise ContainerError(f"file too large: {rel}")
-        total += len(data)
-        if total > MAX_TOTAL:
-            raise ContainerError("payload too large")
-        decoded[rel] = data
+    decoded = _decode_payload_files(payload)
     try:
         for rel, data in decoded.items():
             physical_rel = _physical_rel_from_logical(rel)
