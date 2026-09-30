@@ -1,18 +1,14 @@
 import initWasm, { open_aleth_payload, seal_aleth_payload } from "./vendor/wasm/alethech_wasm.js";
 import { verifyPortablePayload, type PortablePayload, type VerifiedPortableView } from "../../alethech-ts/portable-verifier.ts";
 import { appendPortableMemory, canonicalPortablePayloadBytes } from "../../alethech-ts/portable-editor.ts";
-import { toAlethechContext, toContextText } from "../../alethech-ts/context-adapter.ts";
+import { toContextText } from "../../alethech-ts/context-adapter.ts";
+import type { AlethechWritebackProposal } from "../../alethech-ts/chat-adapter-contract.ts";
 import {
-  createChatEnvelope,
-  type AlethechWritebackProposal,
-} from "../../alethech-ts/chat-adapter-contract.ts";
-import {
-  toAnthropicCompatibleRequest,
-  toLocalAgentRequest,
-  toOpenAICompatibleRequest,
-  writebackProposalFromProviderJson,
-} from "../../alethech-ts/provider-bridges.ts";
-import { acceptWritebackProposal } from "../../alethech-ts/provider-writeback.ts";
+  acceptPluginWriteback,
+  preparePluginRequest,
+  reviewPluginWriteback,
+  type PluginProviderKind,
+} from "../../alethech-ts/plugin-api.ts";
 
 let selectedFile: File | null = null;
 let wasmReady: Promise<unknown> | null = null;
@@ -251,16 +247,12 @@ generateRequestButton.addEventListener("click", () => {
     return;
   }
   try {
-    const context = toAlethechContext(verifiedView, { limit: selectedContextLimit() });
-    const envelope = createChatEnvelope(context);
-    let request: unknown;
-    if (providerMode.value === "openai") {
-      request = toOpenAICompatibleRequest(envelope, prompt);
-    } else if (providerMode.value === "anthropic") {
-      request = toAnthropicCompatibleRequest(envelope, prompt);
-    } else {
-      request = toLocalAgentRequest(envelope, prompt);
-    }
+    const request = preparePluginRequest(
+      { payload: verifiedPayload!, view: verifiedView },
+      providerMode.value as PluginProviderKind,
+      prompt,
+      { limit: selectedContextLimit() },
+    );
     providerRequest.value = JSON.stringify(request, null, 2);
     providerRequest.focus();
     providerRequest.select();
@@ -279,8 +271,8 @@ reviewWritebackButton.addEventListener("click", () => {
     return;
   }
   try {
-    pendingWriteback = writebackProposalFromProviderJson(
-      verifiedView.head,
+    pendingWriteback = reviewPluginWriteback(
+      { payload: verifiedPayload!, view: verifiedView },
       providerResponse.value,
     );
     writebackSummary.textContent =
@@ -312,7 +304,10 @@ acceptWritebackButton.addEventListener("click", async () => {
   status.className = "status";
   status.textContent = "Signing accepted writeback locally and reverifying…";
   try {
-    const accepted = await acceptWritebackProposal(verifiedPayload, pendingWriteback);
+    const accepted = await acceptPluginWriteback(
+      { payload: verifiedPayload, view: verifiedView },
+      pendingWriteback,
+    );
     await downloadUpdatedAleth(accepted.payload, secret, "-writeback");
     verifiedPayload = accepted.payload;
     verifiedView = accepted.view;
