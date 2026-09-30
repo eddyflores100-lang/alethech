@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from . import crypto
 from .objects import Identity, MemoryCommit
 from .store import Store, StoreError
-from .verify import VerifyReport, verify_store
+from .verify import VerifyReport, verify_store\nfrom .container import seal_store, open_container
 
 class AlethechError(Exception):
     """Programmatic API error with stable, user-facing semantics."""
