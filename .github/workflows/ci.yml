@@ -186,6 +186,19 @@ jobs:
           assert len(v["entries"]) == 1
           PY
 
+      - name: Verify V2 portable memory in browser TypeScript verifier
+        run: |
+          python scripts/make_v2_portable_fixture.py /tmp/aleth-v2 /tmp/v2.aleth
+          npx --yes tsx alethech-ts/portable-verifier-test.ts /tmp/v2.aleth v2-passphrase > /tmp/browser-v2-view.json
+          python - <<'PY'
+          import json
+          v=json.load(open("/tmp/browser-v2-view.json"))
+          assert v["format"] == "alethech-memory-view"
+          assert v["version"] == 1
+          assert len(v["entries"]) == 1
+          assert v["entries"][0]["content"]["interop"] == "v2-browser"
+          PY
+
       - name: Seal store in TypeScript and open in Python
         run: |
           npx --yes tsx alethech-ts/aleth-container.ts seal /tmp/aleth-source /tmp/ts-produced.aleth interop-passphrase
