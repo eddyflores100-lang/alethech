@@ -59,3 +59,21 @@ Local filesystem stores use percent-encoded physical filenames such as
 macOS, and Linux. Signed protocol identifiers remain unchanged, and `.aleth`
 containers expose the canonical logical paths with `sha256:` / `did:alethech:`.
 Legacy stores that used raw colons remain readable.
+
+
+## Granular sharing
+
+The extension verifies the complete dropped `.aleth` history locally, but chat
+bridges only receive the memories the user explicitly selects in the popup.
+
+The verified global `source_head` is still attached to the outgoing
+`alethech-context@1` so writeback remains bound to the exact verified history
+used to prepare the provider request.
+
+Selection rules:
+
+- unselected memories are omitted from provider context;
+- selected commit IDs must exist in the verified memory view;
+- unknown IDs fail closed;
+- memory type filters are validated;
+- selection never exposes raw protocol files or private keys.
