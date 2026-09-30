@@ -13,7 +13,7 @@ from . import crypto
 from .objects import Identity, MemoryCommit, EvidenceCommit
 from .store import Store, StoreError
 from .verify import VerifyReport, verify_store
-from .container import seal_store, open_container
+from .container import seal_store, open_container, rekey_container
 from .adapters import VerifiedMemoryView, build_memory_view, context_from_aleth
 
 class AlethechError(Exception):
@@ -224,3 +224,14 @@ class Alethech:
     def drop_context(path: str | Path, passphrase: str) -> dict:
         """Unlock a dropped .aleth, verify it, and return neutral context only."""
         return context_from_aleth(str(path), passphrase)
+
+
+    @staticmethod
+    def rekey_aleth(
+        path: str | Path,
+        output: str | Path,
+        old_passphrase: str,
+        new_passphrase: str,
+    ) -> Path:
+        """Rotate .aleth encryption without changing signed memory history."""
+        return rekey_container(path, output, old_passphrase, new_passphrase)
