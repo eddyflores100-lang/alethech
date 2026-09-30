@@ -67,6 +67,31 @@ async function main(): Promise<void> {
   badArtifact.files[artifactPath]=bytesToBase64Url(new TextEncoder().encode("tampered artifact bytes"));
   await mustReject(badArtifact,"artifact hash mismatch");
 
+  if (typeof opened.payload.files["root_authority.json"] === "string") {
+    const badRoot=structuredClone(opened.payload);
+    const root=JSON.parse(new TextDecoder().decode(Buffer.from(badRoot.files["root_authority.json"],"base64url")));
+    root.created_at="2099-01-01T00:00:00.000Z";
+    badRoot.files["root_authority.json"]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(root)));
+    await mustReject(badRoot,"tampered V2 root authority");
+
+    const controlPath=Object.keys(opened.payload.files).find(p=>p.startsWith("control_events/"));
+    if(!controlPath) throw new Error("V2 payload missing control event");
+    const badControl=structuredClone(opened.payload);
+    const control=JSON.parse(new TextDecoder().decode(Buffer.from(badControl.files[controlPath],"base64url")));
+    control.sequence=control.sequence+7;
+    badControl.files[controlPath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(control)));
+    await mustReject(badControl,"tampered V2 control chain");
+
+    const migrationPath=Object.keys(opened.payload.files).find(p=>p.startsWith("migrations/"));
+    if(migrationPath){
+      const badMigration=structuredClone(opened.payload);
+      const migration=JSON.parse(new TextDecoder().decode(Buffer.from(badMigration.files[migrationPath],"base64url")));
+      migration.migration_timestamp="2099-01-01T00:00:00.000Z";
+      badMigration.files[migrationPath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(migration)));
+      await mustReject(badMigration,"tampered bilateral MigrationRecord");
+    }
+  }
+
   const context=toAlethechContext(view);
   const contextText=JSON.stringify(context);
   if(context.source_head!==view.head || context.items.length!==view.entries.length) {
