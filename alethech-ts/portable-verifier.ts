@@ -131,8 +131,16 @@ function safePath(path: string): boolean {
   if (!path || path.includes("\\") || path.startsWith("/")) return false;
   const parts = path.split("/");
   if (parts.some(p => !p || p === "." || p === "..")) return false;
-  if (path === "HEAD" || path === "keys/signing.key") return true;
-  return parts.length === 2 && ["identities", "commits", "evidence", "artifacts"].includes(parts[0]);
+  if (path === "HEAD" || path === "root_authority.json" || path === "keys/signing.key") return true;
+  return parts.length === 2 && [
+    "identities",
+    "commits",
+    "evidence",
+    "artifacts",
+    "control_events",
+    "migrations",
+    "checkpoints",
+  ].includes(parts[0]);
 }
 
 function pemToPkcs8(pem: string): Uint8Array {
