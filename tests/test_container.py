@@ -1,5 +1,6 @@
 """Adversarial tests for the encrypted .aleth portable container."""
 import pytest
+from alethech import crypto
 from alethech.api import Alethech
 from alethech.container import ContainerError, open_container, seal_store
 
@@ -48,3 +49,11 @@ def test_refuses_invalid_source_store(tmp_path):
     (client.store.root/"HEAD").write_text("sha256:not-real")
     with pytest.raises(ContainerError,match="refusing to seal invalid store"):
         seal_store(client.store,tmp_path/"bad.aleth","passphrase")
+
+
+def test_refuses_mismatched_portable_signing_key(tmp_path):
+    client = Alethech.initialize(tmp_path / "source")
+    client.store.write_signing_key(crypto.KeyPair.generate())
+
+    with pytest.raises(ContainerError, match="signing key does not match identity"):
+        seal_store(client.store, tmp_path / "mismatched.aleth", "passphrase")
