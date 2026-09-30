@@ -112,3 +112,18 @@ def build_memory_view(store: Store) -> VerifiedMemoryView:
             )
         )
     return VerifiedMemoryView(head=head, entries=tuple(entries))
+
+
+def context_from_aleth(path: str, passphrase: str) -> dict[str, Any]:
+    """Drop-file primitive: unlock .aleth, verify it, return neutral context.
+
+    Plaintext is materialized only inside a temporary directory that is removed
+    before this function returns. Callers never need to manage Store layout.
+    """
+    import tempfile
+    from pathlib import Path
+    from .container import open_container
+
+    with tempfile.TemporaryDirectory(prefix="alethech-drop-") as tmp:
+        store = open_container(path, Path(tmp) / "store", passphrase)
+        return build_memory_view(store).to_dict()
