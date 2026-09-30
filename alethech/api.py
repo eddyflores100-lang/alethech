@@ -20,6 +20,7 @@ from .container_v2 import (
     open_container_v2,
     recover_container_v2,
     seal_store_v2,
+    rekey_container_v2,
 )
 from .adapters import VerifiedMemoryView, build_memory_view, context_from_aleth
 
@@ -226,7 +227,8 @@ class Alethech:
     def open_aleth(cls, path: str | Path, destination: str | Path, passphrase: str) -> "Alethech":
         """Open ALETH001 or ALETH002 with a passphrase into a local working store."""
         path = Path(path)
-        magic = path.read_bytes()[:8]
+        with path.open("rb") as handle:
+            magic = handle.read(8)
         if magic == MAGIC:
             return cls(open_container(path, destination, passphrase))
         if magic == MAGIC_V2:
@@ -293,6 +295,7 @@ class Alethech:
         new_passphrase: str,
         *,
         create_recovery: bool = True,
+        replace_source: bool = False,
     ) -> tuple[Path, str | None]:
         """Explicitly migrate ALETH001 to ALETH002 after full verification."""
         return migrate_v1_to_v2(
@@ -301,6 +304,7 @@ class Alethech:
             old_passphrase,
             new_passphrase,
             create_recovery=create_recovery,
+            replace_source=replace_source,
         )
 
     @staticmethod
@@ -315,6 +319,17 @@ class Alethech:
         output: str | Path,
         old_passphrase: str,
         new_passphrase: str,
+        *,
+        recovery_code: str | None = None,
     ) -> Path:
-        """Rotate .aleth encryption without changing signed memory history."""
-        return rekey_container(path, output, old_passphrase, new_passphrase)
+        """Rotate encryption, preserving v2 recovery with its explicit credential."""
+        with Path(path).open("rb") as handle:
+            magic = handle.read(8)
+        if magic == MAGIC:
+            if recovery_code is not None:
+                raise AlethechError("ALETH001 has no recovery slot")
+            return rekey_container(path, output, old_passphrase, new_passphrase)
+        if magic == MAGIC_V2:
+            return rekey_container_v2(path, output, old_passphrase, new_passphrase,
+                                      recovery_code=recovery_code)
+        raise AlethechError("unsupported .aleth container magic")

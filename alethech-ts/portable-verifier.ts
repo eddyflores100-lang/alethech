@@ -121,7 +121,7 @@ export interface VerifiedPortableView {
   entries: PortableMemoryEntry[];
 }
 
-const decoder = new TextDecoder();
+const decoder = new TextDecoder("utf-8", {fatal: true});
 
 function decodeText(encoded: string): string {
   return decoder.decode(base64UrlToBytes(encoded));

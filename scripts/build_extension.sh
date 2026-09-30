@@ -23,6 +23,6 @@ npx --yes esbuild@0.25.10 "$ROOT/extension/src/popup.ts"   --bundle   --platform
 cp "$ROOT/extension/manifest.json" "$OUT/manifest.json"
 cp "$ROOT/extension/popup.html" "$OUT/popup.html"
 cp "$ROOT/extension/popup.css" "$OUT/popup.css"
-cp "$ROOT/extension/icon.svg" "$OUT/icon.svg" 2>/dev/null || echo "warning: icon.svg not found"
+cp "$ROOT/extension/icon16.png" "$ROOT/extension/icon48.png" "$ROOT/extension/icon128.png" "$OUT/"
 
 echo "Extension built at $OUT"

@@ -11,7 +11,8 @@ Security boundary:
 4. The updated payload is verified again before WASM reseals a new encrypted .aleth file.
 5. Provider-neutral chat context is generated only from the verified memory view.
 
-The extension has **no host permissions and no network permissions**. It does
+The extension has **no global host or storage permissions**. Chat capture and
+insertion use only temporary `activeTab` access and `scripting` after user activation. It does
 not upload the file, passphrase, plaintext, or signing key. The passphrase is
 cleared after each unlock/reseal operation. No browser storage APIs are used;
 decrypted state exists only in the lifetime of the extension popup.
@@ -89,3 +90,42 @@ MemoryCommit, change HEAD, rotate agent keys, or modify provenance.
 
 The new passphrase is used only in memory for the local reseal operation and is
 not persisted by the extension.
+
+## Envelope recovery
+
+The recovery form is available before unlocking. Choose a file, enter its recovery
+code, and enter matching new passphrases. The extension authenticates the recovery
+slot and verifies the entire portable protocol history before resealing or
+creating any download. Recovery preserves the container ID. The optional
+"Generate a new recovery code" checkbox rotates the code explicitly; otherwise
+the existing code remains usable.
+
+After unlocking, "Create recovery code" adds a recovery slot, upgrading a v1
+container to v2. It is disabled when a recovery slot already exists. "Rotate
+recovery code" is available only for containers with recovery enabled. Both
+require re-entry of the current passphrase. Save generated codes separately from
+the encrypted file.
+
+Append, accepted writeback, and passphrase changes preserve v2 envelopes,
+container IDs, and existing recovery access. Passphrase changes also require the
+current passphrase. Wrong credentials fail before downloading. Every generated
+file becomes the current encrypted source within the popup, so subsequent actions
+use the latest envelope and history. The extension keeps no credential between
+operations; password and recovery input fields are cleared after each operation.
+Choosing another file clears verified memory, displayed codes, and credentials;
+asynchronous results from the previous selection cannot overwrite the new state.
+Files larger than 512 MiB are rejected before reading them into memory.
+
+Rotation affects the newly downloaded file. Earlier copies remain decryptable
+with their earlier passphrases or recovery codes; local downloads cannot revoke
+existing copies. Closing the popup clears all in-memory state.
+
+## Capture and carry (0.9.1)
+
+The toolbar popup now captures the currently loaded conversation after a click,
+shows an editable review, creates a new independent `.aleth`, and downloads its
+recovery code separately. Only `activeTab` and `scripting` are requested; no global
+host permission, storage or automatic sending. The offline single HTML viewer
+works without the extension for import/paste, file creation and local verification.
+See [the full flow](../docs/CHAT_CAPTURE_FLOW.md). Earlier permissionless-client
+descriptions apply to the cryptographic file operations, before page capture.

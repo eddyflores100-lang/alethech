@@ -1084,8 +1084,6 @@ def import_(input_path: str, target_path: str | None,
     click.echo(f"continuity: {continuity}")
 
 
-if __name__ == "__main__":
-    cli()
 
 
 # ============================================================================
@@ -1452,3 +1450,195 @@ import os as _os
 from .objects import IdentityRecordV2, ControlEvent, MigrationRecord, RootAuthority
 from .canonical import canonical_json_bytes
 
+
+
+@cli.group('container')
+def container_commands() -> None:
+    """Seal, unlock, upgrade, rekey, or recover encrypted .aleth files."""
+
+
+def _container_secret(file: str | None, env_name: str, prompt: str, *, confirm: bool = False) -> str:
+    if file is not None:
+        value = Path(file).read_text(encoding='utf-8').rstrip('\r\n')
+    else:
+        value = os.environ.get(env_name)
+        if value is None:
+            value = click.prompt(prompt, hide_input=True, confirmation_prompt=confirm)
+    if not value:
+        raise click.ClickException(f'{prompt} must not be empty')
+    return value
+
+
+def _container_call(callback):
+    from .api import AlethechError
+    from .container import ContainerError
+    try:
+        return callback()
+    except (ContainerError, AlethechError, StoreError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _recovery_output_check(recovery_output: str | None, *protected: str) -> Path | None:
+    if recovery_output is None:
+        return None
+    target = Path(recovery_output)
+    if target.exists():
+        raise click.ClickException('recovery output must be a new file')
+    if any(target.resolve() == Path(p).resolve() for p in protected):
+        raise click.ClickException('recovery output must differ from container paths')
+    if not target.parent.is_dir():
+        raise click.ClickException('recovery output parent directory must exist')
+    return target
+
+
+def _save_recovery(target: Path | None, code: str | None) -> None:
+    if target is not None and code is not None:
+        # Exclusive creation avoids overwriting a credential created meanwhile.
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+                handle.write(code + '\n')
+                handle.flush()
+                os.fsync(handle.fileno())
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+        click.echo(f'Recovery code saved to {target}')
+
+
+def _container_publish(output: str, recovery_target: Path | None, callback):
+    """Persist a recovery credential before publishing its encrypted envelope."""
+    if recovery_target is None:
+        return callback(output)
+    import tempfile
+    from .container import _atomic_write, _read_container
+    target = Path(output)
+    with tempfile.TemporaryDirectory(prefix=".alethech-publish-", dir=target.parent) as tmp:
+        staged, code = callback(Path(tmp) / "memory.aleth")
+        _save_recovery(recovery_target, code)
+        _atomic_write(target, _read_container(staged))
+    return target, code
+
+
+@container_commands.command('seal')
+@click.argument('output', type=click.Path())
+@click.option('--passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--recovery-output', type=click.Path(), help='Save a new recovery code privately here.')
+@click.option('--no-recovery', is_flag=True, help='Create a passphrase-only ALETH002 file.')
+@click.pass_context
+def container_seal(ctx, output, passphrase_file, recovery_output, no_recovery):
+    """Seal the selected store as ALETH002. Secret env: ALETHECH_PASSPHRASE."""
+    from .api import Alethech
+    def run():
+        if no_recovery and recovery_output:
+            raise click.ClickException('--no-recovery conflicts with --recovery-output')
+        if not no_recovery and not recovery_output:
+            raise click.ClickException('provide --recovery-output or explicitly choose --no-recovery')
+        recovery_target = _recovery_output_check(recovery_output, output)
+        password = _container_secret(passphrase_file, 'ALETHECH_PASSPHRASE', 'Passphrase', confirm=True)
+        result, _ = _container_publish(output, recovery_target, lambda target:
+            Alethech.open(_store_path(ctx)).seal_v2(target, password, create_recovery=not no_recovery))
+        click.echo(f'Sealed {result}')
+    _container_call(run)
+
+
+@container_commands.command('open')
+@click.argument('source', type=click.Path(exists=True, dir_okay=False))
+@click.argument('destination', type=click.Path())
+@click.option('--passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--recovery-code-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--use-recovery', is_flag=True, help='Prompt for a recovery code instead of a passphrase.')
+def container_open(source, destination, passphrase_file, recovery_code_file, use_recovery):
+    """Unlock v1/v2. Secrets: ALETHECH_PASSPHRASE or ALETHECH_RECOVERY_CODE."""
+    from .api import Alethech
+    def run():
+        if (use_recovery or recovery_code_file) and passphrase_file:
+            raise click.ClickException('choose exactly one unlock credential')
+        if use_recovery or recovery_code_file:
+            code = _container_secret(recovery_code_file, 'ALETHECH_RECOVERY_CODE', 'Recovery code')
+            Alethech.open_aleth_v2(source, destination, recovery_code=code)
+        else:
+            password = _container_secret(passphrase_file, 'ALETHECH_PASSPHRASE', 'Passphrase')
+            Alethech.open_aleth(source, destination, password)
+        click.echo(f'Opened {destination}')
+    _container_call(run)
+
+
+@container_commands.command('rekey')
+@click.argument('source', type=click.Path(exists=True, dir_okay=False))
+@click.argument('output', type=click.Path())
+@click.option('--old-passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--new-passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--recovery-code-file', type=click.Path(exists=True, dir_okay=False))
+def container_rekey(source, output, old_passphrase_file, new_passphrase_file, recovery_code_file):
+    """Rotate secrets. Env: ALETHECH_OLD/NEW_PASSPHRASE, ALETHECH_RECOVERY_CODE."""
+    from .api import Alethech
+    from .container_v2 import MAGIC_V2, _parse_header_v2
+    from .container import _read_container
+    def run():
+        old = _container_secret(old_passphrase_file, 'ALETHECH_OLD_PASSPHRASE', 'Old passphrase')
+        new = _container_secret(new_passphrase_file, 'ALETHECH_NEW_PASSPHRASE', 'New passphrase', confirm=True)
+        code = None
+        blob = _read_container(source)
+        needs_recovery = blob[:8] == MAGIC_V2 and any(s['type'] == 'recovery-secret' for s in _parse_header_v2(blob)[0]['slots'])
+        if needs_recovery or recovery_code_file:
+            code = _container_secret(recovery_code_file, 'ALETHECH_RECOVERY_CODE', 'Recovery code')
+        result = Alethech.rekey_aleth(source, output, old, new, recovery_code=code)
+        click.echo(f'Rekeyed {result}')
+    _container_call(run)
+
+
+@container_commands.command('recover')
+@click.argument('source', type=click.Path(exists=True, dir_okay=False))
+@click.argument('output', type=click.Path())
+@click.option('--recovery-code-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--new-passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--rotate-recovery', is_flag=True)
+@click.option('--recovery-output', type=click.Path())
+def container_recover(source, output, recovery_code_file, new_passphrase_file, rotate_recovery, recovery_output):
+    """Recover v2. Env: ALETHECH_RECOVERY_CODE and ALETHECH_NEW_PASSPHRASE."""
+    from .api import Alethech
+    def run():
+        if rotate_recovery and not recovery_output:
+            raise click.ClickException('--rotate-recovery requires --recovery-output')
+        target = _recovery_output_check(recovery_output, source, output)
+        code = _container_secret(recovery_code_file, 'ALETHECH_RECOVERY_CODE', 'Recovery code')
+        new = _container_secret(new_passphrase_file, 'ALETHECH_NEW_PASSPHRASE', 'New passphrase', confirm=True)
+        result, _ = _container_publish(output, target, lambda staged:
+            Alethech.recover_aleth_v2(source, staged, code, new, rotate_recovery=rotate_recovery))
+        click.echo(f'Recovered {result}')
+    _container_call(run)
+
+
+@container_commands.command('upgrade')
+@click.argument('source', type=click.Path(exists=True, dir_okay=False))
+@click.argument('output', type=click.Path())
+@click.option('--old-passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--new-passphrase-file', type=click.Path(exists=True, dir_okay=False))
+@click.option('--recovery-output', type=click.Path())
+@click.option('--no-recovery', is_flag=True)
+@click.option('--replace-source', is_flag=True, help='Explicitly authorize replacing the v1 source.')
+def container_upgrade(source, output, old_passphrase_file, new_passphrase_file, recovery_output, no_recovery, replace_source):
+    """Upgrade v1 to v2. Env: ALETHECH_OLD_PASSPHRASE, ALETHECH_NEW_PASSPHRASE."""
+    from .api import Alethech
+    def run():
+        if no_recovery and recovery_output:
+            raise click.ClickException('--no-recovery conflicts with --recovery-output')
+        if not no_recovery and not recovery_output:
+            raise click.ClickException('provide --recovery-output or explicitly choose --no-recovery')
+        target = _recovery_output_check(recovery_output, source, output)
+        old = _container_secret(old_passphrase_file, 'ALETHECH_OLD_PASSPHRASE', 'Old passphrase')
+        new = _container_secret(new_passphrase_file, 'ALETHECH_NEW_PASSPHRASE', 'New passphrase', confirm=True)
+        source_path, output_path = Path(source), Path(output)
+        if (source_path.resolve() == output_path.resolve() or
+                (output_path.exists() and os.path.samefile(source_path, output_path))) and not replace_source:
+            raise click.ClickException('migration requires replace_source=True to replace its v1 source')
+        result, _ = _container_publish(output, target, lambda staged:
+            Alethech.migrate_aleth_v1_to_v2(source, staged, old, new,
+                create_recovery=not no_recovery, replace_source=replace_source))
+        click.echo(f'Upgraded {result}')
+    _container_call(run)
+
+
+if __name__ == "__main__":
+    cli()

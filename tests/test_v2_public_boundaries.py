@@ -26,10 +26,12 @@ def test_drop_context_accepts_both_envelopes(tmp_path, version):
 @pytest.mark.parametrize("existing_output", [False, True])
 def test_recovery_rejects_authenticated_but_invalid_history(tmp_path, existing_output):
     source = Alethech.initialize(tmp_path / "source")
-    source.commit({"memory": "original"})
+    ancestor = source.commit({"memory": "ancestor"})
+    head = source.commit({"memory": "original"})
     path, recovery = source.seal_v2(tmp_path / "memory.aleth", "passphrase")
     payload, _ = _parse_v2(path.read_bytes(), passphrase="passphrase")
-    commit_path = next(p for p in payload["files"] if p.startswith("commits/"))
+    assert ancestor.commit_id != head.commit_id
+    commit_path = "commits/" + ancestor.commit_id + ".json"
     commit = json.loads(b64url_decode(payload["files"][commit_path]))
     commit["content"] = {"memory": "forged without signature"}
     payload["files"][commit_path] = b64url(json.dumps(commit).encode())

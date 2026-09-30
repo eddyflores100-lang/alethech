@@ -8,7 +8,7 @@ use hkdf::Hkdf;
 use scrypt::{scrypt, Params};
 use serde_json::{json, Value};
 use sha2::Sha256;
-use std::{env, fs, path::Path, process};
+use std::{env, fs, io::{Read, Write}, path::Path, process::{self, Command, Stdio}};
 
 const MAGIC: &[u8; 8] = b"ALETH002";
 const MAX_HEADER: usize = 16 * 1024;
@@ -25,7 +25,11 @@ fn fail(msg: &str) -> ! {
 }
 
 fn decode_b64(s: &str, what: &str) -> Vec<u8> {
-    Base64UrlUnpadded::decode_vec(s).unwrap_or_else(|_| fail(what))
+    let decoded = Base64UrlUnpadded::decode_vec(s).unwrap_or_else(|_| fail(what));
+    if Base64UrlUnpadded::encode_string(&decoded) != s {
+        fail(what);
+    }
+    decoded
 }
 
 fn exact_keys(value: &Value, expected: &[&str]) -> bool {
@@ -41,6 +45,7 @@ fn exact_keys(value: &Value, expected: &[&str]) -> bool {
 fn allowed_path(rel: &str) -> bool {
     if rel.is_empty()
         || rel.contains('\\')
+        || rel.contains('\0')
         || rel.starts_with('/')
         || rel.split('/').any(|p| p.is_empty() || p == "." || p == "..")
     {
@@ -312,7 +317,8 @@ fn unlock_recovery(header: &Value, recovery_code: &str) -> [u8; 32] {
 }
 
 fn validate_payload(payload: &Value) {
-    if payload.get("payload_version").and_then(Value::as_u64) != Some(1) {
+    if !exact_keys(payload, &["payload_version", "files"])
+        || payload.get("payload_version").and_then(Value::as_u64) != Some(1) {
         fail("unsupported payload");
     }
     let files = payload
@@ -327,10 +333,11 @@ fn validate_payload(payload: &Value) {
         if !allowed_path(rel) {
             fail("invalid payload path");
         }
-        let data = Base64UrlUnpadded::decode_vec(
-            encoded.as_str().unwrap_or_else(|| fail("invalid payload encoding"))
-        )
-        .unwrap_or_else(|_| fail("invalid payload encoding"));
+        let encoded = encoded.as_str().unwrap_or_else(|| fail("invalid payload encoding"));
+        if encoded.len() > (MAX_FILE * 4 + 2) / 3 {
+            fail("file too large");
+        }
+        let data = decode_b64(encoded, "invalid payload encoding");
         if data.len() > MAX_FILE {
             fail("file too large");
         }
@@ -341,8 +348,79 @@ fn validate_payload(payload: &Value) {
     }
 }
 
-fn open(path: &Path, mode: &str, credential: &str) {
-    let blob = fs::read(path).unwrap_or_else(|_| fail("failed to read container"));
+/// Required dependency: Python 3 and the matching installed/local alethech package.
+/// The native verifier currently covers only part of the protocol. Never substitute
+/// it for full store history verification, including current private-key binding.
+fn verify_full_payload(payload: &Value) {
+    validate_payload(payload);
+    const BRIDGE: &str = r#"
+import json, sys, tempfile
+from pathlib import Path
+from alethech.container_v2 import _materialize_payload
+from alethech.container import _verify_portable_signing_key
+with tempfile.TemporaryDirectory(prefix='alethech-rust-verify-') as temporary:
+    store = _materialize_payload(json.load(sys.stdin), Path(temporary) / 'store')
+    # Read-only archives may omit the operational key; supplied keys must bind.
+    if (store.root / 'keys' / 'signing.key').exists():
+        _verify_portable_signing_key(store)
+"#;
+    // Fixed program and arguments; payload only travels through stdin, no shell.
+    let mut child = Command::new("python3")
+        .args(["-c", BRIDGE])
+        .stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null())
+        .spawn().unwrap_or_else(|_| fail("full verification requires Python 3 and the alethech package"));
+    let write_ok = serde_json::to_writer(child.stdin.take().unwrap(), payload).is_ok();
+    let status = child.wait().unwrap_or_else(|_| fail("full payload verification failed"));
+    if !write_ok || !status.success() {
+        fail("full payload verification failed (Python 3 and matching alethech package required)");
+    }
+}
+
+fn read_bounded(path: &Path, limit: usize) -> Vec<u8> {
+    let file = fs::File::open(path).unwrap_or_else(|_| fail("failed to read input"));
+    let mut data = Vec::new();
+    file.take(limit as u64 + 1).read_to_end(&mut data)
+        .unwrap_or_else(|_| fail("failed to read input"));
+    if data.len() > limit { fail("input too large"); }
+    data
+}
+
+fn atomic_write(path: &Path, blob: &[u8]) {
+    use rand::RngCore;
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let mut random = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut random);
+    let temporary = parent.join(format!(".alethech-{}.tmp", hex::encode(random)));
+    let mut created = false;
+    let result = (|| -> std::io::Result<()> {
+        let mut options = fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&temporary)?;
+        created = true;
+        file.write_all(blob)?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, path)?;
+        // The rename commits the result. Directory sync is best-effort: a
+        // post-commit error must not suppress generated recovery credentials.
+        #[cfg(unix)] {
+            let _ = fs::File::open(parent).and_then(|directory| directory.sync_all());
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        if created { let _ = fs::remove_file(&temporary); }
+        fail("failed to atomically write output");
+    }
+}
+
+fn decrypt_v2(path: &Path, mode: &str, credential: &str) -> (Value, Value) {
+
+    let blob = read_bounded(path, MAX_CONTAINER);
     if blob.len() > MAX_CONTAINER {
         fail("container too large");
     }
@@ -398,8 +476,12 @@ fn open(path: &Path, mode: &str, credential: &str) {
 
     let payload: Value =
         serde_json::from_slice(&plaintext).unwrap_or_else(|_| fail("invalid encrypted payload"));
-    validate_payload(&payload);
+    verify_full_payload(&payload);
+    (payload, header)
+}
 
+fn open(path: &Path, mode: &str, credential: &str) {
+    let (payload, header) = decrypt_v2(path, mode, credential);
     let mut slot_types: Vec<String> = header
         .get("slots")
         .and_then(Value::as_array)
@@ -520,6 +602,7 @@ fn seal_payload_v2(
     container_id: Option<&[u8]>,
 ) -> (Vec<u8>, Option<String>, String) {
     // Returns (blob, recovery_code, container_id_str)
+    verify_full_payload(payload);
     use rand::RngCore;
 
     let cid = match container_id {
@@ -586,8 +669,8 @@ fn seal_payload_v2(
 /// Read a payload from a JSON file. The payload must be:
 ///   { "payload_version": 1, "files": { "rel/path": "base64url-bytes", ... } }
 fn read_payload(path: &Path) -> Value {
-    let content = fs::read_to_string(path).unwrap_or_else(|_| fail("failed to read payload file"));
-    let payload: Value = serde_json::from_str(&content).unwrap_or_else(|_| fail("invalid payload JSON"));
+    let content = read_bounded(path, MAX_TOTAL);
+    let payload: Value = serde_json::from_slice(&content).unwrap_or_else(|_| fail("invalid payload JSON"));
     validate_payload(&payload);
     payload
 }
@@ -604,7 +687,7 @@ fn cmd_seal(payload_path: &Path, out_path: &Path, passphrase: &str, recovery_arg
         recovery_secret.as_deref(),
         None,
     );
-    fs::write(out_path, &blob).unwrap_or_else(|_| fail("failed to write output"));
+    atomic_write(out_path, &blob);
     let out = json!({
         "recoveryCode": recovery_code,
         "containerId": container_id,
@@ -619,38 +702,16 @@ fn cmd_recover(
     new_passphrase: &str,
     rotate_recovery: bool,
 ) {
-    // Open the original container with the recovery code to extract the payload
-    // and container_id.
-    let blob = fs::read(in_path).unwrap_or_else(|_| fail("failed to read input"));
-    if blob.len() < 12 || &blob[..8] != MAGIC {
-        fail("input is not an ALETH002 container");
+    let (payload, header) = decrypt_v2(in_path, "open-recovery", recovery_code);
+    let slots = header["slots"].as_array().unwrap();
+    if slots.len() != 2
+        || slots.iter().filter(|slot| slot["type"] == "passphrase").count() != 1
+        || slots.iter().filter(|slot| slot["type"] == "recovery-secret").count() != 1
+    {
+        fail("recovery supports exactly one passphrase and one recovery slot");
     }
-    let hlen = u32::from_be_bytes(blob[8..12].try_into().unwrap()) as usize;
-    let header_bytes = &blob[12..12 + hlen];
-    let header: Value = serde_json::from_slice(header_bytes).unwrap_or_else(|_| fail("invalid v2 header"));
-    validate_header(&header);
-    let container_id_str = header
-        .get("container_id")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-    let container_id_bytes = decode_b64(&container_id_str, "invalid container_id").clone();
-
-    // Decrypt payload using recovery code
-    let dek = unlock_recovery(&header, recovery_code);
-    let payload_nonce = decode_b64(
-        header.get("payload_nonce").and_then(Value::as_str).unwrap_or(""),
-        "invalid payload nonce",
-    );
-    let encrypted = &blob[12 + hlen..];
-    let cipher = Aes256Gcm::new_from_slice(&dek).unwrap();
-    let plaintext = cipher
-        .decrypt(
-            Nonce::from_slice(&payload_nonce),
-            Payload { msg: encrypted, aad: header_bytes },
-        )
-        .unwrap_or_else(|_| fail("recovery unlock failed"));
-    let payload: Value = serde_json::from_slice(&plaintext).unwrap_or_else(|_| fail("invalid payload"));
+    let container_id_str = header["container_id"].as_str().unwrap().to_owned();
+    let container_id_bytes = decode_b64(&container_id_str, "invalid container_id");
 
     // Decide next recovery secret
     use rand::RngCore;
@@ -668,12 +729,37 @@ fn cmd_recover(
         Some(&next_secret),
         Some(&container_id_bytes),
     );
-    fs::write(out_path, &new_blob).unwrap_or_else(|_| fail("failed to write output"));
+    atomic_write(out_path, &new_blob);
     let out = json!({
         "recoveryCode": new_recovery_code,
         "containerId": container_id_str,
     });
     println!("{}", serde_json::to_string(&out).unwrap());
+}
+
+/// Canonical paths catch symlinks; device/inode identity catches Unix hard links.
+fn guard_migration_source(in_path: &Path, out_path: &Path) {
+    let source = fs::canonicalize(in_path).unwrap_or_else(|_| fail("failed to resolve migration source"));
+    if !out_path.exists() { return; }
+    let target = fs::canonicalize(out_path).unwrap_or_else(|_| fail("failed to resolve migration output"));
+    let mut same = source == target;
+    #[cfg(unix)] {
+        use std::os::unix::fs::MetadataExt;
+        let source_meta = fs::metadata(in_path).unwrap_or_else(|_| fail("failed to inspect migration source"));
+        let target_meta = fs::metadata(out_path).unwrap_or_else(|_| fail("failed to inspect migration output"));
+        same |= source_meta.dev() == target_meta.dev() && source_meta.ino() == target_meta.ino();
+    }
+    #[cfg(not(unix))] {
+        // Python samefile provides platform file identity on non-Unix systems.
+        let status = Command::new("python3").args(["-c",
+            "import os,sys; sys.exit(2 if os.path.samefile(sys.argv[1],sys.argv[2]) else 0)"])
+            .arg(in_path).arg(out_path).stdin(Stdio::null())
+            .stdout(Stdio::null()).stderr(Stdio::null()).status()
+            .unwrap_or_else(|_| fail("migration source identity check requires Python 3"));
+        if status.code() == Some(2) { same = true; }
+        else if !status.success() { fail("failed to check migration source identity"); }
+    }
+    if same { fail("migration requires --replace-source to replace its v1 source"); }
 }
 
 fn cmd_migrate(
@@ -682,11 +768,10 @@ fn cmd_migrate(
     old_passphrase: &str,
     new_passphrase: &str,
     create_recovery: bool,
+    replace_source: bool,
 ) {
-    // Read v1 container using the v1 reader.
-    // We shell out to the v1 binary if available; otherwise we read inline
-    // using the same logic. For simplicity, we re-implement the v1 read here.
-    let blob = fs::read(in_path).unwrap_or_else(|_| fail("failed to read v1 container"));
+    if !replace_source { guard_migration_source(in_path, out_path); }
+    let blob = read_bounded(in_path, MAX_CONTAINER);
     let magic_v1: &[u8; 8] = b"ALETH001";
     if blob.len() < 12 || &blob[..8] != magic_v1 {
         fail("input is not an ALETH001 container");
@@ -701,11 +786,14 @@ fn cmd_migrate(
 
     // Validate v1 header
     let expected_keys = ["cipher", "format", "kdf", "nonce", "salt", "scrypt_n", "scrypt_p", "scrypt_r", "version"];
-    for k in &expected_keys {
-        if !header.get(*k).is_some() {
-            fail(&format!("v1 header missing field: {}", k));
-        }
+    if !exact_keys(&header, &expected_keys) {
+        fail("invalid v1 header schema");
     }
+    if canonical_json(&header).as_bytes() != header_bytes {
+        fail("v1 header is not canonical JCS");
+    }
+    if encrypted.len() < 16 { fail("truncated ciphertext"); }
+    if old_passphrase.is_empty() { fail("passphrase must be non-empty"); }
     if header.get("cipher").and_then(Value::as_str) != Some("AES-256-GCM")
         || header.get("format").and_then(Value::as_str) != Some("aleth")
         || header.get("kdf").and_then(Value::as_str) != Some("scrypt")
@@ -755,22 +843,13 @@ fn cmd_migrate(
         recovery_secret.as_deref(),
         None,
     );
-    fs::write(out_path, &new_blob).unwrap_or_else(|_| fail("failed to write output"));
-
-    // Sanity: re-open the v2 container we just wrote, to confirm it round-trips.
-    let _ = open_internal(out_path, "open-pass", new_passphrase);
+    atomic_write(out_path, &new_blob);
 
     let out = json!({
         "recoveryCode": recovery_code,
         "containerId": container_id,
     });
     println!("{}", serde_json::to_string(&out).unwrap());
-}
-
-// Refactor: rename `open` to `open_internal` so we can call it from cmd_migrate.
-// The original `open` function is kept as a thin wrapper for the CLI dispatcher.
-fn open_internal(path: &Path, mode: &str, credential: &str) {
-    open(path, mode, credential);
 }
 
 fn main() {
@@ -792,7 +871,7 @@ fn main() {
         }
         "seal" => {
             // seal <payload.json> <out.aleth> <passphrase> [recovery-secret-base64url]
-            if args.len() < 5 {
+            if !(5..=6).contains(&args.len()) {
                 fail("usage: alethech-container-v2 seal <payload.json> <out.aleth> <passphrase> [recovery-secret-base64url]");
             }
             let recovery_arg = if args.len() >= 6 { Some(args[5].as_str()) } else { None };
@@ -805,10 +884,10 @@ fn main() {
         }
         "recover" => {
             // recover <in.aleth> <out.aleth> <recovery-code> <new-passphrase> [--rotate-recovery]
-            if args.len() < 6 {
+            if !(6..=7).contains(&args.len()) || (args.len() == 7 && args[6] != "--rotate-recovery") {
                 fail("usage: alethech-container-v2 recover <in.aleth> <out.aleth> <recovery-code> <new-passphrase> [--rotate-recovery]");
             }
-            let rotate_recovery = args.iter().any(|a| a == "--rotate-recovery");
+            let rotate_recovery = args.len() == 7;
             cmd_recover(
                 Path::new(&args[2]),
                 Path::new(&args[3]),
@@ -818,17 +897,26 @@ fn main() {
             );
         }
         "migrate" => {
-            // migrate <in-v1.aleth> <out-v2.aleth> <old-pass> <new-pass> [--no-recovery]
-            if args.len() < 6 {
-                fail("usage: alethech-container-v2 migrate <in-v1.aleth> <out-v2.aleth> <old-pass> <new-pass> [--no-recovery]");
+            // migrate <in-v1.aleth> <out-v2.aleth> <old-pass> <new-pass> [--no-recovery] [--replace-source]
+            let mut create_recovery = true;
+            let mut replace_source = false;
+            if !(6..=8).contains(&args.len()) {
+                fail("usage: alethech-container-v2 migrate <in-v1.aleth> <out-v2.aleth> <old-pass> <new-pass> [--no-recovery] [--replace-source]");
             }
-            let create_recovery = !args.iter().any(|a| a == "--no-recovery");
+            for flag in &args[6..] {
+                match flag.as_str() {
+                    "--no-recovery" if create_recovery => create_recovery = false,
+                    "--replace-source" if !replace_source => replace_source = true,
+                    _ => fail("unknown or duplicate migration flag"),
+                }
+            }
             cmd_migrate(
                 Path::new(&args[2]),
                 Path::new(&args[3]),
                 &args[4],
                 &args[5],
                 create_recovery,
+                replace_source,
             );
         }
         _ => {
