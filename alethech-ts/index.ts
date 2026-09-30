@@ -371,6 +371,19 @@ export async function runTests(): Promise<{ passed: number; failed: number; resu
     const tamperedCommit = { ...commit, content: { test: false } };
     assert(!await verifyCommit(tamperedCommit as MemoryCommit, kp.publicKeyBytes), "Commit tamper detection");
 
+    // Mutation guard: a signer can sign an arbitrary commit_id, but the verifier
+    // must still reject it when the ID is not the hash of the content.
+    const { signature: _sig, commit_id: _id, ...body } = commit;
+    const wrongId = `sha256:${"0".repeat(64)}`;
+    const forgedSignable = { ...body, commit_id: wrongId };
+    const forgedBytes = new TextEncoder().encode(canonicalizeJson(forgedSignable));
+    const forgedSig = await sign(kp.privateKey, forgedBytes);
+    const forgedCommit = {
+        ...forgedSignable,
+        signature: `ed25519:${bytesToBase64Url(forgedSig)}`,
+    } as MemoryCommit;
+    assert(!await verifyCommit(forgedCommit, kp.publicKeyBytes), "Commit ID integrity mutation guard");
+
     const commit1 = await createCommit(ident.agent_id, "key-001", [], { v: 1 }, kp);
     const commit2 = await createCommit(ident.agent_id, "key-001", [], { v: 2 }, kp);
     assert(commit1.commit_id !== commit2.commit_id, "Commit ID changes with content");
