@@ -78,7 +78,7 @@ try {
   const extension = join(temp, "extension");
   await cp(join(root, "extension/dist"), extension, { recursive: true });
   const manifest = JSON.parse(await readFile(join(extension, "manifest.json"), "utf8"));
-  assert.deepEqual([...(manifest.permissions ?? [])].sort(), ["activeTab", "scripting"]);
+  assert.deepEqual([...(manifest.permissions ?? [])].sort(), ["activeTab"]);
   assert.equal((manifest.optional_permissions ?? []).length, 0);
   assert.equal((manifest.optional_host_permissions ?? []).length, 0);
   assert.equal((manifest.host_permissions ?? []).length, 0);
