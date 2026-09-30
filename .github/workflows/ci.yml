@@ -75,17 +75,10 @@ jobs:
         run: pip install -e .
 
       - name: Build Rust helpers
-        run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf --bin alethech-container
-
-      - name: Emit generated Rust lockfile for synchronization
-        run: |
-          echo "ALETHECH_LOCK_BEGIN"
-          base64 -w0 alethech-rs/Cargo.lock
-          echo
-          echo "ALETHECH_LOCK_END"
+        run: cargo build --locked --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf --bin alethech-container
 
       - name: Run Rust SDK tests
-        run: cargo test --manifest-path alethech-rs/Cargo.toml
+        run: cargo test --locked --manifest-path alethech-rs/Cargo.toml
 
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
