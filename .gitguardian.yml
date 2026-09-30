@@ -1,0 +1,23 @@
+# GitGuardian configuration
+# https://docs.gitguardian.com/internal-reputation-monitoring/dashboard/ignore_list
+
+# Conformance test vectors are PUBLIC SYNTHETIC test data, not real secrets.
+# The golden.vector file contains:
+#   - passphrase: "PUBLIC-TEST-ONLY-aleth002"  (literal test value, never used in production)
+#   - recovery_code: "aleth-recovery-v1:____...8"  (synthetic placeholder, never used in production)
+# These are detected by the Generic Password detector because of their format, but
+# they are intentionally public test credentials documented in the vector's
+# "warning" field. The actual cryptographic private keys are NOT in the file
+# (only public Ed25519 JWKs, which are not secrets).
+paths-ignore:
+  - "conformance/container_v2/golden.vector"
+  - "conformance/container_v2/*.vector"
+  - "conformance/**/*.vector"
+
+matches:
+  # Belt-and-suspenders: also ignore the specific patterns by content,
+  # in case a future vector uses a different filename.
+  - name: "PUBLIC-TEST-ONLY passphrase"
+    match: "PUBLIC-TEST-ONLY-aleth002"
+  - name: "Synthetic ALETH recovery code"
+    match: "aleth-recovery-v1:__________________________________________8"
