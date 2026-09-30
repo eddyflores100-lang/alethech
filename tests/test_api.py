@@ -48,3 +48,16 @@ def test_portable_aleth_public_api(tmp_path):
     continued = target.commit({"memory": "continued on device B"})
     assert continued.parents == [source.head]
     assert target.verify().ok
+
+
+def test_public_api_context_view(tmp_path):
+    agent = Alethech.initialize(tmp_path / "store")
+    agent.commit({"fact": "portable context"}, session_id="ctx")
+
+    context = agent.context()
+
+    assert context["format"] == "alethech-memory-view"
+    assert context["version"] == 1
+    assert context["head"] == agent.head
+    assert len(context["entries"]) == 1
+    assert context["entries"][0]["content"] == {"fact": "portable context"}
