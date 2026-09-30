@@ -6,9 +6,14 @@ from pathlib import Path
 import subprocess
 import shlex
 import tempfile
+import struct
+from copy import deepcopy
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from alethech.canonical import canonical_json_bytes
 
 from alethech.container import ContainerError
-from alethech.container_v2 import _parse_v2
+from alethech.container_v2 import _parse_v2, _parse_header_v2, _unlock_dek_with_recovery
 from alethech.crypto import b64url_decode
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +42,31 @@ def main():
         ("modified-tag", blob[:-1] + bytes([blob[-1] ^ 1]), "passphrase", fixture["passphrase"], False),
         ("truncated", blob[:-16], "recovery_code", fixture["recovery_code"], False),
     ]
+    # Authenticate deliberately invalid schemas: rejecting these must come
+    # from validation, rather than a ciphertext tag mismatch.
+    header, _, _ = _parse_header_v2(blob)
+    dek = _unlock_dek_with_recovery(header, fixture["recovery_code"])
+
+    def authenticated(h, payload):
+        hb = canonical_json_bytes(h)
+        ciphertext = AESGCM(dek).encrypt(b64url_decode(h["payload_nonce"]),
+                                        canonical_json_bytes(payload), hb)
+        return b"ALETH002" + struct.pack(">I", len(hb)) + hb + ciphertext
+
+    bad_payloads = []
+    extra = deepcopy(fixture["expected"]["payload"])
+    extra["unsupported"] = True
+    bad_payloads.append(("payload-extra-field", extra))
+    bad_payloads.append(("payload-boolean-version", {"payload_version": True, "files": {}}))
+    bad_payloads.append(("payload-traversal", {"payload_version": 1, "files": {"../escape": "AA"}}))
+    bad_payloads.append(("payload-authority", {"payload_version": 1, "files": {"keys/root.key": "AA"}}))
+    bad_payloads.append(("payload-invalid-base64", {"payload_version": 1, "files": {"HEAD": "!"}}))
+    for name, payload in bad_payloads:
+        cases.append((name, authenticated(header, payload), "recovery_code", fixture["recovery_code"], False))
+    duplicate = deepcopy(header)
+    duplicate["slots"].append(deepcopy(duplicate["slots"][0]))
+    cases.append(("duplicate-slot", authenticated(duplicate, fixture["expected"]["payload"]),
+                  "recovery_code", fixture["recovery_code"], False))
     with tempfile.TemporaryDirectory(prefix="alethech-golden-") as tmp:
         for runtime in runtimes:
             for name, data, kind, credential, valid in cases:

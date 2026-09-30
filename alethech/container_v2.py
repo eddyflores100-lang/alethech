@@ -30,6 +30,11 @@ from .container import (
     MAX_FILES,
     MAX_HEADER,
     MAX_TOTAL,
+    _atomic_write,
+    _verify_payload,
+    _materialize_payload,
+    _read_container,
+    _strict_b64,
     _collect,
     _decode_payload_files,
     _physical_rel_from_logical,
@@ -71,10 +76,11 @@ def encode_recovery_secret(secret: bytes) -> str:
 
 
 def decode_recovery_secret(code: str) -> bytes:
-    if not isinstance(code, str) or not code.startswith(RECOVERY_PREFIX):
+    if (not isinstance(code, str) or not code.startswith(RECOVERY_PREFIX)
+            or len(code) != len(RECOVERY_PREFIX) + 43):
         raise ContainerError("invalid recovery code")
     try:
-        secret = b64url_decode(code[len(RECOVERY_PREFIX):])
+        secret = _strict_b64(code[len(RECOVERY_PREFIX):])
     except Exception as exc:
         raise ContainerError("invalid recovery code") from exc
     if len(secret) != 32:
@@ -119,7 +125,7 @@ def _unwrap_dek(
     nonce: bytes,
 ) -> bytes:
     try:
-        wrapped = b64url_decode(wrapped_key)
+        wrapped = _strict_b64(wrapped_key)
     except Exception as exc:
         raise ContainerError("invalid wrapped key") from exc
     if len(wrapped) != 48:
@@ -198,6 +204,7 @@ def _validate_slot(slot: Any) -> None:
             or slot.get("scrypt_n") != 32768
             or slot.get("scrypt_p") != 1
             or slot.get("scrypt_r") != 8
+            or any(type(slot.get(k)) is not int for k in ("scrypt_n", "scrypt_p", "scrypt_r"))
         ):
             raise ContainerError("unsupported passphrase slot parameters")
     elif slot_type == "recovery-secret":
@@ -212,9 +219,9 @@ def _validate_slot(slot: Any) -> None:
     if not isinstance(slot.get("id"), str) or not slot["id"]:
         raise ContainerError("invalid slot id")
     try:
-        nonce = b64url_decode(slot["nonce"])
-        salt = b64url_decode(slot["salt"])
-        wrapped = b64url_decode(slot["wrapped_key"])
+        nonce = _strict_b64(slot["nonce"])
+        salt = _strict_b64(slot["salt"])
+        wrapped = _strict_b64(slot["wrapped_key"])
     except Exception as exc:
         raise ContainerError("invalid unlock slot encoding") from exc
     if len(nonce) != 12 or len(salt) != 16 or len(wrapped) != 48:
@@ -237,12 +244,13 @@ def _validate_header(header: Any) -> None:
     if (
         header.get("format") != "aleth"
         or header.get("payload_cipher") != "AES-256-GCM"
+        or type(header.get("version")) is not int
         or header.get("version") != 2
     ):
         raise ContainerError("unsupported v2 container parameters")
     try:
-        container_id = b64url_decode(header["container_id"])
-        payload_nonce = b64url_decode(header["payload_nonce"])
+        container_id = _strict_b64(header["container_id"])
+        payload_nonce = _strict_b64(header["payload_nonce"])
     except Exception as exc:
         raise ContainerError("invalid v2 header encoding") from exc
     if len(container_id) != 16 or len(payload_nonce) != 12:
@@ -317,14 +325,16 @@ def seal_store_v2(
         raise ContainerError("refusing to seal invalid store: " + report.summary())
     _verify_portable_signing_key(store)
     payload = {"files": _collect(store.root), "payload_version": 1}
+    _verify_payload(payload)
     recovery_secret = os.urandom(32) if create_recovery else None
     blob = _seal_payload_v2(
         payload,
         passphrase,
         recovery_secret=recovery_secret,
     )
+    _parse_v2(blob, passphrase=passphrase)
     output = Path(output)
-    output.write_bytes(blob)
+    _atomic_write(output, blob)
     return output, (
         encode_recovery_secret(recovery_secret)
         if recovery_secret is not None
@@ -360,8 +370,8 @@ def _unlock_dek_with_passphrase(header: dict, passphrase: str) -> bytes:
         if slot["type"] != "passphrase":
             continue
         try:
-            salt = b64url_decode(slot["salt"])
-            nonce = b64url_decode(slot["nonce"])
+            salt = _strict_b64(slot["salt"])
+            nonce = _strict_b64(slot["nonce"])
             kek = _derive_passphrase_kek(passphrase, salt)
             return _unwrap_dek(
                 slot["wrapped_key"],
@@ -382,8 +392,8 @@ def _unlock_dek_with_recovery(header: dict, recovery_code: str) -> bytes:
         if slot["type"] != "recovery-secret":
             continue
         try:
-            salt = b64url_decode(slot["salt"])
-            nonce = b64url_decode(slot["nonce"])
+            salt = _strict_b64(slot["salt"])
+            nonce = _strict_b64(slot["nonce"])
             kek = _derive_recovery_kek(secret, salt)
             return _unwrap_dek(
                 slot["wrapped_key"],
@@ -415,7 +425,7 @@ def _parse_v2(
         dek = _unlock_dek_with_recovery(header, recovery_code)
 
     try:
-        nonce = b64url_decode(header["payload_nonce"])
+        nonce = _strict_b64(header["payload_nonce"])
         plain = AESGCM(dek).decrypt(nonce, encrypted, hb)
     except InvalidTag as exc:
         raise ContainerError("payload authentication failed") from exc
@@ -435,7 +445,7 @@ def inspect_container_v2(
     recovery_code: str | None = None,
 ) -> dict:
     payload, header = _parse_v2(
-        Path(path).read_bytes(),
+        _read_container(path),
         passphrase=passphrase,
         recovery_code=recovery_code,
     )
@@ -449,29 +459,6 @@ def inspect_container_v2(
     }
 
 
-def _materialize_payload(payload: dict, destination: Path) -> Store:
-    if destination.exists() and any(destination.iterdir()):
-        raise ContainerError("destination must be empty")
-    destination.mkdir(parents=True, exist_ok=True)
-    decoded = _decode_payload_files(payload)
-    try:
-        for rel, data in decoded.items():
-            physical_rel = _physical_rel_from_logical(rel)
-            target = destination / PurePosixPath(physical_rel)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-        store = Store.open(destination)
-        report = verify_store(store)
-        if not report.ok:
-            raise ContainerError(
-                "decrypted store failed verification: " + report.summary()
-            )
-        return store
-    except Exception:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise
-
-
 def open_container_v2(
     path: str | Path,
     destination: str | Path,
@@ -480,7 +467,7 @@ def open_container_v2(
     recovery_code: str | None = None,
 ) -> Store:
     payload, _ = _parse_v2(
-        Path(path).read_bytes(),
+        _read_container(path),
         passphrase=passphrase,
         recovery_code=recovery_code,
     )
@@ -497,9 +484,11 @@ def recover_container_v2(
 ) -> tuple[Path, str]:
     """Recover ALETH002 and replace its passphrase."""
     payload, header = _parse_v2(
-        Path(path).read_bytes(),
+        _read_container(path),
         recovery_code=recovery_code,
     )
+    if sorted(s["type"] for s in header["slots"]) != ["passphrase", "recovery-secret"]:
+        raise ContainerError("recovery supports exactly one passphrase and one recovery slot")
     # Envelope authentication does not establish protocol validity. Verify
     # signatures and history before writing any replacement container.
     with tempfile.TemporaryDirectory(prefix="alethech-recovery-") as tmp:
@@ -507,15 +496,16 @@ def recover_container_v2(
 
     current_secret = decode_recovery_secret(recovery_code)
     next_secret = os.urandom(32) if rotate_recovery else current_secret
-    container_id = b64url_decode(header["container_id"])
+    container_id = _strict_b64(header["container_id"])
     blob = _seal_payload_v2(
         payload,
         new_passphrase,
         recovery_secret=next_secret,
         container_id=container_id,
     )
+    _parse_v2(blob, passphrase=new_passphrase)
     output = Path(output)
-    output.write_bytes(blob)
+    _atomic_write(output, blob)
     return output, encode_recovery_secret(next_secret)
 
 
@@ -526,11 +516,16 @@ def migrate_v1_to_v2(
     new_passphrase: str,
     *,
     create_recovery: bool = True,
+    replace_source: bool = False,
 ) -> tuple[Path, str | None]:
     """Explicitly migrate an authenticated ALETH001 container to ALETH002."""
     from .container import _parse
 
-    payload = _parse(Path(path).read_bytes(), old_passphrase)
+    source, output = Path(path), Path(output)
+    if (source.resolve() == output.resolve() or
+            (output.exists() and os.path.samefile(source, output))) and not replace_source:
+        raise ContainerError("migration requires replace_source=True to replace its v1 source")
+    payload = _parse(_read_container(source), old_passphrase)
 
     # Full protocol verification before changing envelope versions.
     with tempfile.TemporaryDirectory(prefix="alethech-v1-v2-") as tmp:
@@ -543,12 +538,42 @@ def migrate_v1_to_v2(
         recovery_secret=recovery_secret,
     )
     output = Path(output)
-    output.write_bytes(blob)
-
-    # Do not report success until the produced v2 container re-opens.
-    inspect_container_v2(output, passphrase=new_passphrase)
+    # Validate produced bytes before replacing any existing output.
+    _parse_v2(blob, passphrase=new_passphrase)
+    _atomic_write(output, blob)
     return output, (
         encode_recovery_secret(recovery_secret)
         if recovery_secret is not None
         else None
     )
+
+
+def rekey_container_v2(
+    path: str | Path,
+    output: str | Path,
+    old_passphrase: str,
+    new_passphrase: str,
+    *,
+    recovery_code: str | None = None,
+) -> Path:
+    """Rekey verified ALETH002, requiring recovery credentials to retain recovery."""
+    payload, header = _parse_v2(_read_container(path), passphrase=old_passphrase)
+    recovery_slots = [s for s in header["slots"] if s["type"] == "recovery-secret"]
+    if len(header["slots"]) != 1 + len(recovery_slots) or len(recovery_slots) > 1:
+        raise ContainerError("rekey supports one passphrase and at most one recovery slot")
+    secret = None
+    if recovery_slots:
+        if recovery_code is None:
+            raise ContainerError("recovery_code required to preserve the recovery slot")
+        _unlock_dek_with_recovery(header, recovery_code)
+        secret = decode_recovery_secret(recovery_code)
+    elif recovery_code is not None:
+        raise ContainerError("container has no recovery slot")
+    with tempfile.TemporaryDirectory(prefix="alethech-rekey-v2-") as tmp:
+        _materialize_payload(payload, Path(tmp) / "store")
+    blob = _seal_payload_v2(payload, new_passphrase, recovery_secret=secret,
+                            container_id=_strict_b64(header["container_id"]))
+    _parse_v2(blob, passphrase=new_passphrase)
+    output = Path(output)
+    _atomic_write(output, blob)
+    return output

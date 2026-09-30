@@ -83,6 +83,9 @@ jobs:
       - name: Run TypeScript SDK tests
         run: npx --yes tsx alethech-ts/test.ts
 
+      - name: Audit TypeScript ALETH002 writers
+        run: npx --yes tsx alethech-ts/aleth-v2-writer-test.ts
+
       - name: Run browser WASM crypto tests
         run: cargo test --manifest-path alethech-wasm/Cargo.toml
 
@@ -179,6 +182,9 @@ jobs:
 
       - name: Verify frozen ALETH002 vector across all runtimes
         run: python conformance/container_v2/check.py
+
+      - name: Verify ALETH002 cross-writer recovery and migration
+        run: python conformance/container_v2/writer_matrix.py
 
       - name: Verify ALETH002 Python to TypeScript recovery interop
         run: |
@@ -479,6 +485,18 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Set up Python for independent browser output verification
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Install independent verifier and browser test dependencies
+        run: |
+          pip install -e .
+          npm ci --prefix scripts/browser-tests
+          cd scripts/browser-tests
+          npx playwright install --with-deps chromium
+
       - name: Install pinned wasm-bindgen CLI
         run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
 
@@ -507,6 +525,9 @@ jobs:
         run: |
           find extension/dist -maxdepth 3 -type f -print | sort
           test -s extension/dist/vendor/wasm/alethech_wasm_bg.wasm
+
+      - name: Exercise recovery in the actual browser extension
+        run: npm test --prefix scripts/browser-tests
 
       - name: Upload extension package
         uses: actions/upload-artifact@v4

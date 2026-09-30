@@ -89,3 +89,32 @@ MemoryCommit, change HEAD, rotate agent keys, or modify provenance.
 
 The new passphrase is used only in memory for the local reseal operation and is
 not persisted by the extension.
+
+## Envelope recovery
+
+The recovery form is available before unlocking. Choose a file, enter its recovery
+code, and enter matching new passphrases. The extension authenticates the recovery
+slot and verifies the entire portable protocol history before resealing or
+creating any download. Recovery preserves the container ID. The optional
+"Generate a new recovery code" checkbox rotates the code explicitly; otherwise
+the existing code remains usable.
+
+After unlocking, "Create recovery code" adds a recovery slot, upgrading a v1
+container to v2. It is disabled when a recovery slot already exists. "Rotate
+recovery code" is available only for containers with recovery enabled. Both
+require re-entry of the current passphrase. Save generated codes separately from
+the encrypted file.
+
+Append, accepted writeback, and passphrase changes preserve v2 envelopes,
+container IDs, and existing recovery access. Passphrase changes also require the
+current passphrase. Wrong credentials fail before downloading. Every generated
+file becomes the current encrypted source within the popup, so subsequent actions
+use the latest envelope and history. The extension keeps no credential between
+operations; password and recovery input fields are cleared after each operation.
+Choosing another file clears verified memory, displayed codes, and credentials;
+asynchronous results from the previous selection cannot overwrite the new state.
+Files larger than 512 MiB are rejected before reading them into memory.
+
+Rotation affects the newly downloaded file. Earlier copies remain decryptable
+with their earlier passphrases or recovery codes; local downloads cannot revoke
+existing copies. Closing the popup clears all in-memory state.

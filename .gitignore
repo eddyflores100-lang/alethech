@@ -40,3 +40,4 @@ alethech-rs/target/
 # generated browser artifacts
 extension/dist/
 alethech-wasm/target/
+scripts/browser-tests/node_modules/

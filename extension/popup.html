@@ -31,6 +31,21 @@
     <p id="filename" class="filename"></p>
     <div id="status" class="status" aria-live="polite">No memory loaded.</div>
 
+      <section class="recover-access">
+        <h2>Recover access</h2>
+        <p class="hint">Forgot your passphrase? Use your recovery code to unlock and set a new passphrase.</p>
+        <label for="recovery-input">Recovery code</label>
+        <textarea id="recovery-input" rows="3" placeholder="aleth-recovery-v1:..." spellcheck="false"></textarea>
+        <label for="recover-new-pass">New passphrase</label>
+        <input id="recover-new-pass" type="password" autocomplete="new-password" spellcheck="false">
+        <label for="recover-confirm-pass">Confirm new passphrase</label>
+        <input id="recover-confirm-pass" type="password" autocomplete="new-password" spellcheck="false">
+        <label><input id="recover-rotate" type="checkbox"> Generate a new recovery code (old code stops working for the downloaded file)</label>
+        <button id="recover-btn" disabled>Recover & download new .aleth</button>
+        <p class="hint">The downloaded file will have the same memory history, signed by the same identity. Only the encryption changes.</p>
+      </section>
+
+
     <section id="result" class="result" hidden>
       <div class="verified">✓ Verified locally</div>
       <dl>
@@ -80,7 +95,7 @@
 
       <section class="recovery">
         <h2>Recovery code</h2>
-        <p class="hint">A recovery code lets you regain access to your memory if you forget the passphrase. Store it somewhere safe — it's shown only once when created.</p>
+        <p class="hint">A recovery code lets you regain access to your memory if you forget the passphrase. Store it somewhere safe — it is displayed for this popup session.</p>
         <button id="create-recovery" disabled>Create recovery code</button>
         <div id="recovery-code-display" class="recovery-code" hidden>
           <label for="recovery-code-text">Your recovery code (shown once)</label>
@@ -89,25 +104,12 @@
           <p class="hint">Save this somewhere safe. Anyone with this code can decrypt your memory.</p>
         </div>
         <button id="rotate-recovery" disabled>Rotate recovery code</button>
-        <p class="hint">Rotate generates a new recovery code and invalidates the old one. The container_id stays the same.</p>
+        <p class="hint">Rotate creates a new code for the downloaded file and preserves its container ID. Earlier file copies still accept their original code.</p>
         <div id="rotated-recovery-display" class="recovery-code" hidden>
           <label for="rotated-recovery-text">New recovery code (shown once)</label>
           <textarea id="rotated-recovery-text" rows="3" readonly aria-label="New recovery code"></textarea>
           <button id="copy-rotated-recovery" type="button">Copy</button>
         </div>
-      </section>
-
-      <section class="recover-access">
-        <h2>Recover access</h2>
-        <p class="hint">Forgot your passphrase? Use your recovery code to unlock and set a new passphrase.</p>
-        <label for="recovery-input">Recovery code</label>
-        <textarea id="recovery-input" rows="3" placeholder="aleth-recovery-v1:..." spellcheck="false"></textarea>
-        <label for="recover-new-pass">New passphrase</label>
-        <input id="recover-new-pass" type="password" autocomplete="new-password" spellcheck="false">
-        <label for="recover-confirm-pass">Confirm new passphrase</label>
-        <input id="recover-confirm-pass" type="password" autocomplete="new-password" spellcheck="false">
-        <button id="recover-btn" disabled>Recover & download new .aleth</button>
-        <p class="hint">The downloaded file will have the same memory history, signed by the same identity. Only the encryption changes.</p>
       </section>
 
       <section class="rekey">
