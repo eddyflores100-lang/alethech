@@ -160,7 +160,10 @@ try {
   context.on("page", recordBrainPage);
   const openedFromBrain = context.waitForEvent("page");
   await sourceChat.locator("#alethech-brain").click();
-  const brainPopup = await openedFromBrain;
+  const brainPopup = await openedFromBrain.catch(async error => {
+    const errors = await sourceChat.locator('[role="status"]').allTextContents();
+    throw new Error(`Brain did not open review: ${JSON.stringify(errors)}; ${error.message}`);
+  });
   brainPopup.on("request", request => { if (/^https?:/.test(request.url())) externalRequests.push(request.url()); });
   await brainPopup.waitForLoadState("domcontentloaded");
   assert(brainPopup.url().startsWith(`chrome-extension://${id}/popup.html`));

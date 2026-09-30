@@ -16,11 +16,19 @@ function sourceUrl(value: unknown): URL {
 }
 function allowedSource(url: URL): boolean {
   return (chrome.runtime.getManifest().content_scripts ?? []).some(script => script.matches?.some(pattern => {
-    // Manifest patterns are trusted configuration; preserve their path restrictions.
-    const expression = pattern.replace(":*", "__PORT_WILDCARD__")
-      .replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
-      .replace("__PORT_WILDCARD__", "(?::[0-9]+)?");
-    return new RegExp(`^${expression}$`).test(url.href);
+    // Chrome match patterns without a port match every port on the host.
+    const match = /^(\*|https?):\/\/([^/]+)(\/.*)$/.exec(pattern);
+    if (!match || (match[1] !== "*" && `${match[1]}:` !== url.protocol)) return false;
+    const authority = /^(.*?)(?::(\*|[0-9]+))?$/.exec(match[2]);
+    if (!authority) return false;
+    const host = authority[1];
+    const hostMatches = host === "*" || host === url.hostname
+      || (host.startsWith("*.") && (url.hostname === host.slice(2) || url.hostname.endsWith(`.${host.slice(2)}`)));
+    if (!hostMatches) return false;
+    const port = authority[2];
+    if (port && port !== "*" && port !== (url.port || (url.protocol === "https:" ? "443" : "80"))) return false;
+    const path = match[3].replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+    return new RegExp(`^${path}$`).test(url.pathname);
   }));
 }
 function validatedCapture(input: unknown, source: URL): CaptureChatResult {

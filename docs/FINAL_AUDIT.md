@@ -33,9 +33,9 @@ Revisión del 30 de septiembre de 2026 sobre `main` en
   rechazo de alteraciones, continuación y apertura/verificación en Python.
 - Escritores ALETH002 TypeScript: esquemas, autenticación, reemplazo atómico,
   migración, recuperación y CLI.
-- `node scripts/browser-tests/background.mjs`: ocho grupos aprobados, incluyendo
+- `node scripts/browser-tests/background.mjs`: nueve grupos aprobados, incluyendo
   pestaña incorrecta antes del consumo legítimo, consumo concurrente único y
-  lectura antes de finalizar `tabs.create`.
+  lectura antes de finalizar `tabs.create` y patrones con puertos dinámicos.
 - El flujo Chrome comprueba captura, arrastre del cerebro, primera memoria sin
   archivo previo, aislamiento de secretos, lectura entre pestañas, continuación,
   recuperación y creación/verificación desde un HTML `file://` independiente.

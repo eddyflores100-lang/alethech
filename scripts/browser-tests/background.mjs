@@ -20,7 +20,7 @@ const sourceSender = (overrides = {}) => ({
   id: extensionId, frameId: 0, tab: { id: 1, url: sourcePage }, url: sourcePage, ...overrides,
 });
 
-function harness() {
+function harness(testManifest = manifest) {
   let onMessage, onRemoved, onUpdated;
   let now = Date.parse("2026-09-30T12:00:00.000Z");
   let timerId = 0;
@@ -33,7 +33,7 @@ function harness() {
   const chrome = {
     runtime: {
       id: extensionId, getURL: path => `chrome-extension://${extensionId}/${path}`,
-      getManifest: () => manifest, onMessage: { addListener: fn => { onMessage = fn; } },
+      getManifest: () => testManifest, onMessage: { addListener: fn => { onMessage = fn; } },
     },
     tabs: {
       create: options => new Promise((resolve, reject) => { creates.push({ ...options, resolve, reject }); }),
@@ -132,6 +132,20 @@ await check("source sender identity, frame, actual source URL and manifest paths
     const h = harness();
     const token = await open(h, fixture({ url }), sourceSender({ tab: { id: 1, url }, url }));
     assert.equal((await h.take(token)).capture.url, url);
+  }
+});
+
+await check("Chrome portless match patterns accept dynamic/default ports while preserving host and path restrictions", async () => {
+  const configured = { content_scripts: [{ matches: ["http://127.0.0.1/transcript/*", "https://example.test:8443/chat/*"] }] };
+  for (const url of ["http://127.0.0.1:49152/transcript/one", "http://127.0.0.1/transcript/two", "http://127.0.0.1:80/transcript/three", "https://example.test:8443/chat/one"]) {
+    const h = harness(configured);
+    const token = await open(h, fixture({ url }), sourceSender({ tab: { id: 1, url }, url }));
+    assert.equal((await h.take(token)).capture.url, new URL(url).href);
+  }
+  for (const url of ["http://127.0.0.1:49152/private/one", "http://127.0.0.2:49152/transcript/one", "https://example.test:8444/chat/one", "https://example.test/chat/one"]) {
+    const h = harness(configured);
+    await rejected(h.send({ type: "alethech.open-capture", capture: fixture({ url }) }, sourceSender({ tab: { id: 1, url }, url })), "host/path/explicit-port mismatch must fail");
+    assert.equal(h.creates.length, 0);
   }
 });
 
