@@ -24,6 +24,30 @@ async function main(): Promise<void> {
   }
 
   const forbidden = ["PRIVATE KEY", "signing.key", "root.key", "recovery.key"];
+
+  // granular selection: exact IDs, preserved order, and fail-closed unknown IDs.
+  if (view.entries.length > 0) {
+    const chosen = view.entries.slice(-1).map((entry) => entry.commit_id);
+    const selected = toAlethechContext(view, { include_ids: chosen });
+    if (selected.items.length !== 1 || selected.items[0].id !== chosen[0]) {
+      throw new Error("granular selection did not preserve exact selected commit");
+    }
+
+    let unknownRejected = false;
+    try {
+      toAlethechContext(view, { include_ids: ["sha256:" + "0".repeat(64)] });
+    } catch {
+      unknownRejected = true;
+    }
+    if (!unknownRejected) throw new Error("unknown selected memory id was accepted");
+
+    const typed = toAlethechContext(view, {
+      memory_types: [view.entries[0].memory_type as "semantic" | "episodic" | "procedural"],
+    });
+    if (typed.items.some((item) => item.memory_type !== view.entries[0].memory_type)) {
+      throw new Error("memory_type filter leaked a different memory type");
+    }
+  }
   for (const needle of forbidden) {
     if (text.includes(needle)) throw new Error(`context leaked forbidden material: ${needle}`);
   }
