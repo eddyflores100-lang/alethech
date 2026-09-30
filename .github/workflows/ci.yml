@@ -77,6 +77,12 @@ jobs:
       - name: Build Rust helpers
         run: cargo build --manifest-path alethech-rs/Cargo.toml --release --bin alethech-conf --bin alethech-container
 
+      - name: Run Rust SDK tests
+        run: cargo test --manifest-path alethech-rs/Cargo.toml
+
+      - name: Run TypeScript SDK tests
+        run: npx --yes tsx alethech-ts/test.ts
+
       - name: Run all three implementations
         run: python conformance/cross_language_check.py
 
