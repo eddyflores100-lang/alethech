@@ -90,6 +90,21 @@ async function main(): Promise<void> {
       badMigration.files[migrationPath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(migration)));
       await mustReject(badMigration,"tampered bilateral MigrationRecord");
     }
+
+    const checkpointPath=Object.keys(opened.payload.files).find(p=>p.startsWith("checkpoints/"));
+    if(checkpointPath){
+      const badCheckpoint=structuredClone(opened.payload);
+      const checkpoint=JSON.parse(new TextDecoder().decode(Buffer.from(badCheckpoint.files[checkpointPath],"base64url")));
+      checkpoint.head_commit_id="sha256:not-in-history";
+      badCheckpoint.files[checkpointPath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(checkpoint)));
+      await mustReject(badCheckpoint,"tampered signed checkpoint");
+
+      const regressedCheckpoint=structuredClone(opened.payload);
+      const checkpoint2=JSON.parse(new TextDecoder().decode(Buffer.from(regressedCheckpoint.files[checkpointPath],"base64url")));
+      checkpoint2.commit_count=999999;
+      regressedCheckpoint.files[checkpointPath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(checkpoint2)));
+      await mustReject(regressedCheckpoint,"checkpoint count regression");
+    }
   }
 
   const context=toAlethechContext(view);
