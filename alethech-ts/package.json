@@ -26,7 +26,7 @@
     "agent-memory",
     "verifiable",
     "provenance",
-    "merkle-dag",
+    "hash-linked-dag",
     "jcs",
     "rfc8785",
     "key-rotation",
