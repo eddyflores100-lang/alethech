@@ -199,6 +199,31 @@ jobs:
           assert v["entries"][0]["content"]["interop"] == "v2-browser"
           PY
 
+      - name: Verify migrated V2 portable continuity in browser
+        run: |
+          alethech --store /tmp/aleth-migrated init
+          alethech --store /tmp/aleth-migrated migrate --to v0.2
+          python - <<'PY'
+          from alethech import Alethech
+          a=Alethech.open("/tmp/aleth-migrated")
+          ev=a.evidence(
+              tool="migration.fixture",
+              input_bytes=b"request",
+              output_bytes=b"response",
+              artifacts={"proof.bin":b"migration-proof"},
+          )
+          a.commit({"interop":"v2-migrated-browser"}, evidence_refs=[ev.commit_id])
+          a.seal("/tmp/migrated-v2.aleth","migrated-passphrase")
+          PY
+          npx --yes tsx alethech-ts/portable-verifier-test.ts /tmp/migrated-v2.aleth migrated-passphrase > /tmp/browser-migrated-view.json
+          python - <<'PY'
+          import json
+          v=json.load(open("/tmp/browser-migrated-view.json"))
+          assert v["format"]=="alethech-memory-view"
+          assert len(v["entries"])==1
+          assert v["entries"][0]["content"]["interop"]=="v2-migrated-browser"
+          PY
+
       - name: Seal store in TypeScript and open in Python
         run: |
           npx --yes tsx alethech-ts/aleth-container.ts seal /tmp/aleth-source /tmp/ts-produced.aleth interop-passphrase
