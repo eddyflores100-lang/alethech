@@ -3,86 +3,52 @@
 This document describes how alethech is released to PyPI and npm, and what
 provenance information is recorded for each release.
 
-## Current state (as of 0.8.4)
+## Current state (as of 0.8.5)
 
 | Channel | Method | Trusted publishing? |
 |---|---|---|
-| PyPI | `twine upload` from local machine | ❌ not yet |
+| PyPI | `pypa/gh-action-pypi-publish` in CI workflow (GitHub OIDC) | ✅ since 0.8.5 |
 | npm | `npm publish` from local machine | ❌ npm doesn't support trusted publishing |
-| GitHub Release | `softprops/action-gh-release@v2` (when CI workflow runs) | ✅ via OIDC |
+| GitHub Release | `softprops/action-gh-release@v2` (automatic in CI workflow) | ✅ via OIDC |
 | Sigstore signatures | `sigstore sign` in CI workflow | ✅ via OIDC |
 
-**The goal** is to move PyPI to trusted publishing so that the entire
-release chain is CI-driven and no local tokens are needed.
+**0.8.5 is the first release published entirely through the CI chain.**
+No local PyPI token was used. The local PyPI API token used for
+transitional uploads of 0.8.0–0.8.4 can be revoked (see
+"Rotating the local PyPI token" below).
 
-## What's blocking PyPI trusted publishing
+## How the trusted publishing chain works
 
-The CI workflow `.github/workflows/release.yml` is already configured
-to use `pypa/gh-action-pypi-publish@release/v1`, which uses GitHub
-OIDC to mint a short-lived token from PyPI. The workflow runs on
-every `v*` tag push.
+The CI workflow `.github/workflows/release.yml` uses
+`pypa/gh-action-pypi-publish@release/v1`, which uses GitHub OIDC to
+mint a short-lived token from PyPI. The workflow runs on every `v*`
+tag push.
 
-**What's missing:** the PyPI project `alethech` has not yet been
-registered with a "GitHub trusted publisher" entry. Without that
-registration, PyPI rejects the OIDC token with:
+The PyPI project `alethech` has a registered GitHub trusted publisher
+with these exact claims:
+
+- Owner: `eddyflores100-lang`
+- Repository: `alethech`
+- Workflow: `release.yml`
+- Environment: _(none)_
+
+The full chain:
 
 ```
-invalid-publisher: valid token, but no corresponding publisher
+git tag vX.Y.Z + git push origin vX.Y.Z
+                ↓
+   GitHub Actions release.yml workflow runs
+                ↓
+   Build package (python -m build)
+                ↓
+   Sign with Sigstore via GitHub OIDC
+                ↓
+   Publish to PyPI via pypa/gh-action-pypi-publish (no token)
+                ↓
+   Create GitHub Release with artifacts + signatures
 ```
 
-## How to register the trusted publisher (one-time, manual)
-
-Only the PyPI project owner can do this. The steps are:
-
-1. Log in to https://pypi.org with the account that owns `alethech`.
-2. Go to https://pypi.org/manage/account/publishing/
-3. Click "Add a new publisher" → select **GitHub**.
-4. Fill in the form with these exact values:
-
-   | Field | Value |
-   |---|---|
-   | PyPI Project Name | `alethech` |
-   | Owner | `eddyflores100-lang` |
-   | Repository name | `alethech` |
-   | Workflow name | `release.yml` |
-   | Environment name | _(leave empty — we don't use environments)_ |
-
-5. Click "Add publisher".
-
-After this registration, the next `git tag v0.8.5 && git push origin v0.8.5`
-will trigger the release workflow, which will:
-
-1. Build the package.
-2. Sign it with Sigstore via GitHub OIDC.
-3. Publish to PyPI via `pypa/gh-action-pypi-publish` (no stored token).
-4. Create a GitHub Release with the artifacts and signatures attached.
-
-The full chain — `commit → tag → CI build → Sigstore sign → PyPI publish → GitHub Release` — will then be publicly verifiable with no manual steps.
-
-## Verifying a release (for consumers)
-
-For any release starting from the first one published via trusted
-publishing, consumers can verify the full chain:
-
-```bash
-# 1. Download the wheel
-pip download alethech==0.8.5 --no-deps -d /tmp/verify
-
-# 2. Compute its SHA-256
-sha256sum /tmp/verify/alethech-0.8.5-*.whl
-
-# 3. Compare against the hash in the GitHub Release body
-#    https://github.com/eddyflores100-lang/alethech/releases/tag/v0.8.5
-
-# 4. (Optional) Verify the Sigstore signature
-sigstore verify /tmp/verify/alethech-0.8.5-*.whl \
-    --certificate-identity https://github.com/eddyflores100-lang/alethech/.github/workflows/release.yml@refs/tags/v0.8.5 \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-The Sigstore signature proves that the artifact was produced by the
-`release.yml` workflow on the `v0.8.5` tag — not by an attacker with
-PyPI credentials.
+The full chain — `commit → tag → CI build → Sigstore sign → PyPI publish → GitHub Release` — is publicly verifiable with no manual steps.
 
 ## Pre-trusted-publishing releases (0.8.0 through 0.8.4)
 
@@ -105,9 +71,8 @@ correct commits, but the PyPI artifacts for those versions were not
 produced by the CI workflow. This is documented in each release's
 CHANGELOG entry.
 
-Starting from the first release after the trusted publisher is
-registered (target: 0.8.5), the CI chain will be the only path to
-PyPI, and the local PyPI API token can be revoked.
+Starting from 0.8.5, the CI chain is the only path to PyPI, and the
+local PyPI API token can be revoked.
 
 ## npm releases (alethech-ts)
 
@@ -117,9 +82,9 @@ The npm token is stored locally in `~/.npmrc` (chmod 600) and is
 rotated periodically.
 
 The TypeScript package is published from the same commit as the
-Python package, so the git tag (`v0.8.4`) covers both:
-- `pip install alethech` → 0.8.4 (PyPI, manual twine)
-- `npm install alethech-ts` → 0.8.4 (npm, manual publish)
+Python package, so the git tag (`v0.8.5`) covers both:
+- `pip install alethech` → 0.8.5 (PyPI, CI trusted publishing since 0.8.5)
+- `npm install alethech-ts` → 0.8.5 (npm, manual publish — npm doesn't support trusted publishing)
 
 Both should match the version in `pyproject.toml` and
 `alethech-ts/package.json` at the tagged commit.
