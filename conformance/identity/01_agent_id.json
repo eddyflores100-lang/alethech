@@ -1,0 +1,13 @@
+{
+  "description": "Same Ed25519 public key MUST derive the same agent_id in every implementation",
+  "expected_result": "verify_ok",
+  "input": {
+    "type": "AgentIdDerivation",
+    "public_key": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "KioqKioqKioqKioqKioqKioqKioqKioqKioqKioqKio"
+    },
+    "expected_agent_id": "did:alethech:jcsjojphm7rtqmxq2hrrf7ooni"
+  }
+}
