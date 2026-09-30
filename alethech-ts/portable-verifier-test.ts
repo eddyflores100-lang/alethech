@@ -45,6 +45,18 @@ async function main(): Promise<void> {
   authorityLeak.files["keys/root.key"]=bytesToBase64Url(new Uint8Array([1,2,3]));
   await mustReject(authorityLeak,"root authority key leak");
 
+  const wrongSigningKey=structuredClone(opened.payload);
+  wrongSigningKey.files["keys/signing.key"]=bytesToBase64Url(
+    new TextEncoder().encode("-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n")
+  );
+  await mustReject(wrongSigningKey,"mismatched signing key");
+
+  const badArtifact=structuredClone(opened.payload);
+  badArtifact.files["artifacts/sha256:"+"0".repeat(64)]=bytesToBase64Url(
+    new TextEncoder().encode("artifact bytes")
+  );
+  await mustReject(badArtifact,"artifact hash mismatch");
+
   process.stdout.write(JSON.stringify(view));
 }
 
