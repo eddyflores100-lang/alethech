@@ -34,3 +34,17 @@ def test_initialize_refuses_nonempty_directory(tmp_path):
     (path / "foreign.txt").write_text("do not overwrite")
     with pytest.raises(AlethechError, match="directory not empty"):
         Alethech.initialize(path)
+
+
+def test_portable_aleth_public_api(tmp_path):
+    source = Alethech.initialize(tmp_path / "source")
+    source.commit({"memory": "moves between devices"})
+    container = source.seal(tmp_path / "memory.aleth", "portable-secret")
+
+    target = Alethech.open_aleth(container, tmp_path / "device-b", "portable-secret")
+
+    assert target.head == source.head
+    assert target.verify().ok
+    continued = target.commit({"memory": "continued on device B"})
+    assert continued.parents == [source.head]
+    assert target.verify().ok
