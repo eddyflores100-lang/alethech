@@ -1,8 +1,8 @@
 [package]
 name = "alethech"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2021"
-description = "Verifiable agent continuity protocol — Ed25519-signed memory, Merkle DAG, key rotation"
+description = "Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation"
 license = "MIT"
 authors = ["AliceLabs"]
 repository = "https://github.com/eddyflores100-lang/alethech"
