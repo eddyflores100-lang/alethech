@@ -1,4 +1,4 @@
-import initWasm, { open_aleth_payload, seal_aleth_payload } from "./vendor/wasm/alethech_wasm.js";
+import initWasm, { open_aleth_payload, seal_aleth_payload, seal_aleth_v2, open_aleth_v2_recovery, recover_aleth_v2, generate_recovery_secret } from "./vendor/wasm/alethech_wasm.js";
 import { verifyPortablePayload, type PortablePayload, type VerifiedPortableView } from "../../alethech-ts/portable-verifier.ts";
 import { appendPortableMemory, canonicalPortablePayloadBytes } from "../../alethech-ts/portable-editor.ts";
 import { toContextText } from "../../alethech-ts/context-adapter.ts";
@@ -43,6 +43,18 @@ const clearSelectionButton = el<HTMLButtonElement>("clear-memory-selection");
 const newPassphrase = el<HTMLInputElement>("new-passphrase");
 const confirmPassphrase = el<HTMLInputElement>("confirm-passphrase");
 const rekeyButton = el<HTMLButtonElement>("rekey");
+const createRecoveryButton = el<HTMLButtonElement>("create-recovery");
+const recoveryCodeDisplay = el<HTMLElement>("recovery-code-display");
+const recoveryCodeText = el<HTMLTextAreaElement>("recovery-code-text");
+const copyRecoveryButton = el<HTMLButtonElement>("copy-recovery-code");
+const rotateRecoveryButton = el<HTMLButtonElement>("rotate-recovery");
+const rotatedRecoveryDisplay = el<HTMLElement>("rotated-recovery-display");
+const rotatedRecoveryText = el<HTMLTextAreaElement>("rotated-recovery-text");
+const copyRotatedRecoveryButton = el<HTMLButtonElement>("copy-rotated-recovery");
+const recoveryInput = el<HTMLTextAreaElement>("recovery-input");
+const recoverNewPass = el<HTMLInputElement>("recover-new-pass");
+const recoverConfirmPass = el<HTMLInputElement>("recover-confirm-pass");
+const recoverButton = el<HTMLButtonElement>("recover-btn");
 
 function ensureWasm(): Promise<unknown> {
   if (!wasmReady) wasmReady = initWasm();
@@ -78,6 +90,7 @@ function renderView(view: VerifiedPortableView): void {
     memories.appendChild(row);
   }
   saveButton.disabled = !verifiedPayload || !newMemory.value.trim();
+  updateRecoveryButtons();
 }
 
 function clearVerifiedState(): void {
@@ -417,5 +430,208 @@ rekeyButton.addEventListener("click", async () => {
     newPassphrase.value = "";
     confirmPassphrase.value = "";
     updateRekeyButton();
+  }
+});
+
+// ============================================================
+// Recovery code handlers
+// ============================================================
+
+function updateRecoveryButtons(): void {
+  // "Create recovery code" is enabled only when a verified payload is loaded.
+  // "Rotate recovery code" is enabled only when a verified payload is loaded
+  // and the user has NOT yet created a recovery code in this session.
+  // "Recover access" button is enabled when the recovery-input field has
+  // content and the new passphrase fields match.
+  const canCreate = !!verifiedPayload && !!selectedFile;
+  createRecoveryButton.disabled = !canCreate || !recoveryCodeDisplay.hidden;
+  rotateRecoveryButton.disabled = !canCreate;
+
+  const rc = recoveryInput.value.trim();
+  const np = recoverNewPass.value;
+  const cp = recoverConfirmPass.value;
+  recoverButton.disabled = !rc || !np || np !== cp;
+}
+
+recoveryInput.addEventListener("input", updateRecoveryButtons);
+recoverNewPass.addEventListener("input", updateRecoveryButtons);
+recoverConfirmPass.addEventListener("input", updateRecoveryButtons);
+
+async function downloadRecoveryAleth(
+  plaintext: Uint8Array,
+  passphrase: string,
+  recoverySecretB64: string,
+  suffix: string,
+): Promise<{ recoveryCode: string; containerId: string }> {
+  if (!selectedFile) throw new Error("No source .aleth selected.");
+  await ensureWasm();
+  const resultJson = seal_aleth_v2(plaintext, passphrase, recoverySecretB64);
+  const result = JSON.parse(resultJson) as { blob: string; recovery_code: string | null; container_id: string };
+  if (!result.recovery_code) throw new Error("Internal: recovery code was not generated.");
+
+  // Decode the blob from base64url to Uint8Array
+  const blob = Uint8Array.from(
+    atob(result.blob.replace(/-/g, "+").replace(/_/g, "/")),
+    (c) => c.charCodeAt(0),
+  );
+  const url = URL.createObjectURL(new Blob([blob], { type: "application/octet-stream" }));
+  const link = document.createElement("a");
+  const base = (selectedFile.name.replace(/\.aleth$/i, "") || "memory");
+  link.href = url;
+  link.download = base + suffix + ".aleth";
+  link.click();
+  URL.revokeObjectURL(url);
+
+  return { recoveryCode: result.recovery_code, containerId: result.container_id };
+}
+
+createRecoveryButton.addEventListener("click", async () => {
+  if (!verifiedPayload || !selectedFile) return;
+  const pass = passphrase.value;
+  if (!pass) {
+    status.className = "status error";
+    status.textContent = "Re-enter the current passphrase to create a recovery code.";
+    return;
+  }
+
+  createRecoveryButton.disabled = true;
+  status.className = "status";
+  status.textContent = "Generating recovery code…";
+
+  let plaintext: Uint8Array | null = null;
+  try {
+    await ensureWasm();
+    plaintext = canonicalPortablePayloadBytes(verifiedPayload);
+    const secret = generate_recovery_secret();
+    const { recoveryCode } = await downloadRecoveryAleth(plaintext, pass, secret, "-with-recovery");
+
+    recoveryCodeText.value = recoveryCode;
+    recoveryCodeDisplay.hidden = false;
+    status.textContent = "Recovery code created. Downloaded a new .aleth with the recovery slot added.";
+    status.className = "status";
+    updateRecoveryButtons();
+  } catch (e) {
+    status.className = "status error";
+    status.textContent = e instanceof Error ? e.message : String(e);
+  } finally {
+    if (plaintext) plaintext.fill(0);
+    passphrase.value = "";
+    createRecoveryButton.disabled = false;
+  }
+});
+
+copyRecoveryButton.addEventListener("click", () => {
+  recoveryCodeText.select();
+  document.execCommand("copy");
+  status.textContent = "Recovery code copied to clipboard.";
+});
+
+rotateRecoveryButton.addEventListener("click", async () => {
+  if (!verifiedPayload || !selectedFile) return;
+  const pass = passphrase.value;
+  if (!pass) {
+    status.className = "status error";
+    status.textContent = "Re-enter the current passphrase to rotate the recovery code.";
+    return;
+  }
+
+  rotateRecoveryButton.disabled = true;
+  status.className = "status";
+  status.textContent = "Rotating recovery code…";
+
+  let plaintext: Uint8Array | null = null;
+  try {
+    await ensureWasm();
+    plaintext = canonicalPortablePayloadBytes(verifiedPayload);
+    const secret = generate_recovery_secret();
+    const { recoveryCode } = await downloadRecoveryAleth(plaintext, pass, secret, "-rotated-recovery");
+
+    rotatedRecoveryText.value = recoveryCode;
+    rotatedRecoveryDisplay.hidden = false;
+    status.textContent = "Recovery code rotated. The old recovery code no longer works.";
+    status.className = "status";
+    updateRecoveryButtons();
+  } catch (e) {
+    status.className = "status error";
+    status.textContent = e instanceof Error ? e.message : String(e);
+  } finally {
+    if (plaintext) plaintext.fill(0);
+    passphrase.value = "";
+    rotateRecoveryButton.disabled = false;
+  }
+});
+
+copyRotatedRecoveryButton.addEventListener("click", () => {
+  rotatedRecoveryText.select();
+  document.execCommand("copy");
+  status.textContent = "New recovery code copied to clipboard.";
+});
+
+recoverButton.addEventListener("click", async () => {
+  if (!selectedFile) return;
+  const code = recoveryInput.value.trim();
+  const newPass = recoverNewPass.value;
+  const confirmPass = recoverConfirmPass.value;
+  if (!code) {
+    status.className = "status error";
+    status.textContent = "Enter the recovery code.";
+    return;
+  }
+  if (!newPass) {
+    status.className = "status error";
+    status.textContent = "Enter a new passphrase.";
+    return;
+  }
+  if (newPass !== confirmPass) {
+    status.className = "status error";
+    status.textContent = "New passphrases do not match.";
+    return;
+  }
+
+  recoverButton.disabled = true;
+  status.className = "status";
+  status.textContent = "Recovering access…";
+
+  try {
+    await ensureWasm();
+    const blob = new Uint8Array(await selectedFile.arrayBuffer());
+
+    // Use recover_aleth_v2 to decrypt with recovery code and re-seal with new passphrase.
+    // rotate_recovery=true so the old recovery code is invalidated.
+    const resultJson = recover_aleth_v2(blob, code, newPass, true);
+    const result = JSON.parse(resultJson) as { blob: string; recovery_code: string; container_id: string };
+
+    // Decode the new blob
+    const newBlob = Uint8Array.from(
+      atob(result.blob.replace(/-/g, "+").replace(/_/g, "/")),
+      (c) => c.charCodeAt(0),
+    );
+
+    // Download the new .aleth
+    const url = URL.createObjectURL(new Blob([newBlob], { type: "application/octet-stream" }));
+    const link = document.createElement("a");
+    const base = selectedFile.name.replace(/\.aleth$/i, "") || "memory";
+    link.href = url;
+    link.download = base + "-recovered.aleth";
+    link.click();
+    URL.revokeObjectURL(url);
+
+    // Show the new recovery code
+    rotatedRecoveryText.value = result.recovery_code;
+    rotatedRecoveryDisplay.hidden = false;
+
+    status.textContent = "Access recovered. A new .aleth was downloaded with the new passphrase and a new recovery code. The old recovery code is invalid.";
+    status.className = "status";
+
+    // Clear the recovery form
+    recoveryInput.value = "";
+    recoverNewPass.value = "";
+    recoverConfirmPass.value = "";
+    updateRecoveryButtons();
+  } catch (e) {
+    status.className = "status error";
+    status.textContent = e instanceof Error ? e.message : String(e);
+  } finally {
+    recoverButton.disabled = false;
   }
 });

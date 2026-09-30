@@ -78,6 +78,38 @@
         <p class="hint">Provider output is unsigned until you explicitly accept it here. Re-enter the passphrase above before acceptance.</p>
       </section>
 
+      <section class="recovery">
+        <h2>Recovery code</h2>
+        <p class="hint">A recovery code lets you regain access to your memory if you forget the passphrase. Store it somewhere safe — it's shown only once when created.</p>
+        <button id="create-recovery" disabled>Create recovery code</button>
+        <div id="recovery-code-display" class="recovery-code" hidden>
+          <label for="recovery-code-text">Your recovery code (shown once)</label>
+          <textarea id="recovery-code-text" rows="3" readonly aria-label="Recovery code"></textarea>
+          <button id="copy-recovery-code" type="button">Copy</button>
+          <p class="hint">Save this somewhere safe. Anyone with this code can decrypt your memory.</p>
+        </div>
+        <button id="rotate-recovery" disabled>Rotate recovery code</button>
+        <p class="hint">Rotate generates a new recovery code and invalidates the old one. The container_id stays the same.</p>
+        <div id="rotated-recovery-display" class="recovery-code" hidden>
+          <label for="rotated-recovery-text">New recovery code (shown once)</label>
+          <textarea id="rotated-recovery-text" rows="3" readonly aria-label="New recovery code"></textarea>
+          <button id="copy-rotated-recovery" type="button">Copy</button>
+        </div>
+      </section>
+
+      <section class="recover-access">
+        <h2>Recover access</h2>
+        <p class="hint">Forgot your passphrase? Use your recovery code to unlock and set a new passphrase.</p>
+        <label for="recovery-input">Recovery code</label>
+        <textarea id="recovery-input" rows="3" placeholder="aleth-recovery-v1:..." spellcheck="false"></textarea>
+        <label for="recover-new-pass">New passphrase</label>
+        <input id="recover-new-pass" type="password" autocomplete="new-password" spellcheck="false">
+        <label for="recover-confirm-pass">Confirm new passphrase</label>
+        <input id="recover-confirm-pass" type="password" autocomplete="new-password" spellcheck="false">
+        <button id="recover-btn" disabled>Recover & download new .aleth</button>
+        <p class="hint">The downloaded file will have the same memory history, signed by the same identity. Only the encryption changes.</p>
+      </section>
+
       <section class="rekey">
         <h2>Change file passphrase</h2>
         <label for="new-passphrase">New passphrase</label>
