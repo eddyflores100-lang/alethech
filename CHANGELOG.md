@@ -1,5 +1,77 @@
 # Changelog
 
+## [0.9.0] — 2026-09-30
+
+### ALETH002 cross-language + browser extension recovery UI
+
+Minor bump: ALETH002 (recovery code) is now implemented in all three
+runtimes (Python, TypeScript, Rust) with the write-side (seal, recover,
+migrate) verified via cross-language conformance. The browser extension
+popup now has a full recovery flow UI.
+
+#### Python
+- `seal_store_v2`, `recover_container_v2`, `migrate_v1_to_v2` — already
+  existed; now used by the CI cross-language conformance job.
+
+#### TypeScript (alethech-ts/aleth-container-v2.ts)
+- `sealAlethV2(payload, output, passphrase, options)` — seal a v2 container
+  with optional recovery slot.
+- `recoverAlethV2(input, output, recoveryCode, newPassphrase, options)` —
+  recover a v2 container using the recovery code, preserving container_id.
+  Supports `rotateRecovery` to invalidate the old recovery code.
+- `migrateAlethV1ToV2(input, output, oldPass, newPass, options)` —
+  migrate a v1 container to v2, generating a recovery slot by default.
+- Cross-language interop verified: TS seals ↔ Python opens, Python
+  seals ↔ TS opens.
+
+#### Rust (alethech-rs/src/bin/aleth_container_v2.rs)
+- CLI subcommands: `seal`, `recover`, `migrate` — same contract as TS.
+- CI cross-language conformance job compiles and runs the Rust helper.
+
+#### WASM (alethech-wasm/src/lib.rs)
+- `open_aleth_v2_passphrase(blob, passphrase)` — open v2 by passphrase.
+- `open_aleth_v2_recovery(blob, recovery_code)` — open v2 by recovery code.
+- `open_aleth_payload(blob, passphrase)` — auto-detects v1/v2 from magic
+  bytes and dispatches. Existing popup.ts code automatically supports
+  v2 containers without any JS changes.
+- `seal_aleth_v2(plaintext, passphrase, recovery_secret_b64)` — seal v2,
+  returns JSON with blob/recovery_code/container_id.
+- `recover_aleth_v2(blob, recovery_code, new_passphrase, rotate)` —
+  decrypt with recovery, re-seal with new passphrase.
+- `generate_recovery_secret()` — fresh 32-byte random secret as base64url.
+
+#### Browser extension (extension/popup.html + extension/src/popup.ts)
+- New "Recovery code" section: create, copy, rotate.
+- New "Recover access" section: enter recovery code + new passphrase,
+  download a new .aleth with the recovery code rotated.
+- Buttons are enabled/disabled based on whether a verified payload is
+  loaded and whether the recovery form is filled.
+
+#### CI
+- Cross-language conformance job: ✅ (Python + Rust + TypeScript)
+- Browser extension package: ✅
+- pytest py3.10/3.11/3.12/3.13: ✅
+- GitGuardian: ⚠️ false positive on golden.vector (public synthetic
+  test vector, not a real secret). `.gitguardian.yml` added with
+  paths-ignore, but the dashboard incident 37740856 still needs to be
+  manually marked as false positive by the owner.
+
+### Files changed
+- alethech/container_v2.py — no changes (already complete)
+- alethech-ts/aleth-container-v2.ts — +274 lines (seal/recover/migrate)
+- alethech-rs/src/bin/aleth_container_v2.rs — +406 lines (seal/recover/migrate)
+- alethech-wasm/src/lib.rs — +545 lines (v2 open/seal/recover + tests)
+- extension/popup.html — +31 lines (recovery UI sections)
+- extension/src/popup.ts — +218 lines (recovery handlers)
+- .gitguardian.yml — +23 lines (paths-ignore for test vectors)
+- conformance/container_v2/golden.vector — frozen ALETH002 test vector
+- conformance/container_v2/check.py — frozen reader conformance check
+- conformance/container_v2/README.md — fixture documentation
+- docs/ALETH002_PROGRESS.md — progress notes
+- docs/ALETH_RECOVERY_SPEC.md — recovery spec
+- tests/test_container_v2_golden.py — frozen vector test
+- tests/test_070_audit_fixes.py — fixture cleanup
+
 ## [0.8.5] — 2026-09-29
 
 ### First CI-trusted-publish release
