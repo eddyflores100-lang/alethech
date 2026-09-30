@@ -14,7 +14,7 @@ from .objects import Identity, MemoryCommit
 from .store import Store, StoreError
 from .verify import VerifyReport, verify_store
 from .container import seal_store, open_container
-from .adapters import VerifiedMemoryView, build_memory_view
+from .adapters import VerifiedMemoryView, build_memory_view, context_from_aleth
 
 class AlethechError(Exception):
     """Programmatic API error with stable, user-facing semantics."""
@@ -145,3 +145,8 @@ class Alethech:
     def open_aleth(cls, path: str | Path, destination: str | Path, passphrase: str) -> "Alethech":
         """Open an encrypted .aleth into a new local working store."""
         return cls(open_container(path, destination, passphrase))
+
+    @staticmethod
+    def drop_context(path: str | Path, passphrase: str) -> dict:
+        """Unlock a dropped .aleth, verify it, and return neutral context only."""
+        return context_from_aleth(str(path), passphrase)
