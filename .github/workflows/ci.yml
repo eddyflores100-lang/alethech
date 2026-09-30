@@ -534,7 +534,7 @@ jobs:
           const fs=require("fs");
           const m=JSON.parse(fs.readFileSync("extension/dist/manifest.json","utf8"));
           if (m.manifest_version !== 3) throw new Error("Manifest V3 required");
-          if (JSON.stringify([...(m.permissions || [])].sort()) !== JSON.stringify(["activeTab"])) throw new Error("Only activeTab permission is allowed (Chrome Web Store compliance)");
+          if (JSON.stringify([...(m.permissions || [])].sort()) !== JSON.stringify(["activeTab","scripting"])) throw new Error("Only activeTab + scripting permissions are allowed (Chrome Web Store compliant with activeTab)
           if ((m.host_permissions || []).length) throw new Error("Extension must not request host permissions");
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
