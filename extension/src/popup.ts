@@ -40,6 +40,9 @@ const writebackSummary = el<HTMLElement>("writeback-summary");
 const acceptWritebackButton = el<HTMLButtonElement>("accept-writeback");
 const selectAllButton = el<HTMLButtonElement>("select-all-memories");
 const clearSelectionButton = el<HTMLButtonElement>("clear-memory-selection");
+const newPassphrase = el<HTMLInputElement>("new-passphrase");
+const confirmPassphrase = el<HTMLInputElement>("confirm-passphrase");
+const rekeyButton = el<HTMLButtonElement>("rekey");
 
 function ensureWasm(): Promise<unknown> {
   if (!wasmReady) wasmReady = initWasm();
@@ -90,6 +93,9 @@ function clearVerifiedState(): void {
   writebackSummary.textContent = "";
   pendingWriteback = null;
   acceptWritebackButton.disabled = true;
+  newPassphrase.value = "";
+  confirmPassphrase.value = "";
+  rekeyButton.disabled = true;
 }
 
 async function downloadUpdatedAleth(
@@ -124,6 +130,16 @@ function selectedContextLimit(): number {
   }
   return parsed;
 }
+
+function updateRekeyButton(): void {
+  rekeyButton.disabled =
+    !verifiedPayload ||
+    !newPassphrase.value ||
+    !confirmPassphrase.value;
+}
+
+newPassphrase.addEventListener("input", updateRekeyButton);
+confirmPassphrase.addEventListener("input", updateRekeyButton);
 
 function choose(file: File | null): void {
   clearVerifiedState();
@@ -368,4 +384,38 @@ clearSelectionButton.addEventListener("click", () => {
   }
   status.className = "status";
   status.textContent = "Memory sharing selection cleared.";
+});
+
+
+rekeyButton.addEventListener("click", async () => {
+  if (!verifiedPayload || !selectedFile) return;
+  const next = newPassphrase.value;
+  const confirm = confirmPassphrase.value;
+  if (!next) {
+    status.className = "status error";
+    status.textContent = "Enter a new passphrase.";
+    return;
+  }
+  if (next !== confirm) {
+    status.className = "status error";
+    status.textContent = "New passphrases do not match.";
+    return;
+  }
+
+  rekeyButton.disabled = true;
+  status.className = "status";
+  status.textContent = "Re-encrypting the same verified memory with a new passphrase…";
+  try {
+    await downloadUpdatedAleth(verifiedPayload, next, "-rekeyed");
+    status.textContent = "Passphrase rotated locally. Memory history was not changed.";
+    newPassphrase.value = "";
+    confirmPassphrase.value = "";
+  } catch (e) {
+    status.className = "status error";
+    status.textContent = e instanceof Error ? e.message : String(e);
+  } finally {
+    newPassphrase.value = "";
+    confirmPassphrase.value = "";
+    updateRekeyButton();
+  }
 });
