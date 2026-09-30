@@ -20,6 +20,7 @@ thiserror = "1.0"
 rand = "0.8"
 aes-gcm = "0.10"
 scrypt = "0.11"
+hkdf = "0.12"
 
 [dev-dependencies]
 serde_json = "1.0"
@@ -32,3 +33,8 @@ path = "src/bin/conf.rs"
 [[bin]]
 name = "alethech-container"
 path = "src/bin/aleth_container.rs"
+
+
+[[bin]]
+name = "alethech-container-v2"
+path = "src/bin/aleth_container_v2.rs"
