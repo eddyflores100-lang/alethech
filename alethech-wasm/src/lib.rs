@@ -102,3 +102,68 @@ pub fn open_aleth_payload(blob: &[u8], passphrase: &str) -> Result<Vec<u8>, JsVa
         )
         .map_err(|_| err("authentication failed"))
 }
+
+
+/// Seal an already protocol-verified plaintext payload as .aleth v1.
+///
+/// The caller MUST verify the plaintext payload before calling this function.
+/// This function provides confidentiality + authenticated transport only.
+#[wasm_bindgen]
+pub fn seal_aleth_payload(plaintext: &[u8], passphrase: &str) -> Result<Vec<u8>, JsValue> {
+    if plaintext.len() > MAX_CONTAINER {
+        return Err(err("payload too large"));
+    }
+    if passphrase.is_empty() {
+        return Err(err("passphrase must be non-empty"));
+    }
+
+    let mut salt = [0u8; 16];
+    let mut nonce = [0u8; 12];
+    getrandom::getrandom(&mut salt).map_err(|_| err("random generation failed"))?;
+    getrandom::getrandom(&mut nonce).map_err(|_| err("random generation failed"))?;
+
+    // All keys are ASCII and serde_json's default map ordering is sorted,
+    // which matches JCS ordering for this fixed v1 header.
+    let header = json!({
+        "cipher": "AES-256-GCM",
+        "format": "aleth",
+        "kdf": "scrypt",
+        "nonce": Base64UrlUnpadded::encode_string(&nonce),
+        "salt": Base64UrlUnpadded::encode_string(&salt),
+        "scrypt_n": 32768,
+        "scrypt_p": 1,
+        "scrypt_r": 8,
+        "version": 1
+    });
+    let header_bytes = serde_json::to_vec(&header).map_err(|_| err("header serialization failed"))?;
+    if header_bytes.len() > MAX_HEADER {
+        return Err(err("header too large"));
+    }
+
+    let key = derive_key(passphrase, &salt)?;
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| err("invalid AES key"))?;
+    let encrypted = cipher
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: plaintext,
+                aad: &header_bytes,
+            },
+        )
+        .map_err(|_| err("encryption failed"))?;
+
+    let total_len = 12usize
+        .checked_add(header_bytes.len())
+        .and_then(|n| n.checked_add(encrypted.len()))
+        .ok_or_else(|| err("container too large"))?;
+    if total_len > MAX_CONTAINER {
+        return Err(err("container too large"));
+    }
+
+    let mut blob = Vec::with_capacity(total_len);
+    blob.extend_from_slice(MAGIC);
+    blob.extend_from_slice(&(header_bytes.len() as u32).to_be_bytes());
+    blob.extend_from_slice(&header_bytes);
+    blob.extend_from_slice(&encrypted);
+    Ok(blob)
+}
