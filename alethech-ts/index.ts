@@ -108,7 +108,8 @@ export function bytesToBase32Lower(bytes: Uint8Array): string {
 
 export async function deriveAgentId(publicKeyBytes: Uint8Array): Promise<string> {
     const x = bytesToBase64Url(publicKeyBytes);
-    const jwk = JSON.stringify({ kty: "OKP", crv: "Ed25519", x });
+    // Protocol rule: hash the JCS-canonical JWK, not insertion-order JSON.
+    const jwk = canonicalizeJson({ kty: "OKP", crv: "Ed25519", x });
     const jwkBytes = new TextEncoder().encode(jwk);
     const hash = await sha256(jwkBytes);
     const b32 = bytesToBase32Lower(hash.slice(0, 16));
@@ -263,7 +264,14 @@ export async function verifyCommit(
     const sigBytes = base64UrlToBytes(sigB64);
     if (sigBytes.length !== 64) return false;
 
-    const { signature, ...rest } = commit;
+    // Integrity rule: commit_id MUST equal SHA-256(JCS(commit without
+    // commit_id/signature)); a valid signature over an arbitrary ID is not enough.
+    const { signature, commit_id, ...body } = commit;
+    const bodyBytes = new TextEncoder().encode(canonicalizeJson(body));
+    const expectedId = `sha256:${await sha256Hex(bodyBytes)}`;
+    if (commit_id !== expectedId) return false;
+
+    const rest = { ...body, commit_id };
     const canonical = canonicalizeJson(rest);
     const data = new TextEncoder().encode(canonical);
 
@@ -346,6 +354,7 @@ export async function runTests(): Promise<{ passed: number; failed: number; resu
     const id1 = await deriveAgentId(pk);
     const id2 = await deriveAgentId(pk);
     assert(id1 === id2 && id1.startsWith("did:alethech:"), "Agent ID deterministic");
+    assert(id1 === "did:alethech:jcsjojphm7rtqmxq2hrrf7ooni", "Agent ID Python/JCS conformance vector");
 
     assert(canonicalizeJson({ b: 1, a: 2 }) === `{"a":2,"b":1}`, "JCS key sorting");
 
