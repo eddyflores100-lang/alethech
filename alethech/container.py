@@ -118,25 +118,73 @@ def _verify_portable_signing_key(store: Store) -> None:
         raise ContainerError("signing key does not match identity")
 
 
+def _seal_payload_bytes(payload: dict, passphrase: str) -> bytes:
+    """Encrypt one already-formed logical payload as an ALETH001 container."""
+    if payload.get("payload_version") != 1 or not isinstance(payload.get("files"), dict):
+        raise ContainerError("unsupported payload")
+    if len(payload["files"]) > MAX_FILES:
+        raise ContainerError("too many files")
+    salt, nonce = os.urandom(16), os.urandom(12)
+    header = {"cipher":"AES-256-GCM","format":"aleth","kdf":"scrypt",
+              "nonce":b64url(nonce),"salt":b64url(salt),
+              "scrypt_n":32768,"scrypt_p":1,"scrypt_r":8,"version":1}
+    hb = canonical_json_bytes(header)
+    plain = canonical_json_bytes(payload)
+    if len(plain) > MAX_TOTAL:
+        raise ContainerError("payload too large")
+    ciphertext = AESGCM(_derive(passphrase, salt)).encrypt(nonce, plain, hb)
+    blob = MAGIC + struct.pack(">I", len(hb)) + hb + ciphertext
+    if len(blob) > MAX_CONTAINER:
+        raise ContainerError("container too large")
+    return blob
+
+
 def seal_store(store: Store, output: str | Path, passphrase: str) -> Path:
     """Seal a store into one authenticated encrypted .aleth file."""
     report = verify_store(store)
     if not report.ok:
         raise ContainerError("refusing to seal invalid store: " + report.summary())
     _verify_portable_signing_key(store)
-    salt, nonce = os.urandom(16), os.urandom(12)
-    header = {"cipher":"AES-256-GCM","format":"aleth","kdf":"scrypt",
-              "nonce":b64url(nonce),"salt":b64url(salt),
-              "scrypt_n":32768,"scrypt_p":1,"scrypt_r":8,"version":1}
-    hb = canonical_json_bytes(header)
-    payload = canonical_json_bytes({"files": _collect(store.root), "payload_version": 1})
-    ciphertext = AESGCM(_derive(passphrase, salt)).encrypt(nonce, payload, hb)
-    blob = MAGIC + struct.pack(">I", len(hb)) + hb + ciphertext
-    if len(blob) > MAX_CONTAINER:
-        raise ContainerError("container too large")
+    payload = {"files": _collect(store.root), "payload_version": 1}
+    blob = _seal_payload_bytes(payload, passphrase)
     output = Path(output)
     output.write_bytes(blob)
     return output
+
+
+def rekey_container(
+    path: str | Path,
+    output: str | Path,
+    old_passphrase: str,
+    new_passphrase: str,
+) -> Path:
+    """Rotate only the container passphrase without changing protocol history.
+
+    The old container is fully authenticated before any output is written.
+    The decrypted logical payload is re-encrypted in memory with fresh scrypt
+    salt + AES-GCM nonce. Protocol objects, signatures, commit IDs and HEAD are
+    preserved byte-for-byte at the logical payload level.
+
+    This is a container-layer operation: it does not repair or reinterpret
+    protocol history. A protocol-invalid but correctly authenticated container
+    remains protocol-invalid after rekeying.
+    """
+    source = Path(path)
+    target = Path(output)
+    payload = _parse(source.read_bytes(), old_passphrase)
+    blob = _seal_payload_bytes(payload, new_passphrase)
+
+    if source.resolve() == target.resolve():
+        tmp = target.with_name(target.name + ".rekey-tmp")
+        try:
+            tmp.write_bytes(blob)
+            os.replace(tmp, target)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+    else:
+        target.write_bytes(blob)
+    return target
 
 def _parse(blob: bytes, passphrase: str) -> dict:
     if len(blob) > MAX_CONTAINER:
