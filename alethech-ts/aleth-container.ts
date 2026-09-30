@@ -1,8 +1,10 @@
 // Portable .aleth v1 reader for Node.js.
 // Decrypts the exact container produced by the Python reference implementation.
-import { readFile } from "node:fs/promises";
-import { createHash, scrypt as scryptCb, webcrypto } from "node:crypto";
+import { lstat, readFile, readdir, writeFile } from "node:fs/promises";
+import { createHash, randomBytes, scrypt as scryptCb, webcrypto } from "node:crypto";
 import { promisify } from "node:util";
+import { join, relative, sep } from "node:path";
+import { bytesToBase64Url, canonicalizeJson } from "./index.ts";
 
 const scrypt = promisify(scryptCb);
 const subtle = globalThis.crypto?.subtle ?? webcrypto.subtle;
@@ -22,6 +24,63 @@ export interface AlethPayload {
 export interface AlethOpened {
   payload: AlethPayload;
   plaintext_sha256: string;
+}
+
+
+function allowedPath(rel: string): boolean {
+  if (!rel || rel.includes("\\") || rel.startsWith("/") || rel.split("/").some(p => !p || p === "." || p === "..")) return false;
+  if (["HEAD","root_authority.json","keys/signing.key"].includes(rel)) return true;
+  const parts = rel.split("/");
+  return parts.length === 2 && ["identities","commits","evidence","artifacts","control_events","migrations","checkpoints"].includes(parts[0]);
+}
+
+async function collectFiles(root: string): Promise<Record<string,string>> {
+  const files: Record<string,string> = {};
+  let total = 0;
+  async function walk(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      const st = await lstat(full);
+      if (st.isSymbolicLink()) throw new Error("symlink not allowed");
+      if (st.isDirectory()) { await walk(full); continue; }
+      if (!st.isFile()) continue;
+      const rel = relative(root, full).split(sep).join("/");
+      if (rel === "keys/root.key" || rel === "keys/recovery.key") continue;
+      if (!allowedPath(rel)) continue;
+      const data = await readFile(full);
+      if (data.length > 100 * 1024 * 1024) throw new Error("file too large");
+      total += data.length;
+      if (total > 512 * 1024 * 1024) throw new Error("payload too large");
+      files[rel] = bytesToBase64Url(data);
+      if (Object.keys(files).length > 100000) throw new Error("too many files");
+    }
+  }
+  await walk(root);
+  return files;
+}
+
+export async function sealAlethDirectory(source: string, output: string, passphrase: string): Promise<void> {
+  if (!passphrase) throw new Error("passphrase must be non-empty");
+  const salt = randomBytes(16);
+  const nonce = randomBytes(12);
+  const header = {
+    cipher:"AES-256-GCM", format:"aleth", kdf:"scrypt",
+    nonce:bytesToBase64Url(nonce), salt:bytesToBase64Url(salt),
+    scrypt_n:32768, scrypt_p:1, scrypt_r:8, version:1
+  };
+  const hb = Buffer.from(canonicalizeJson(header), "utf8");
+  const payload = { files: await collectFiles(source), payload_version: 1 };
+  const plain = Buffer.from(canonicalizeJson(payload), "utf8");
+  const keyBytes = await scrypt(passphrase, salt, 32, { N:32768, r:8, p:1, maxmem:64*1024*1024 }) as Buffer;
+  const key = await subtle.importKey("raw", keyBytes, {name:"AES-GCM"}, false, ["encrypt"]);
+  const encrypted = Buffer.from(await subtle.encrypt(
+    {name:"AES-GCM", iv:nonce, additionalData:hb, tagLength:128},
+    key,
+    plain
+  ));
+  const len = Buffer.alloc(4); len.writeUInt32BE(hb.length, 0);
+  await writeFile(output, Buffer.concat([MAGIC, len, hb, encrypted]));
 }
 
 export async function openAleth(path: string, passphrase: string): Promise<AlethOpened> {
@@ -63,8 +122,16 @@ export async function openAleth(path: string, passphrase: string): Promise<Aleth
 }
 
 async function main(): Promise<void> {
-  const [path, passphrase] = process.argv.slice(2);
-  if (!path || !passphrase) throw new Error("usage: aleth-container.ts <file.aleth> <passphrase>");
+  const args = process.argv.slice(2);
+  if (args[0] === "seal") {
+    const [, source, output, passphrase] = args;
+    if (!source || !output || !passphrase) throw new Error("usage: aleth-container.ts seal <store-dir> <out.aleth> <passphrase>");
+    await sealAlethDirectory(source, output, passphrase);
+    return;
+  }
+  const openArgs = args[0] === "open" ? args.slice(1) : args;
+  const [path, passphrase] = openArgs;
+  if (!path || !passphrase) throw new Error("usage: aleth-container.ts open <file.aleth> <passphrase>");
   const opened = await openAleth(path, passphrase);
   process.stdout.write(JSON.stringify({
     payload_version: opened.payload.payload_version,
