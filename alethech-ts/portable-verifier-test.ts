@@ -1,11 +1,11 @@
 import { openAleth } from "./aleth-container.ts";
 import { bytesToBase64Url } from "./index.ts";
-import { verifyPortableLegacyPayload, type PortablePayload } from "./portable-verifier.ts";
+import { verifyPortablePayload, type PortablePayload } from "./portable-verifier.ts";
 import { toAlethechContext } from "./context-adapter.ts";
 
 async function mustReject(payload: PortablePayload, label: string): Promise<void> {
   try {
-    await verifyPortableLegacyPayload(payload);
+    await verifyPortablePayload(payload);
   } catch {
     return;
   }
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   if (!path || !passphrase) throw new Error("usage: portable-verifier-test.ts <file.aleth> <passphrase>");
 
   const opened=await openAleth(path,passphrase);
-  const view=await verifyPortableLegacyPayload(opened.payload);
+  const view=await verifyPortablePayload(opened.payload);
   if(view.entries.length!==1) throw new Error(`expected 1 memory entry, got ${view.entries.length}`);
   if(typeof (view.entries[0].content as any).interop!=="string") throw new Error("unexpected memory content");
 
