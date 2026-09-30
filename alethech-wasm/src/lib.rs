@@ -167,3 +167,21 @@ pub fn seal_aleth_payload(plaintext: &[u8], passphrase: &str) -> Result<Vec<u8>,
     blob.extend_from_slice(&encrypted);
     Ok(blob)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seal_open_roundtrip() {
+        let plaintext = br#"{"files":{"HEAD":"dGVzdAo"},"payload_version":1}"#;
+        let sealed = seal_aleth_payload(plaintext, "test-passphrase")
+            .expect("seal must succeed");
+        assert!(sealed.starts_with(MAGIC));
+        assert_ne!(sealed.windows(plaintext.len()).any(|w| w == plaintext), true);
+        let opened = open_aleth_payload(&sealed, "test-passphrase")
+            .expect("open must succeed");
+        assert_eq!(opened, plaintext);
+    }
+}
