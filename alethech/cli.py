@@ -19,7 +19,7 @@ import click
 
 from . import crypto
 from .objects import Identity, MemoryCommit, EvidenceCommit, Checkpoint
-from .store import Store, StoreError
+from .store import Store, StoreError, portable_fs_name, logical_id_from_fs_name
 from .verify import verify_store
 
 
@@ -45,6 +45,19 @@ def _hash_file(path: str) -> str:
     """Compute sha256:hex of file contents."""
     data = Path(path).read_bytes()
     return "sha256:" + crypto.sha256_hex(data)
+
+
+def _portable_package_path(directory: Path, identifier: str, suffix: str = "") -> Path:
+    """Preferred cross-platform package filename for a protocol identifier."""
+    return directory / (portable_fs_name(identifier) + suffix)
+
+
+def _existing_package_path(directory: Path, identifier: str, suffix: str = "") -> Path:
+    """Resolve portable package filename first, then legacy raw identifier."""
+    preferred = _portable_package_path(directory, identifier, suffix)
+    if preferred.is_file():
+        return preferred
+    return directory / (identifier + suffix)
 
 
 # ---------- CLI group ----------
@@ -396,14 +409,14 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
     # Copy identities (legacy)
     identities = store.load_identities()
     for ident in identities.values():
-        (out / "identities" / f"{ident.agent_id}.json").write_text(
+        _portable_package_path(out / "identities", ident.agent_id, ".json").write_text(
             json.dumps(ident.to_dict(), indent=2), encoding="utf-8"
         )
 
     # Copy IdentityRecordV2 (v0.2 identity layer)
     v2_identities = store.load_identity_records_v2()
     for ident in v2_identities.values():
-        (out / "identities" / f"{ident.agent_id}.json").write_text(
+        _portable_package_path(out / "identities", ident.agent_id, ".json").write_text(
             json.dumps(ident.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
@@ -420,7 +433,7 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
     control_events = store.load_control_events()
     (out / "control_events").mkdir(exist_ok=True)
     for ev in control_events.values():
-        (out / "control_events" / f"{ev.commit_id}.json").write_text(
+        _portable_package_path(out / "control_events", ev.commit_id, ".json").write_text(
             json.dumps(ev.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
@@ -428,21 +441,21 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
     migrations = store.load_migration_records()
     (out / "migrations").mkdir(exist_ok=True)
     for mig in migrations.values():
-        (out / "migrations" / f"{mig.commit_id}.json").write_text(
+        _portable_package_path(out / "migrations", mig.commit_id, ".json").write_text(
             json.dumps(mig.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
     # Copy commits
     commits = store.load_commits()
     for commit in commits.values():
-        (out / "commits" / f"{commit.commit_id}.json").write_text(
+        _portable_package_path(out / "commits", commit.commit_id, ".json").write_text(
             json.dumps(commit.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
     # Copy evidence
     evidence = store.load_evidence()
     for ev in evidence.values():
-        (out / "evidence" / f"{ev.commit_id}.json").write_text(
+        _portable_package_path(out / "evidence", ev.commit_id, ".json").write_text(
             json.dumps(ev.to_signed_dict(), indent=2), encoding="utf-8"
         )
 
@@ -453,7 +466,7 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
         for h in store.list_artifacts():
             data = store.read_artifact(h)
             if data is not None:
-                (out / "artifacts" / h).write_bytes(data)
+                _portable_package_path(out / "artifacts", h).write_bytes(data)
                 artifact_count += 1
                 total_bytes += len(data)
 
@@ -643,7 +656,7 @@ def import_(input_path: str, target_path: str | None,
 
     # Load exporter identity
     exporter_id = manifest.get("exported_by", "")
-    exporter_identity_path = src / "identities" / f"{exporter_id}.json"
+    exporter_identity_path = _existing_package_path(src / "identities", exporter_id, ".json")
     if not exporter_identity_path.is_file():
         raise click.ClickException(f"exporter identity not in package: {exporter_id}")
     exporter_identity = Identity.from_dict(json.loads(exporter_identity_path.read_text(encoding="utf-8")))
@@ -809,7 +822,7 @@ def import_(input_path: str, target_path: str | None,
                 continue
             if art_path.is_symlink():
                 raise click.ClickException(f"security: artifact is symlink — refusing: {art_path}")
-            h = art_path.name  # filename IS the declared hash
+            h = logical_id_from_fs_name(art_path.name)  # decode portable or legacy filename
             content = art_path.read_bytes()
             # 0.7.0: verify hash matches content BEFORE staging
             actual_hash = "sha256:" + crypto.sha256_hex(content)
@@ -990,7 +1003,7 @@ def import_(input_path: str, target_path: str | None,
         existing_idents = store.load_identities()
         for agent_id, ident in pkg_identities.items():
             if agent_id not in existing_idents:
-                rel = f"identities/{agent_id}.json"
+                rel = f"identities/{portable_fs_name(agent_id)}.json"
                 # Identity V1 has to_dict(), not to_signed_dict()
                 ident_data = ident.to_signed_dict() if hasattr(ident, 'to_signed_dict') else ident.to_dict()
                 _atomic_write(rel, json.dumps(ident_data, separators=(",", ":")).encode())
@@ -1000,7 +1013,7 @@ def import_(input_path: str, target_path: str | None,
         # not identities_v2/. This matches Store.write_identity_record_v2()
         # convention — the type field on the JSON distinguishes them.
         for agent_id, ident in pkg_identities_v2.items():
-            rel = f"identities/{agent_id}.json"
+            rel = f"identities/{portable_fs_name(agent_id)}.json"
             _atomic_write(rel, json.dumps(ident.to_signed_dict(), separators=(",", ":")).encode())
 
         # Write RootAuthority
@@ -1010,12 +1023,12 @@ def import_(input_path: str, target_path: str | None,
 
         # Write ControlEvents
         for ce_id, ce in staged_control_events.items():
-            rel = f"control_events/{ce_id}.json"
+            rel = f"control_events/{portable_fs_name(ce_id)}.json"
             _atomic_write(rel, json.dumps(ce.to_signed_dict(), separators=(",", ":")).encode())
 
         # Write MigrationRecords
         for mig_id, mig in staged_migrations.items():
-            rel = f"migrations/{mig_id}.json"
+            rel = f"migrations/{portable_fs_name(mig_id)}.json"
             _atomic_write(rel, json.dumps(mig.to_signed_dict(), separators=(",", ":")).encode())
 
         # Write commits (don't overwrite)
@@ -1023,7 +1036,7 @@ def import_(input_path: str, target_path: str | None,
         for cid, commit in pkg_commits.items():
             if cid in target_commits:
                 continue
-            rel = f"commits/{cid}.json"
+            rel = f"commits/{portable_fs_name(cid)}.json"
             _atomic_write(rel, json.dumps(commit.to_signed_dict(), separators=(",", ":")).encode())
             new_commits += 1
 
@@ -1032,13 +1045,13 @@ def import_(input_path: str, target_path: str | None,
         for eid, ev in pkg_evidence.items():
             if eid in target_evidence:
                 continue
-            rel = f"evidence/{eid}.json"
+            rel = f"evidence/{portable_fs_name(eid)}.json"
             _atomic_write(rel, json.dumps(ev.to_signed_dict(), separators=(",", ":")).encode())
             new_evidence += 1
 
         # Write artifacts (already hash-verified in Step C)
         for h, content in staged_artifacts.items():
-            rel = f"artifacts/{h}"
+            rel = f"artifacts/{portable_fs_name(h)}"
             _atomic_write(rel, content)
             new_artifacts += 1
 
