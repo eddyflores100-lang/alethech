@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/extension/dist"
-WASM_OUT="$OUT/vendor"
+WASM_OUT="$OUT/vendor/wasm"
 
 command -v wasm-bindgen >/dev/null || {
   echo "wasm-bindgen CLI is required (0.2.129)" >&2
@@ -46,3 +46,6 @@ cp "$ROOT/extension/icon48.png" "$OUT/icon48.png" 2>/dev/null || true
 cp "$ROOT/extension/icon128.png" "$OUT/icon128.png" 2>/dev/null || true
 
 echo "Extension built at $OUT"
+
+# Copy scrypt-js for content script (brain.ts loads it via chrome.runtime.getURL)
+cp "$ROOT/extension/src/vendor/scrypt-js.min.js" "$OUT/vendor/scrypt-js.min.js"
