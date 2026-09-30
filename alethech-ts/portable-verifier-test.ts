@@ -1,6 +1,7 @@
 import { openAleth } from "./aleth-container.ts";
 import { bytesToBase64Url } from "./index.ts";
 import { verifyPortableLegacyPayload, type PortablePayload } from "./portable-verifier.ts";
+import { toAlethechContext } from "./context-adapter.ts";
 
 async function mustReject(payload: PortablePayload, label: string): Promise<void> {
   try {
@@ -37,9 +38,18 @@ async function main(): Promise<void> {
   badHead.files.HEAD=bytesToBase64Url(new TextEncoder().encode("sha256:not-real\n"));
   await mustReject(badHead,"invalid HEAD");
 
-  const unsupported=structuredClone(opened.payload);
-  unsupported.files["evidence/sha256:test.json"]=bytesToBase64Url(new TextEncoder().encode("{}"));
-  await mustReject(unsupported,"unsupported evidence layer");
+  const evidencePath=Object.keys(opened.payload.files).find(p=>p.startsWith("evidence/"));
+  if(!evidencePath) throw new Error("expected evidence fixture in portable payload");
+
+  const tamperedEvidence=structuredClone(opened.payload);
+  const ev=JSON.parse(new TextDecoder().decode(Buffer.from(tamperedEvidence.files[evidencePath],"base64url")));
+  ev.tool="tampered.tool";
+  tamperedEvidence.files[evidencePath]=bytesToBase64Url(new TextEncoder().encode(JSON.stringify(ev)));
+  await mustReject(tamperedEvidence,"tampered evidence content");
+
+  const missingEvidence=structuredClone(opened.payload);
+  delete missingEvidence.files[evidencePath];
+  await mustReject(missingEvidence,"missing evidence reference");
 
   const authorityLeak=structuredClone(opened.payload);
   authorityLeak.files["keys/root.key"]=bytesToBase64Url(new Uint8Array([1,2,3]));
@@ -52,10 +62,19 @@ async function main(): Promise<void> {
   await mustReject(wrongSigningKey,"mismatched signing key");
 
   const badArtifact=structuredClone(opened.payload);
-  badArtifact.files["artifacts/sha256:"+"0".repeat(64)]=bytesToBase64Url(
-    new TextEncoder().encode("artifact bytes")
-  );
+  const artifactPath=Object.keys(badArtifact.files).find(p=>p.startsWith("artifacts/"));
+  if(!artifactPath) throw new Error("expected artifact fixture in portable payload");
+  badArtifact.files[artifactPath]=bytesToBase64Url(new TextEncoder().encode("tampered artifact bytes"));
   await mustReject(badArtifact,"artifact hash mismatch");
+
+  const context=toAlethechContext(view);
+  const contextText=JSON.stringify(context);
+  if(context.source_head!==view.head || context.items.length!==view.entries.length) {
+    throw new Error("context adapter lost verified memory data");
+  }
+  if(contextText.includes("PRIVATE KEY") || contextText.includes("signing.key") || contextText.includes("root.key")) {
+    throw new Error("context leaked private key material");
+  }
 
   process.stdout.write(JSON.stringify(view));
 }
