@@ -45,6 +45,32 @@
         <p id="context-hint" class="hint" hidden>Verified memory only. Select and copy this text into any chat or compatible plugin.</p>
       </section>
 
+      <section class="provider-bridge">
+        <h2>Share with chat</h2>
+        <label for="provider-mode">Provider format</label>
+        <select id="provider-mode">
+          <option value="openai">OpenAI-compatible</option>
+          <option value="anthropic">Anthropic-compatible</option>
+          <option value="local">Local / generic agent</option>
+        </select>
+
+        <label for="context-limit">Recent memories to include</label>
+        <input id="context-limit" type="number" min="1" max="1000" value="20">
+
+        <label for="user-prompt">Message for the chat</label>
+        <textarea id="user-prompt" rows="3" placeholder="What should the chat do with this verified memory?"></textarea>
+        <button id="generate-request">Generate provider request</button>
+        <textarea id="provider-request" rows="7" readonly placeholder="Generated request appears here"></textarea>
+        <p class="hint">Nothing is sent automatically. Copy this JSON into your provider client or compatible plugin.</p>
+
+        <h3>Review writeback</h3>
+        <textarea id="provider-response" rows="6" placeholder='Paste strict JSON: {"alethech_writeback":[...]}'></textarea>
+        <button id="review-writeback">Review proposal</button>
+        <p id="writeback-summary" class="hint"></p>
+        <button id="accept-writeback" disabled>Accept locally, sign & download</button>
+        <p class="hint">Provider output is unsigned until you explicitly accept it here. Re-enter the passphrase above before acceptance.</p>
+      </section>
+
       <section id="continue" class="continue">
         <label for="new-memory">Continue this memory</label>
         <textarea id="new-memory" rows="4" placeholder="Add a memory to the verified history…"></textarea>
