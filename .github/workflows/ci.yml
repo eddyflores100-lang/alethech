@@ -204,6 +204,28 @@ jobs:
               assert forbidden not in text
           PY
 
+      - name: Compare Python and TypeScript chat envelopes
+        run: |
+          python - <<'PY'
+          import json
+          from alethech import Alethech
+          from alethech.adapters import create_chat_envelope
+
+          a=Alethech.open("/tmp/aleth-source")
+          with open("/tmp/py-chat-envelope.json","w") as f:
+              json.dump(create_chat_envelope(a.memory_view()), f, sort_keys=True)
+          PY
+          npx --yes tsx alethech-ts/chat-envelope-dump.ts /tmp/interop.aleth interop-passphrase > /tmp/ts-chat-envelope.json
+          python - <<'PY'
+          import json
+          py=json.load(open("/tmp/py-chat-envelope.json"))
+          ts=json.load(open("/tmp/ts-chat-envelope.json"))
+          assert py == ts, (py, ts)
+          assert py["format"]=="alethech-chat-envelope"
+          assert py["version"]==1
+          assert py["source_head"]==py["context"]["source_head"]
+          PY
+
       - name: Verify provider bridge contract and stale-writeback guard
         run: |
           npx --yes tsx alethech-ts/chat-adapter-contract-test.ts /tmp/interop.aleth interop-passphrase > /tmp/chat-adapter.json
