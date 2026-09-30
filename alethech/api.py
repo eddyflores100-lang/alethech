@@ -13,7 +13,14 @@ from . import crypto
 from .objects import Identity, MemoryCommit, EvidenceCommit
 from .store import Store, StoreError
 from .verify import VerifyReport, verify_store
-from .container import seal_store, open_container, rekey_container
+from .container import MAGIC, seal_store, open_container, rekey_container
+from .container_v2 import (
+    MAGIC_V2,
+    migrate_v1_to_v2,
+    open_container_v2,
+    recover_container_v2,
+    seal_store_v2,
+)
 from .adapters import VerifiedMemoryView, build_memory_view, context_from_aleth
 
 class AlethechError(Exception):
@@ -217,8 +224,84 @@ class Alethech:
 
     @classmethod
     def open_aleth(cls, path: str | Path, destination: str | Path, passphrase: str) -> "Alethech":
-        """Open an encrypted .aleth into a new local working store."""
-        return cls(open_container(path, destination, passphrase))
+        """Open ALETH001 or ALETH002 with a passphrase into a local working store."""
+        path = Path(path)
+        magic = path.read_bytes()[:8]
+        if magic == MAGIC:
+            return cls(open_container(path, destination, passphrase))
+        if magic == MAGIC_V2:
+            return cls(open_container_v2(path, destination, passphrase=passphrase))
+        raise AlethechError("unsupported .aleth container magic")
+
+    def seal_v2(
+        self,
+        output: str | Path,
+        passphrase: str,
+        *,
+        create_recovery: bool = True,
+    ) -> tuple[Path, str | None]:
+        """Export this memory as ALETH002 with optional recovery code."""
+        return seal_store_v2(
+            self.store,
+            output,
+            passphrase,
+            create_recovery=create_recovery,
+        )
+
+    @classmethod
+    def open_aleth_v2(
+        cls,
+        path: str | Path,
+        destination: str | Path,
+        *,
+        passphrase: str | None = None,
+        recovery_code: str | None = None,
+    ) -> "Alethech":
+        """Open ALETH002 using exactly one passphrase or recovery code."""
+        return cls(
+            open_container_v2(
+                path,
+                destination,
+                passphrase=passphrase,
+                recovery_code=recovery_code,
+            )
+        )
+
+    @staticmethod
+    def recover_aleth_v2(
+        path: str | Path,
+        output: str | Path,
+        recovery_code: str,
+        new_passphrase: str,
+        *,
+        rotate_recovery: bool = False,
+    ) -> tuple[Path, str]:
+        """Replace a forgotten ALETH002 passphrase using its recovery code."""
+        return recover_container_v2(
+            path,
+            output,
+            recovery_code,
+            new_passphrase,
+            rotate_recovery=rotate_recovery,
+        )
+
+    @staticmethod
+    def migrate_aleth_v1_to_v2(
+        path: str | Path,
+        output: str | Path,
+        old_passphrase: str,
+        new_passphrase: str,
+        *,
+        create_recovery: bool = True,
+    ) -> tuple[Path, str | None]:
+        """Explicitly migrate ALETH001 to ALETH002 after full verification."""
+        return migrate_v1_to_v2(
+            path,
+            output,
+            old_passphrase,
+            new_passphrase,
+            create_recovery=create_recovery,
+        )
 
     @staticmethod
     def drop_context(path: str | Path, passphrase: str) -> dict:
