@@ -37,6 +37,6 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "npx tsx index.ts"
+    "test": "npx --yes tsx test.ts"
   }
 }
