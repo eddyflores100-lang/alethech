@@ -3,7 +3,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/alethech.svg)](https://pypi.org/project/alethech/)
 [![Python](https://img.shields.io/pypi/pyversions/alethech.svg)](https://pypi.org/project/alethech/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-230%20passing-brightgreen)](https://github.com/eddyflores100-lang/alethech)
 [![CI](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml)
 [![Mutation paths](https://img.shields.io/badge/mutation%20paths-8-blue)](https://github.com/eddyflores100-lang/alethech)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-yellow)](https://github.com/eddyflores100-lang/alethech)
@@ -21,10 +20,12 @@ This is the reference implementation of the protocol specified in `docs/implemen
 
 ## what this is
 
-`alethech` is a Python package that provides **cryptographically verifiable memory continuity for AI agents**. It lets an agent sign its memory commits with Ed25519, link them in a hash-linked DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.
+`alethech` provides **cryptographically verifiable, portable memory continuity for AI agents**. It signs memory commits with Ed25519, links them in a hash-linked DAG, rotates keys without losing identity, and can seal a verified history into one encrypted `.aleth` file for transfer between compatible runtimes and devices.
 
 **What this repo IS:**
 - A cryptographic protocol implementation (Ed25519 + SHA-256 + JCS RFC 8785)
+- An encrypted portable memory container (`.aleth`, scrypt + AES-256-GCM)
+- A neutral verified adapter view for plugins and chat integrations
 - 9 CLI commands (`init`, `commit`, `evidence`, `verify`, `export`, `import`, `migrate`, `key rotate`, `key revoke`)
 - A test suite with mutation-guard paths (each guarantee has a test that fails when the check is defeated)
 - MIT licensed, published on PyPI as `alethech`
@@ -47,7 +48,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Version 0.8.5. 9 commands, 230 Python tests, 8 mutation-guard paths, 85% coverage. No LLM, no MCP, no network, no P2P, no cloud, no consensus, no trust providers, no marketplace, no skill verification, no multi-agent consensus.
+Released version 0.8.5; `main` contains the 0.9 portable-memory work in progress. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
 
 ## install
 
@@ -78,11 +79,30 @@ alethech key revoke --key-id <id>          # revoke a key
 alethech migrate --to v0.2                  # migrate identity layer
 ```
 
+## portable encrypted memory (`.aleth`)
+
+Alethech 0.9 development adds a single encrypted file designed for drag-and-drop transfer:
+
+```python
+from alethech import Alethech
+
+agent = Alethech.initialize("./working-store")
+agent.commit({"fact": "portable memory"})
+agent.seal("memory.aleth", "your-passphrase")
+
+# Plugin-style path: dropped file -> unlock -> verify -> neutral context
+context = Alethech.drop_context("memory.aleth", "your-passphrase")
+```
+
+The `.aleth` container uses scrypt + AES-256-GCM. Its authenticated payload can be opened byte-exactly by the Python, Rust, and TypeScript implementations in CI. The portable file may carry the encrypted operational signing key so history can continue on another device, but it excludes `root.key` and `recovery.key`.
+
+See [`docs/ALETH_CONTAINER_SPEC.md`](docs/ALETH_CONTAINER_SPEC.md) and [`docs/ADAPTER_CONTRACT.md`](docs/ADAPTER_CONTRACT.md).
+
 ## what it does NOT do
 
 - It does NOT prove that the agent's claims are true. Only that they were signed by the identity that claims them.
 - It does NOT detect rollback without an external checkpoint.
-- It does NOT encrypt content at rest.
+- The local working store is NOT encrypted at rest; the portable `.aleth` container is encrypted.
 - It does NOT delegate permissions between agents.
 - It does NOT call any LLM.
 
@@ -108,7 +128,7 @@ It does NOT un-conceal whether the content is true — that's the agent's respon
 python -m pytest tests/
 ```
 
-230 tests covering:
+The Python test suite covers:
 - crypto primitives (Ed25519, SHA-256, base64url, base32)
 - JCS canonicalization (RFC 8785) — 56 conformance vectors including:
   - integer/float serialization per ECMAScript Number.prototype.toString()
@@ -143,7 +163,7 @@ alethech/                    # this repo — cryptographic protocol only
 │   └── integrations/        # langchain + memex hooks
 ├── alethech-rs/             # Rust SDK (31 tests, cross-validation)
 ├── alethech-ts/             # TypeScript SDK (15 tests, Web Crypto API)
-├── tests/                   # 230 tests (incl. 56 JCS conformance + 8 mutation-guard paths)
+├── tests/                   # Python behavioral, adversarial, mutation and conformance tests
 ├── conformance/             # 15 adversarial conformance vectors
 ├── docs/                    # protocol specification
 ├── examples/                # basic_usage.py
@@ -164,7 +184,7 @@ The protocol is implemented in three independent languages:
 
 | Language | Tests | Dependencies |
 |---|---|---|
-| Python | 230 | cryptography + click |
+| Python | CI suite | cryptography + click |
 | Rust | 31 | ed25519-dalek, sha2, serde |
 | TypeScript | 15 | 0 (Web Crypto API only) |
 
