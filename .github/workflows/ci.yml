@@ -204,6 +204,19 @@ jobs:
               assert forbidden not in text
           PY
 
+      - name: Verify provider bridge contract and stale-writeback guard
+        run: |
+          npx --yes tsx alethech-ts/chat-adapter-contract-test.ts /tmp/interop.aleth interop-passphrase > /tmp/chat-adapter.json
+          python - <<'PY'
+          import json
+          a=json.load(open("/tmp/chat-adapter.json"))
+          assert a["format"]=="alethech-chat-envelope"
+          assert a["source_head"].startswith("sha256:")
+          assert a["context_items"]==1
+          assert a["writeback_items"]==1
+          assert a["stale_rejected"] is True
+          PY
+
       - name: Verify V2 portable memory in browser TypeScript verifier
         run: |
           python scripts/make_v2_portable_fixture.py /tmp/aleth-v2 /tmp/v2.aleth
