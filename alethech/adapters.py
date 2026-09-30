@@ -127,3 +127,102 @@ def context_from_aleth(path: str, passphrase: str) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="alethech-drop-") as tmp:
         store = open_container(path, Path(tmp) / "store", passphrase)
         return build_memory_view(store).to_dict()
+
+
+def create_chat_envelope(view: VerifiedMemoryView) -> dict[str, Any]:
+    """Create provider-neutral chat envelope bound to the verified source HEAD."""
+    context = {
+        "format": "alethech-context",
+        "version": 1,
+        "source_head": view.head,
+        "items": [
+            {
+                "id": entry.commit_id,
+                "memory_type": entry.memory_type,
+                "timestamp": entry.timestamp,
+                "content": entry.content,
+                "provenance": entry.provenance,
+            }
+            for entry in view.entries
+        ],
+    }
+    return {
+        "format": "alethech-chat-envelope",
+        "version": 1,
+        "source_head": view.head,
+        "context": context,
+    }
+
+
+def validate_writeback_proposal(value: Any) -> dict[str, Any]:
+    """Validate the provider-neutral unsigned writeback proposal schema."""
+    if not isinstance(value, dict):
+        raise AdapterError("invalid writeback proposal")
+    if value.get("format") != "alethech-writeback-proposal" or value.get("version") != 1:
+        raise AdapterError("unsupported writeback proposal")
+    source_head = value.get("source_head")
+    if not isinstance(source_head, str) or not source_head.startswith("sha256:"):
+        raise AdapterError("invalid writeback source_head")
+    items = value.get("items")
+    if not isinstance(items, list) or not items or len(items) > 100:
+        raise AdapterError("invalid writeback items")
+    normalized: list[dict[str, Any]] = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict) or not isinstance(item.get("content"), dict):
+            raise AdapterError(f"invalid writeback item {i}")
+        memory_type = item.get("memory_type")
+        if memory_type not in {"semantic", "episodic", "procedural"}:
+            raise AdapterError(f"invalid writeback memory_type at {i}")
+        source = item.get("source", "provider_proposal")
+        if not isinstance(source, str) or not source:
+            raise AdapterError(f"invalid writeback source at {i}")
+        confidence = item.get("confidence", 1.0)
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0 <= float(confidence) <= 1:
+            raise AdapterError(f"invalid writeback confidence at {i}")
+        normalized.append({
+            "memory_type": memory_type,
+            "content": item["content"],
+            "source": source,
+            "confidence": float(confidence),
+        })
+    return {
+        "format": "alethech-writeback-proposal",
+        "version": 1,
+        "source_head": source_head,
+        "items": normalized,
+    }
+
+
+def accept_writeback_proposal(store: Store, proposal: Any) -> list[str]:
+    """Accept an explicitly approved provider proposal through local signing only.
+
+    The proposal is unsigned/untrusted. This function binds it to the current
+    verified HEAD, appends a linear sequence of locally signed commits, and
+    verifies the complete resulting store before returning commit IDs.
+    """
+    from .api import Alethech
+
+    normalized = validate_writeback_proposal(proposal)
+    before = build_memory_view(store)
+    if normalized["source_head"] != before.head:
+        raise AdapterError("stale writeback proposal: source_head no longer current")
+
+    agent = Alethech(store)
+    created: list[str] = []
+    expected_parent = before.head
+    for item in normalized["items"]:
+        commit = agent.commit(
+            item["content"],
+            memory_type=item["memory_type"],
+            source=item["source"],
+            confidence=item["confidence"],
+        )
+        if commit.parents != [expected_parent]:
+            raise AdapterError("writeback commit chain is not linear from source_head")
+        created.append(commit.commit_id)
+        expected_parent = commit.commit_id
+
+    after = build_memory_view(store)
+    if not created or after.head != created[-1]:
+        raise AdapterError("writeback did not advance verified HEAD")
+    return created
