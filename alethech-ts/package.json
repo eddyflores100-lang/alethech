@@ -1,7 +1,7 @@
 {
   "name": "alethech-ts",
   "version": "0.8.5",
-  "description": "Verifiable agent continuity protocol \u2014 Ed25519-signed memory commits, hash-linked DAG, key rotation with reachability guarantee. Zero dependencies. Web Crypto API only.",
+  "description": "Verifiable agent continuity protocol — Ed25519-signed memory commits, hash-linked DAG, key rotation with reachability guarantee. Zero dependencies. Web Crypto API only.",
   "main": "index.ts",
   "types": "index.ts",
   "files": [
@@ -38,5 +38,6 @@
   },
   "scripts": {
     "test": "npx --yes tsx test.ts"
-  }
+  },
+  "type": "module"
 }
