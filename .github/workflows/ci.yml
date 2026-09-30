@@ -266,6 +266,19 @@ jobs:
           assert b["invalid_type_rejected"] is True
           PY
 
+      - name: Verify stable plugin API lifecycle
+        run: |
+          npx --yes tsx alethech-ts/plugin-api-test.ts /tmp/interop.aleth interop-passphrase > /tmp/plugin-api.json
+          python - <<'PY'
+          import json
+          p=json.load(open("/tmp/plugin-api.json"))
+          assert p["source_head"].startswith("sha256:")
+          assert p["updated_head"].startswith("sha256:")
+          assert p["updated_head"] != p["source_head"]
+          assert p["entries_after"] == p["entries_before"] + 1
+          assert p["replay_rejected"] is True
+          PY
+
       - name: Verify V2 portable memory in browser TypeScript verifier
         run: |
           python scripts/make_v2_portable_fixture.py /tmp/aleth-v2 /tmp/v2.aleth
