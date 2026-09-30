@@ -1,6 +1,8 @@
 import {
   base64UrlToBytes,
   deriveAgentId,
+  sha256Hex,
+  verify,
   verifyCommit,
   type Identity,
   type MemoryCommit,
@@ -41,6 +43,51 @@ function safePath(path: string): boolean {
   if (parts.some(p => !p || p === "." || p === "..")) return false;
   if (path === "HEAD" || path === "keys/signing.key") return true;
   return parts.length === 2 && ["identities", "commits", "artifacts"].includes(parts[0]);
+}
+
+function pemToPkcs8(pem: string): Uint8Array {
+  const body = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  if (!body) throw new Error("invalid signing key PEM");
+  const binary = atob(body);
+  const out = new Uint8Array(binary.length);
+  for (let i=0;i<binary.length;i++) out[i]=binary.charCodeAt(i);
+  return out;
+}
+
+async function verifyPortableSigningKey(files: Record<string,string>, identity: Identity, publicBytes: Uint8Array): Promise<void> {
+  const encoded = files["keys/signing.key"];
+  if (typeof encoded !== "string") return; // read-only portable memories are allowed
+  let privateKey: CryptoKey;
+  try {
+    const pem = decodeText(encoded);
+    privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      pemToPkcs8(pem),
+      {name:"Ed25519"},
+      false,
+      ["sign"],
+    );
+  } catch {
+    throw new Error("portable signing key invalid");
+  }
+  const challenge = new TextEncoder().encode("alethech-portable-key-binding-v1");
+  const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", privateKey, challenge));
+  const pubKey = await crypto.subtle.importKey("raw", publicBytes, {name:"Ed25519"}, false, ["verify"]);
+  if (!(await verify(pubKey, signature, challenge))) {
+    throw new Error("portable signing key does not match identity");
+  }
+}
+
+async function verifyArtifacts(files: Record<string,string>): Promise<void> {
+  for (const [path, encoded] of Object.entries(files)) {
+    if (!path.startsWith("artifacts/")) continue;
+    const name = path.slice("artifacts/".length);
+    const actual = `sha256:${await sha256Hex(base64UrlToBytes(encoded))}`;
+    if (name !== actual) throw new Error(`artifact hash mismatch: ${name}`);
+  }
 }
 
 function parseJsonFile<T>(files: Record<string,string>, path: string): T {
@@ -139,12 +186,15 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
   if(identityPaths.length!==1) throw new Error("legacy browser verifier requires exactly one identity");
   const identity=parseJsonFile<Identity>(files,identityPaths[0]);
   if(identity.type!=="Identity" || identity.version!==1) throw new Error("unsupported identity type");
+  if(identityPaths[0] !== `identities/${identity.agent_id}.json`) throw new Error("identity filename mismatch");
   if(identity.public_key?.kty!=="OKP" || identity.public_key?.crv!=="Ed25519") throw new Error("invalid identity public key");
 
   const pubBytes=base64UrlToBytes(identity.public_key.x);
   if(pubBytes.length!==32) throw new Error("invalid identity public key");
   const derived=await deriveAgentId(pubBytes);
   if(derived!==identity.agent_id) throw new Error("identity_mismatch");
+  await verifyPortableSigningKey(files, identity, pubBytes);
+  await verifyArtifacts(files);
 
   const commitPaths=Object.keys(files).filter(p=>p.startsWith("commits/") && p.endsWith(".json")).sort();
   if(commitPaths.length===0) throw new Error("no commits");
@@ -157,6 +207,10 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
     const expectedPath=`commits/${commit.commit_id}.json`;
     if(path!==expectedPath) throw new Error(`commit filename mismatch: ${path}`);
     if(!(await verifyCommit(commit,pubBytes))) throw new Error(`commit verification failed: ${commit.commit_id}`);
+    const evidenceRefs = Array.isArray((commit.provenance as any)?.evidence_refs)
+      ? (commit.provenance as any).evidence_refs
+      : [];
+    if (evidenceRefs.length > 0) throw new Error("browser verifier does not yet support evidence_refs");
     commits.set(commit.commit_id,commit);
   }
 
