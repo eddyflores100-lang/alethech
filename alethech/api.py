@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Iterable
 from cryptography.hazmat.primitives import serialization
 from . import crypto
-from .objects import Identity, MemoryCommit
+from .objects import Identity, MemoryCommit, EvidenceCommit
 from .store import Store, StoreError
 from .verify import VerifyReport, verify_store
 from .container import seal_store, open_container
@@ -124,6 +124,75 @@ class Alethech:
         self.store.write_commit(commit)
         self.store.write_head(commit.commit_id)
         return commit
+
+    def evidence(
+        self,
+        *,
+        tool: str,
+        input_bytes: bytes,
+        output_bytes: bytes,
+        result: str = "success",
+        tool_version: str = "",
+        artifacts: dict[str, bytes] | None = None,
+    ) -> EvidenceCommit:
+        """Create signed evidence without going through Click or filesystem inputs."""
+        if result not in {"success", "failure", "timeout"}:
+            raise AlethechError(f"unsupported evidence result: {result}")
+        if not isinstance(input_bytes, (bytes, bytearray)) or not isinstance(output_bytes, (bytes, bytearray)):
+            raise AlethechError("input_bytes and output_bytes must be bytes")
+
+        try:
+            signing = self.store.load_signing_key()
+            v2 = self.store.load_identity_records_v2()
+            legacy = self.store.load_identities()
+        except StoreError as exc:
+            raise AlethechError(str(exc)) from exc
+
+        if v2:
+            identity = next(iter(v2.values()))
+            signing_jwk = signing.public_jwk()
+            matches = [
+                item for item in identity.active_keys
+                if isinstance(item, dict) and item.get("public_key") == signing_jwk
+            ]
+            if not matches:
+                raise AlethechError("signing key does not match an active identity key")
+            agent_id = identity.agent_id
+            key_id = matches[0]["key_id"]
+        elif legacy:
+            identity = next(iter(legacy.values()))
+            if identity.public_key != signing.public_jwk():
+                raise AlethechError("signing key does not match identity")
+            agent_id = identity.agent_id
+            key_id = identity.key_id
+        else:
+            raise AlethechError("no identity in store")
+
+        artifact_meta = []
+        for name, data in (artifacts or {}).items():
+            if not isinstance(name, str) or not name:
+                raise AlethechError("artifact name must be a non-empty string")
+            if not isinstance(data, (bytes, bytearray)):
+                raise AlethechError("artifact content must be bytes")
+            if len(data) > 100 * 1024 * 1024:
+                raise AlethechError(f"artifact too large: {name}")
+            h = self.store.write_artifact(bytes(data))
+            artifact_meta.append({"name": name, "hash": h, "size": len(data)})
+
+        ev = EvidenceCommit(
+            agent_id=agent_id,
+            key_id=key_id,
+            event_type="tool_execution",
+            tool=tool,
+            tool_version=tool_version,
+            input_hash="sha256:" + crypto.sha256_hex(bytes(input_bytes)),
+            output_hash="sha256:" + crypto.sha256_hex(bytes(output_bytes)),
+            artifacts=artifact_meta,
+            result=result,
+        )
+        ev.sign(signing)
+        self.store.write_evidence(ev)
+        return ev
 
     def verify(self) -> VerifyReport:
         """Run the standalone verifier against this store."""
