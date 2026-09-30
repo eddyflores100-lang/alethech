@@ -98,7 +98,16 @@ jobs:
           from alethech import Alethech
           from alethech.container import inspect_container
           a = Alethech.initialize("/tmp/aleth-source")
-          a.commit({"interop": "python-to-typescript-rust"})
+          ev = a.evidence(
+              tool="interop.demo",
+              input_bytes=b"request",
+              output_bytes=b"response",
+              artifacts={"proof.bin": b"portable-proof"},
+          )
+          a.commit(
+              {"interop": "python-to-typescript-rust"},
+              evidence_refs=[ev.commit_id],
+          )
           a.seal("/tmp/interop.aleth", "interop-passphrase")
           with open("/tmp/py-payload.json", "w") as f:
               json.dump(inspect_container("/tmp/interop.aleth", "interop-passphrase"), f, sort_keys=True)
@@ -126,6 +135,8 @@ jobs:
           assert "keys/root.key" not in py["files"]
           assert "keys/recovery.key" not in py["files"]
           assert len([x for x in py["files"] if x.startswith("commits/")]) == 2
+          assert len([x for x in py["files"] if x.startswith("evidence/")]) == 1
+          assert len([x for x in py["files"] if x.startswith("artifacts/")]) == 1
           PY
 
 
