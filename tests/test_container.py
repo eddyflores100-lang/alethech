@@ -2,7 +2,7 @@
 import pytest
 from alethech import crypto
 from alethech.api import Alethech
-from alethech.container import ContainerError, inspect_container, open_container, seal_store
+from alethech.container import ContainerError, inspect_container, open_container, rekey_container, seal_store
 from alethech.verify import verify_store
 
 def _sealed(tmp_path):
@@ -100,3 +100,49 @@ def test_portable_filesystem_names_preserve_logical_container_paths(tmp_path):
 
     artifact_hash = ev.artifacts[0]["hash"]
     assert restored.read_artifact(artifact_hash) == b"portable-artifact"
+
+
+def test_rekey_preserves_logical_payload(tmp_path):
+    client = Alethech.initialize(tmp_path / "source")
+    client.commit({"memory": "rekey me"})
+    original = tmp_path / "memory.aleth"
+    rotated = tmp_path / "memory-rotated.aleth"
+    seal_store(client.store, original, "old-passphrase")
+
+    before = inspect_container(original, "old-passphrase")
+    rekey_container(original, rotated, "old-passphrase", "new-passphrase")
+    after = inspect_container(rotated, "new-passphrase")
+
+    assert before == after
+    assert original.read_bytes() != rotated.read_bytes()
+
+    with pytest.raises(ContainerError, match="authentication failed"):
+        inspect_container(rotated, "old-passphrase")
+
+
+def test_rekey_wrong_old_passphrase_creates_no_output(tmp_path):
+    client = Alethech.initialize(tmp_path / "source")
+    original = tmp_path / "memory.aleth"
+    rotated = tmp_path / "should-not-exist.aleth"
+    seal_store(client.store, original, "correct")
+
+    with pytest.raises(ContainerError, match="authentication failed"):
+        rekey_container(original, rotated, "wrong", "new")
+
+    assert not rotated.exists()
+
+
+def test_rekey_in_place_is_safe_and_preserves_payload(tmp_path):
+    client = Alethech.initialize(tmp_path / "source")
+    client.commit({"memory": "same path"})
+    path = tmp_path / "memory.aleth"
+    seal_store(client.store, path, "before")
+
+    before = inspect_container(path, "before")
+    rekey_container(path, path, "before", "after")
+    after = inspect_container(path, "after")
+
+    assert before == after
+    assert not (tmp_path / "memory.aleth.rekey-tmp").exists()
+    with pytest.raises(ContainerError, match="authentication failed"):
+        inspect_container(path, "before")
