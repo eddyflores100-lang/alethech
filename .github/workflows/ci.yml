@@ -224,6 +224,33 @@ jobs:
           assert v["entries"][0]["content"]["interop"]=="v2-migrated-browser"
           PY
 
+      - name: Append in TypeScript, reseal, and continue in Python
+        run: |
+          npx --yes tsx alethech-ts/portable-editor-test.ts /tmp/interop.aleth /tmp/browser-updated.aleth interop-passphrase > /tmp/editor-result.json
+          python - <<'PY'
+          import json
+          from alethech import Alethech
+
+          meta=json.load(open("/tmp/editor-result.json"))
+          assert meta["entries_after"] == meta["entries_before"] + 1
+          assert meta["new_head"] != meta["old_head"]
+
+          restored=Alethech.open_aleth(
+              "/tmp/browser-updated.aleth",
+              "/tmp/from-browser-editor",
+              "interop-passphrase",
+          )
+          report=restored.verify()
+          assert report.ok, report.summary()
+          commits=restored.store.load_commits()
+          assert any(c.content.get("browser_continuation")=="works" for c in commits.values())
+
+          # Device/runtime C can continue from the browser-produced file.
+          next_commit=restored.commit({"continued_again":"python"})
+          assert next_commit.parents == [meta["new_head"]]
+          assert restored.verify().ok
+          PY
+
       - name: Seal store in TypeScript and open in Python
         run: |
           npx --yes tsx alethech-ts/aleth-container.ts seal /tmp/aleth-source /tmp/ts-produced.aleth interop-passphrase
