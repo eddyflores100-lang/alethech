@@ -177,6 +177,44 @@ jobs:
           assert len([x for x in py["files"] if x.startswith("artifacts/")]) == 1
           PY
 
+      - name: Verify passphrase rotation across runtimes
+        run: |
+          python - <<'PY'
+          import json
+          from alethech import Alethech
+          from alethech.container import inspect_container
+
+          before=inspect_container("/tmp/interop.aleth","interop-passphrase")
+          Alethech.rekey_aleth(
+              "/tmp/interop.aleth",
+              "/tmp/interop-rekeyed.aleth",
+              "interop-passphrase",
+              "rotated-passphrase",
+          )
+          after=inspect_container("/tmp/interop-rekeyed.aleth","rotated-passphrase")
+          assert before == after
+          with open("/tmp/rekey-py.json","w") as f:
+              json.dump(after,f,sort_keys=True)
+          PY
+
+          if npx --yes tsx alethech-ts/aleth-container.ts open /tmp/interop-rekeyed.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "TypeScript accepted old passphrase after rekey"; exit 1
+          fi
+          if ./alethech-rs/target/release/alethech-container open /tmp/interop-rekeyed.aleth interop-passphrase >/dev/null 2>&1; then
+            echo "Rust accepted old passphrase after rekey"; exit 1
+          fi
+
+          npx --yes tsx alethech-ts/aleth-container.ts open /tmp/interop-rekeyed.aleth rotated-passphrase > /tmp/rekey-ts.json
+          ./alethech-rs/target/release/alethech-container open /tmp/interop-rekeyed.aleth rotated-passphrase > /tmp/rekey-rs.json
+
+          python - <<'PY'
+          import json
+          py=json.load(open("/tmp/rekey-py.json"))
+          ts=json.load(open("/tmp/rekey-ts.json"))
+          rs=json.load(open("/tmp/rekey-rs.json"))
+          assert py == ts == rs
+          PY
+
 
       - name: Verify dropped Python container with browser TypeScript verifier
         run: |
@@ -404,7 +442,7 @@ jobs:
           if (!fs.existsSync("extension/dist/vendor/wasm/alethech_wasm_bg.wasm")) throw new Error("WASM missing");
           if (!fs.existsSync("extension/dist/popup.js")) throw new Error("popup bundle missing");
           const html=fs.readFileSync("extension/dist/popup.html","utf8");
-          for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback","select-all-memories","clear-memory-selection"]) {
+          for (const id of ["provider-mode","generate-request","provider-response","review-writeback","accept-writeback","select-all-memories","clear-memory-selection","new-passphrase","confirm-passphrase","rekey"]) {
             if (!html.includes(`id="${id}"`)) throw new Error(`provider bridge control missing: ${id}`);
           }
           const js=fs.readFileSync("extension/dist/popup.js","utf8");
