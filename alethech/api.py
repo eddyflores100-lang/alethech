@@ -14,6 +14,7 @@ from .objects import Identity, MemoryCommit
 from .store import Store, StoreError
 from .verify import VerifyReport, verify_store
 from .container import seal_store, open_container
+from .adapters import VerifiedMemoryView, build_memory_view
 
 class AlethechError(Exception):
     """Programmatic API error with stable, user-facing semantics."""
@@ -127,6 +128,14 @@ class Alethech:
     def verify(self) -> VerifyReport:
         """Run the standalone verifier against this store."""
         return verify_store(self.store)
+
+    def memory_view(self) -> VerifiedMemoryView:
+        """Return a verified, backend-neutral causal memory view for adapters."""
+        return build_memory_view(self.store)
+
+    def context(self) -> dict:
+        """Return the verified neutral adapter payload as a plain dictionary."""
+        return self.memory_view().to_dict()
 
     def seal(self, output: str | Path, passphrase: str) -> Path:
         """Export this memory as one encrypted portable .aleth file."""
