@@ -177,6 +177,9 @@ jobs:
           assert len([x for x in py["files"] if x.startswith("artifacts/")]) == 1
           PY
 
+      - name: Verify frozen ALETH002 vector across all runtimes
+        run: python conformance/container_v2/check.py
+
       - name: Verify ALETH002 Python to TypeScript recovery interop
         run: |
           python - <<'PY'

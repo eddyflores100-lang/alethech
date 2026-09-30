@@ -500,6 +500,11 @@ def recover_container_v2(
         Path(path).read_bytes(),
         recovery_code=recovery_code,
     )
+    # Envelope authentication does not establish protocol validity. Verify
+    # signatures and history before writing any replacement container.
+    with tempfile.TemporaryDirectory(prefix="alethech-recovery-") as tmp:
+        _materialize_payload(payload, Path(tmp) / "store")
+
     current_secret = decode_recovery_secret(recovery_code)
     next_secret = os.urandom(32) if rotate_recovery else current_secret
     container_id = b64url_decode(header["container_id"])
