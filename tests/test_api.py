@@ -78,3 +78,68 @@ def test_programmatic_evidence_roundtrip(tmp_path):
     assert ev.commit_id in client.store.load_evidence()
     assert commit.provenance["evidence_refs"] == [ev.commit_id]
     assert len(client.store.list_artifacts()) == 1
+
+
+def test_public_api_aleth_v2_recovery_flow(tmp_path):
+    source = Alethech.initialize(tmp_path / "source-v2")
+    source.commit({"memory": "public v2 api"})
+    path, recovery = source.seal_v2(
+        tmp_path / "memory-v2.aleth",
+        "original-passphrase",
+        create_recovery=True,
+    )
+    assert recovery is not None
+
+    by_pass = Alethech.open_aleth(
+        path,
+        tmp_path / "opened-by-pass",
+        "original-passphrase",
+    )
+    assert by_pass.head == source.head
+    assert by_pass.verify().ok
+
+    by_recovery = Alethech.open_aleth_v2(
+        path,
+        tmp_path / "opened-by-recovery",
+        recovery_code=recovery,
+    )
+    assert by_recovery.head == source.head
+    assert by_recovery.verify().ok
+
+    recovered_path, same_recovery = Alethech.recover_aleth_v2(
+        path,
+        tmp_path / "recovered-v2.aleth",
+        recovery,
+        "replacement-passphrase",
+    )
+    assert same_recovery == recovery
+    recovered = Alethech.open_aleth(
+        recovered_path,
+        tmp_path / "opened-recovered",
+        "replacement-passphrase",
+    )
+    assert recovered.head == source.head
+    assert recovered.verify().ok
+
+
+def test_public_api_v1_to_v2_migration_preserves_head(tmp_path):
+    source = Alethech.initialize(tmp_path / "source-v1")
+    source.commit({"memory": "migrate through public api"})
+    v1 = source.seal(tmp_path / "memory-v1.aleth", "v1-passphrase")
+
+    v2, recovery = Alethech.migrate_aleth_v1_to_v2(
+        v1,
+        tmp_path / "memory-v2.aleth",
+        "v1-passphrase",
+        "v2-passphrase",
+        create_recovery=True,
+    )
+    assert recovery is not None
+
+    migrated = Alethech.open_aleth(
+        v2,
+        tmp_path / "opened-migrated",
+        "v2-passphrase",
+    )
+    assert migrated.head == source.head
+    assert migrated.verify().ok
