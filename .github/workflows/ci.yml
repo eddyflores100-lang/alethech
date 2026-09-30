@@ -99,7 +99,7 @@ jobs:
 
       - name: Open Python container in Rust
         run: |
-          ./alethech-rs/target/release/alethech-container /tmp/interop.aleth interop-passphrase > /tmp/rs-payload.json
+          ./alethech-rs/target/release/alethech-container open /tmp/interop.aleth interop-passphrase > /tmp/rs-payload.json
 
       - name: Compare decrypted payload across Python, TypeScript, and Rust
         run: |
@@ -125,6 +125,21 @@ jobs:
           from alethech import Alethech
           source = Alethech.open("/tmp/aleth-source")
           restored = Alethech.open_aleth("/tmp/ts-produced.aleth", "/tmp/from-ts", "interop-passphrase")
+          assert restored.head == source.head
+          assert restored.verify().ok
+          assert not (restored.path / "keys" / "root.key").exists()
+          assert not (restored.path / "keys" / "recovery.key").exists()
+          assert (restored.path / "keys" / "signing.key").exists()
+          PY
+
+
+      - name: Seal store in Rust and open in Python
+        run: |
+          ./alethech-rs/target/release/alethech-container seal /tmp/aleth-source /tmp/rs-produced.aleth interop-passphrase
+          python - <<'PY'
+          from alethech import Alethech
+          source = Alethech.open("/tmp/aleth-source")
+          restored = Alethech.open_aleth("/tmp/rs-produced.aleth", "/tmp/from-rust", "interop-passphrase")
           assert restored.head == source.head
           assert restored.verify().ok
           assert not (restored.path / "keys" / "root.key").exists()
