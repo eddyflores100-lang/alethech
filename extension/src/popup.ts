@@ -1,5 +1,5 @@
 import initWasm, { open_aleth_payload } from "./vendor/wasm/alethech_wasm.js";
-import { verifyPortableLegacyPayload } from "../../alethech-ts/portable-verifier.ts";
+import { verifyPortablePayload } from "../../alethech-ts/portable-verifier.ts";
 
 let selectedFile: File | null = null;
 let wasmReady: Promise<unknown> | null = null;
@@ -56,7 +56,7 @@ openButton.addEventListener("click", async () => {
     const blob = new Uint8Array(await selectedFile.arrayBuffer());
     plaintext = open_aleth_payload(blob, secret);
     const payload = JSON.parse(new TextDecoder().decode(plaintext));
-    const view = await verifyPortableLegacyPayload(payload);
+    const view = await verifyPortablePayload(payload);
 
     el<HTMLElement>("head").textContent = view.head.slice(0, 20) + "…";
     el<HTMLElement>("count").textContent = String(view.entries.length);
