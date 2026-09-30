@@ -59,11 +59,40 @@ def _collect(root: Path) -> dict[str, str]:
             raise ContainerError("too many files")
     return files
 
+def _verify_portable_signing_key(store: Store) -> None:
+    """Ensure the operational private key belongs to the identity being moved."""
+    try:
+        signing_jwk = store.load_signing_key().public_jwk()
+    except Exception as exc:
+        raise ContainerError("portable signing key unavailable") from exc
+
+    v2 = store.load_identity_records_v2()
+    if v2:
+        if len(v2) != 1:
+            raise ContainerError("portable v1 requires exactly one current identity")
+        identity = next(iter(v2.values()))
+        matches = [
+            item for item in identity.active_keys
+            if isinstance(item, dict) and item.get("public_key") == signing_jwk
+        ]
+        if not matches:
+            raise ContainerError("signing key does not match an active identity key")
+        return
+
+    legacy = store.load_identities()
+    if len(legacy) != 1:
+        raise ContainerError("portable v1 requires exactly one legacy identity")
+    identity = next(iter(legacy.values()))
+    if identity.public_key != signing_jwk:
+        raise ContainerError("signing key does not match identity")
+
+
 def seal_store(store: Store, output: str | Path, passphrase: str) -> Path:
     """Seal a store into one authenticated encrypted .aleth file."""
     report = verify_store(store)
     if not report.ok:
         raise ContainerError("refusing to seal invalid store: " + report.summary())
+    _verify_portable_signing_key(store)
     salt, nonce = os.urandom(16), os.urandom(12)
     header = {"cipher":"AES-256-GCM","format":"aleth","kdf":"scrypt",
               "nonce":b64url(nonce),"salt":b64url(salt),
