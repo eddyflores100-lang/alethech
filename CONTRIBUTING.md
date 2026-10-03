@@ -16,7 +16,35 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 ```
 
-All 230 tests must pass before any merge.
+All 338 tests must pass before any merge.
+
+## Cross-language conformance
+
+The protocol ships three implementations (Python, Rust, TypeScript). They
+must agree byte-for-byte on the same fixtures — that contract is enforced
+by the cross-language harness, not by any single language's test suite.
+
+```bash
+# All three runtimes (requires Python 3.10+, cargo, Node.js 18+):
+python conformance/cross_language_check.py
+
+# Python only — the mode to use when cargo/Node are unavailable:
+python conformance/cross_language_check.py --only python
+```
+
+Exit codes: `0` = all implementations agree on every comparable fixture;
+`1` = at least one disagrees; `2` = a required runtime is missing (use
+`--only` to diagnose). `--no-byte-compare` checks accept/reject agreement
+only, skipping the canonical-bytes comparison.
+
+The full CI job (`.github/workflows/ci.yml`, "cross-language conformance")
+goes further than the harness: it seals a container in Python, opens it in
+TypeScript and Rust, rejects wrong passphrases, tampered and truncated
+containers across all three, rotates passphrases, and round-trips ALETH002
+recovery codes between runtimes. If your change touches canonicalization,
+crypto, or the container format, that job is the bar your PR has to clear.
+Details: [conformance/CROSS_LANGUAGE.md](conformance/CROSS_LANGUAGE.md)
+and [conformance/README.md](conformance/README.md).
 
 ## Mutation testing
 
