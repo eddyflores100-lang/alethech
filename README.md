@@ -26,6 +26,7 @@ This is the reference implementation of the protocol specified in `docs/implemen
 - A cryptographic protocol implementation (Ed25519 + SHA-256 + JCS RFC 8785)
 - An encrypted portable memory container (`.aleth`, scrypt + AES-256-GCM)
 - A neutral verified adapter view for plugins and chat integrations
+- A read-only MCP stdio bridge (`python -m alethech.mcp_memory`) exposing verified memory context and verification tools — credentials and paths stay configuration, never tool arguments
 - 9 CLI commands (`init`, `commit`, `evidence`, `verify`, `export`, `import`, `migrate`, `key rotate`, `key revoke`)
 - A test suite with mutation-guard paths (each guarantee has a test that fails when the check is defeated)
 - MIT licensed, published on PyPI as `alethech`
@@ -33,7 +34,7 @@ This is the reference implementation of the protocol specified in `docs/implemen
 **What this repo is NOT:**
 - It is NOT a memory store or retrieval system
 - It is NOT the legacy `memex` project (Python/ChromaDB memory server)
-- It has no MCP server, no Docker, no auto-update, no LLM calls
+- It has no Docker, no auto-update, no LLM calls, no required cloud
 - It depends only on `cryptography` and `click` — no `mem0ai`, no `chromadb`, no `ollama`
 
 The legacy `memex` codebase (167 commits, AliceLabs Proprietary License) is preserved in a **separate repository**: [`eddyflores100-lang/memex-legacy`](https://github.com/eddyflores100-lang/memex-legacy). It is not part of this repo and not installed by `pip install alethech`.
@@ -48,7 +49,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Released version 0.8.5; `main` contains the 0.9 portable-memory work in progress. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
+Released version 0.9.1 — portable encrypted memory (`.aleth` v2 with ALETH002 recovery across Python, TypeScript, and Rust) and chat capture into portable memory are live. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
 
 ## install
 
