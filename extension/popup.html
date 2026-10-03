@@ -12,31 +12,38 @@
       <div class="mark">A</div>
       <div>
         <h1>Alethech</h1>
-        <p>Tu memoria, entre chats y herramientas</p>
+        <p>Guardar el chat abierto · versión 0.9.2</p>
       </div>
     </header>
 
     <section class="capture-workspace">
-      <h2>¿Guardar este chat como memoria?</h2>
-      <p class="hint">Sin cuenta. Tú revisas el contenido y eliges qué guardar en tu archivo cifrado.</p>
-      <button id="capture-chat" type="button">Capturar el chat actual</button>
+      <h2 id="capture-heading">✋ ¿Quieres guardar este chat?</h2>
+      <p id="first-memory-help" class="hint">No necesitas un archivo previo. Al abrir el icono, leemos el chat de esta pestaña. Elige una contraseña y descargamos tu primera memoria cifrada.</p>
+      <p id="capture-summary" class="capture-summary" aria-live="polite">Preparando la captura del chat abierto…</p>
+      <button id="save-current-chat" type="button">Sí, guardar este chat</button>
+      <button id="capture-chat" type="button">Actualizar captura del chat</button>
       <p id="capture-meta" class="hint">Origen: conversación pegada o importada por ti.</p>
       <p id="capture-warning" class="hint">Solo se captura el contenido cargado en la página. Revisa el resultado; puede faltar historial.</p>
-      <label for="transcript-file">O importa una conversación (.txt / .json, hasta 2 MiB)</label>
-      <input id="transcript-file" type="file" accept=".txt,.json,text/plain,application/json">
+      <details id="manual-transcript">
+        <summary>Alternativa: importar una conversación exportada</summary>
+        <label for="transcript-file">Conversación (.txt / .json, hasta 2 MiB)</label>
+        <input id="transcript-file" type="file" accept=".txt,.json,text/plain,application/json">
+      </details>
       <label for="capture-review">Revisa, edita o pega aquí la conversación</label>
-      <textarea id="capture-review" rows="7" placeholder="Pega una conversación de cualquier IA (hasta 2 MiB)…"></textarea>
+      <textarea id="capture-review" rows="4" placeholder="Aquí aparecerá automáticamente el chat abierto. Puedes revisar y editar lo que guardarás."></textarea>
       <label for="capture-name">Nombre del archivo</label>
       <input id="capture-name" value="mi-memoria" maxlength="100">
       <label for="capture-passphrase">Contraseña para el nuevo archivo</label>
       <input id="capture-passphrase" type="password" autocomplete="new-password" spellcheck="false">
       <label for="capture-confirm-passphrase">Repite la contraseña</label>
       <input id="capture-confirm-passphrase" type="password" autocomplete="new-password" spellcheck="false">
-      <button id="capture-save" type="button" disabled>Cifrar y descargar nuevo .aleth</button>
+      <button id="capture-save" type="button" disabled>Cifrar este chat y descargar mi memoria</button>
       <button id="capture-append" type="button" disabled>Añadir a la memoria abierta</button>
       <p class="hint">Para añadir a una memoria, ábrela abajo y vuelve a introducir su contraseña. El código de recuperación se conserva.</p>
     </section>
 
+    <details id="existing-memory">
+      <summary>Ya tengo una memoria .aleth: abrir o recuperar</summary>
     <section id="drop" class="drop" tabindex="0">
       <strong>Abre tu memoria .aleth</strong>
       <span>Arrastra el archivo o selecciónalo</span>
@@ -50,7 +57,6 @@
     </section>
 
     <p id="filename" class="filename"></p>
-    <div id="status" class="status" aria-live="polite">No memory loaded.</div>
 
       <section class="recover-access">
         <h2>Recover access</h2>
@@ -65,7 +71,8 @@
         <button id="recover-btn" disabled>Recover & download new .aleth</button>
         <p class="hint">The downloaded file will have the same memory history, signed by the same identity. Only the encryption changes.</p>
       </section>
-
+    </details>
+    <div id="status" class="status" aria-live="polite">Crea tu primera memoria desde el chat abierto; no necesitas seleccionar un archivo.</div>
 
     <section id="result" class="result" hidden>
       <div class="verified">✓ Verified locally</div>

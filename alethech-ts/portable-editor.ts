@@ -124,6 +124,11 @@ export async function appendPortableMemory(
 ):Promise<AppendMemoryResult>{
   if(!content||typeof content!=="object"||Array.isArray(content)) throw new Error("content must be an object");
 
+  // Approval and the source history refer to the inputs at invocation, not to
+  // caller changes made while key import, hashing and signing are awaiting.
+  payload=structuredClone(payload);
+  content=structuredClone(content);
+  options=structuredClone(options);
   const before=await verifyPortablePayload(payload);
   const privateKey=await importSigningKey(payload.files);
   const signer=await resolveCurrentSigner(payload,privateKey);

@@ -166,6 +166,10 @@ function updateButtons(): void {
   updateRekeyButton();
   updateRecoveryButtons();
   captureButton.disabled = busy;
+  el<HTMLButtonElement>("save-current-chat").disabled = busy;
+  captureReview.readOnly = busy;
+  capturePassphrase.disabled = busy;
+  captureConfirmPassphrase.disabled = busy;
   captureSave.disabled = busy || !captureReview.value.trim();
   captureAppend.disabled = busy || !verifiedPayload || !captureReview.value.trim();
   for (const id of ["insert-context", "copy-context", "download-context", "prepare-context"]) {
@@ -278,6 +282,7 @@ function choose(file: File | null): void {
   recoveryCodeDisplay.hidden = true;
   rotatedRecoveryDisplay.hidden = true;
   selectedFile = file && file.size <= MAX_FILE_SIZE ? file : null;
+  if (file) el<HTMLDetailsElement>("existing-memory").open = true;
   // Reset native selection so choosing the same original file again emits change.
   // The File object is retained above; generated outputs become the active source.
   fileInput.value = "";
@@ -570,8 +575,9 @@ providerResponse.addEventListener("input", () => { pendingWriteback = null; acce
 
 // Only activeTab and scripting are required; capture always follows a user click.
 type BrowserApi = {
-  tabs: { query(options: {active: boolean; currentWindow: boolean}): Promise<Array<{id?: number}>> };
+  tabs: { query(options: {active: boolean; currentWindow: boolean}): Promise<Array<{id?: number; url?: string}>> };
   scripting: { executeScript(options: {target: {tabId: number}; func: (...args: any[]) => any; args?: any[]}): Promise<Array<{result?: any}>> };
+  runtime: {sendMessage(message: unknown): Promise<{ok: boolean; capture?: ReturnType<typeof captureChatFromPage>; error?: string}>};
 };
 const browserApi = (globalThis as unknown as {chrome?: BrowserApi}).chrome;
 const browserAvailable = !!browserApi?.tabs?.query && !!browserApi?.scripting?.executeScript;
@@ -640,26 +646,50 @@ captureReview.addEventListener("input", () => {
   captureWarning.textContent = "Texto editado por ti. El origen indica la página capturada; no acredita la autoría ni la verificación del proveedor.";
   updateButtons();
 });
-captureButton.addEventListener("click", async () => {
+function installCapturedChat(captured: ReturnType<typeof captureChatFromPage>): void {
+  if (!captured?.messages?.length) throw new Error("No se encontraron mensajes. Pega o importa la conversación para continuar.");
+  captureReview.value = captured.messages.map(message => `${message.role}:\n${message.content}`).join("\n\n");
+  captureMetadata = {title: captured.title, url: captured.url, provider: captured.provider, captured_at: captured.captured_at, scope: captured.scope, warning: captured.warning ?? null};
+  el<HTMLElement>("capture-meta").textContent = `${captured.provider} · ${captured.title} · ${captured.url} · ${captured.captured_at}`;
+  captureWarning.textContent = captured.warning || "Solo mensajes cargados en la página. Revisa el resultado: puede faltar historial.";
+  captureName.value = captured.title.slice(0, 100) || "mi-memoria";
+  el<HTMLElement>("capture-summary").textContent = `✓ ${captured.messages.length} mensajes capturados de «${captured.title}». No necesitas ningún archivo previo.`;
+  status.textContent = "Chat capturado. Revisa el texto, elige una contraseña y pulsa «Cifrar este chat y descargar mi memoria».";
+}
+async function captureCurrentChat(automatic = false): Promise<boolean> {
   const token = startOperation();
-  if (token === null) return;
+  if (token === null) return false;
   status.textContent = "Leyendo los mensajes cargados en esta página…";
   try {
-    const tabId = await activeChatTab();
+    const [tab] = await browserApi!.tabs.query({active: true, currentWindow: true});
+    if (!tab?.id) throw new Error("No se encontró una pestaña de chat abierta.");
+    if (tab.url && /^(chrome-extension:|chrome:|edge:|about:)/.test(tab.url)) {
+      throw new Error("Abre tu conversación de IA y pulsa el icono ✋ de Alethech en esa pestaña. No necesitas crear ni seleccionar un archivo.");
+    }
+    const tabId = tab.id;
     assertCurrent(token);
     const [execution] = await browserApi!.scripting.executeScript({target: {tabId}, func: captureChatFromPage});
     assertCurrent(token);
     const captured = execution?.result as ReturnType<typeof captureChatFromPage> | undefined;
-    if (!captured?.messages?.length) throw new Error("No se encontraron mensajes. Pega o importa la conversación para continuar.");
-    captureReview.value = captured.messages.map(message => `${message.role}:\n${message.content}`).join("\n\n");
-    captureMetadata = {title: captured.title, url: captured.url, provider: captured.provider, captured_at: captured.captured_at, scope: captured.scope, warning: captured.warning ?? null};
-    el<HTMLElement>("capture-meta").textContent = `${captured.provider} · ${captured.title} · ${captured.url} · ${captured.captured_at}`;
-    captureWarning.textContent = captured.warning || "Solo mensajes cargados en la página. Revisa el resultado: puede faltar historial.";
-    captureName.value = captured.title.slice(0, 100) || "mi-memoria";
-    status.textContent = "Captura lista para revisar. Edita el texto antes de guardarlo.";
-    captureReview.focus();
-  } catch (error) { report(error, token); }
+    if (!captured) throw new Error("No se recibió la captura de la página.");
+    installCapturedChat(captured);
+    if (!automatic) captureReview.focus();
+    return true;
+  } catch (error) {
+    report(error, token);
+    if (token === generation) el<HTMLElement>("capture-summary").textContent = "No se pudo leer este chat. Puedes volver a capturarlo o pegar aquí su conversación.";
+    return false;
+  }
   finally { finishOperation(token); }
+}
+captureButton.addEventListener("click", () => { void captureCurrentChat(); });
+el<HTMLButtonElement>("save-current-chat").addEventListener("click", async () => {
+  if (busy) return;
+  if (!captureReview.value.trim() && !(await captureCurrentChat())) return;
+  capturePassphrase.focus();
+  capturePassphrase.scrollIntoView({block: "center", behavior: "smooth"});
+  status.className = "status";
+  status.textContent = "Solo falta elegir una contraseña y repetirla. Después pulsa «Cifrar este chat y descargar mi memoria».";
 });
 el<HTMLInputElement>("transcript-file").addEventListener("change", async event => {
   const input = event.target as HTMLInputElement;
@@ -678,6 +708,7 @@ el<HTMLInputElement>("transcript-file").addEventListener("change", async event =
     captureName.value = file.name.replace(/\.(txt|json)$/i, "");
     el<HTMLElement>("capture-meta").textContent = `Importado: ${file.name}`;
     captureWarning.textContent = "Conversación importada. Revisa el texto completo y elimina lo que no quieras guardar.";
+    el<HTMLElement>("capture-summary").textContent = "Conversación importada: lista para crear tu primera memoria.";
     status.textContent = "Importación lista para revisar.";
   } catch (error) { report(error, token); }
   finally { finishOperation(token); }
@@ -788,8 +819,13 @@ el<HTMLButtonElement>("download-rotated-recovery").addEventListener("click", () 
 if (!browserAvailable) {
   document.body.classList.add("standalone");
   captureButton.hidden = true;
+  el<HTMLButtonElement>("save-current-chat").hidden = true;
   el<HTMLButtonElement>("insert-context").hidden = true;
   captureWarning.textContent = "Pega o importa una conversación, revisa el contenido y crea tu archivo .aleth local.";
+  el<HTMLElement>("capture-heading").textContent = "✋ Crea tu primera memoria";
+  el<HTMLElement>("first-memory-help").textContent = "Este archivo HTML no puede leer otra pestaña. Para capturar el chat automáticamente, usa el icono de la extensión en tu conversación. Aquí puedes pegar un chat y cifrarlo sin tener ningún archivo previo.";
+  el<HTMLElement>("capture-summary").textContent = "Pega aquí tu conversación para crear y descargar su memoria cifrada.";
+  captureReview.placeholder = "Pega aquí tu chat. No necesitas un archivo de memoria previo.";
 }
 document.addEventListener("change", event => {
   if ((event.target as HTMLElement)?.classList?.contains("memory-select")) {
@@ -814,3 +850,23 @@ window.addEventListener("pagehide", () => {
   rotatedRecoveryText.value = "";
 });
 updateButtons();
+// Opening the toolbar action is the user gesture that grants temporary activeTab
+// access. Read into the local preview; sign, encrypt and download only on Save.
+if (browserAvailable) {
+  const pendingCapture = new URLSearchParams(location.hash.slice(1)).get("capture");
+  if (pendingCapture) {
+    // The floating brain passes only captured text through the extension worker.
+    // Passwords and signing keys remain inside this isolated extension page.
+    const token = startOperation()!;
+    void (async () => {
+      try {
+        const response = await browserApi!.runtime.sendMessage({type: "alethech.take-capture", token: pendingCapture});
+        assertCurrent(token);
+        if (!response?.ok || !response.capture) throw new Error("La captura ya no está disponible. Vuelve al chat y pulsa su cerebro flotante.");
+        installCapturedChat(response.capture);
+        history.replaceState(null, "", location.pathname);
+      } catch (error) { report(error, token); }
+      finally { finishOperation(token); }
+    })();
+  } else void captureCurrentChat(true);
+}

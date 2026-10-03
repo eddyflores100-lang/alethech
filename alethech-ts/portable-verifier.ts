@@ -380,7 +380,7 @@ function reachableParentFirst(head:string, commits:Map<string,MemoryCommit>): st
 ///
 /// This intentionally rejects protocol layers not yet implemented in the browser
 /// verifier. Fail-closed is part of the contract.
-export async function verifyPortableLegacyPayload(payload: PortablePayload): Promise<VerifiedPortableView> {
+async function verifyPortableLegacySnapshot(payload: PortablePayload): Promise<VerifiedPortableView> {
   assertSupportedPayload(payload);
   const files=payload.files;
 
@@ -481,7 +481,7 @@ export async function verifyPortableLegacyPayload(payload: PortablePayload): Pro
 /** Verify a decrypted V2 portable payload (root + governance + memory/evidence).
  * Migrations and checkpoints remain fail-closed until their browser rules land.
  */
-export async function verifyPortableV2Payload(payload: PortablePayload): Promise<VerifiedPortableView> {
+async function verifyPortableV2Snapshot(payload: PortablePayload): Promise<VerifiedPortableView> {
   assertSupportedPayload(payload);
   const files=payload.files;
   if(typeof files["root_authority.json"]!=="string") throw new Error("missing root authority");
@@ -683,11 +683,21 @@ export async function verifyPortableV2Payload(payload: PortablePayload): Promise
   return {format:"alethech-memory-view",version:1,head,entries};
 }
 
+/** Verify one stable snapshot, even when callers mutate their source while crypto awaits. */
+export async function verifyPortableLegacyPayload(payload: PortablePayload): Promise<VerifiedPortableView> {
+  return verifyPortableLegacySnapshot(structuredClone(payload));
+}
+
+export async function verifyPortableV2Payload(payload: PortablePayload): Promise<VerifiedPortableView> {
+  return verifyPortableV2Snapshot(structuredClone(payload));
+}
+
 export async function verifyPortablePayload(payload: PortablePayload): Promise<VerifiedPortableView> {
+  payload=structuredClone(payload);
   const identityPaths=Object.keys(payload.files??{}).filter(p=>p.startsWith("identities/")&&p.endsWith(".json"));
   const types=identityPaths.map(p=>{
     try{return parseJsonFile<any>(payload.files,p).type;}catch{return "";}
   });
-  if(types.includes("IdentityRecordV2")) return verifyPortableV2Payload(payload);
-  return verifyPortableLegacyPayload(payload);
+  if(types.includes("IdentityRecordV2")) return verifyPortableV2Snapshot(payload);
+  return verifyPortableLegacySnapshot(payload);
 }

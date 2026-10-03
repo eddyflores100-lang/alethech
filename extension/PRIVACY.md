@@ -2,61 +2,65 @@
 
 **Última actualización:** 30 de septiembre de 2026
 
-## Qué datos recogemos
+## Procesamiento local
 
-**Ninguno.** Alethech Portable Memory no recoge, almacena, transmite ni comparte ningún dato personal, contenido de chat, contraseña, o cualquier otra información con ningún servidor, tercero, o servicio externo.
+La extensión procesa conversaciones, archivos, contraseñas, códigos de recuperación
+y claves en el navegador. No incluye un servicio de subida, analytics, telemetría
+ni llamadas de red para estas operaciones. No persiste estos datos mediante APIs
+de almacenamiento del navegador. Los archivos y códigos que descargas sí quedan
+en el destino que eliges; protégelos y guarda los códigos por separado.
 
-## Cómo funciona
+En las páginas que coinciden con `content_scripts.matches` del
+[manifiesto](manifest.json), se carga automáticamente el cerebro flotante. La
+captura del contenido de la conversación ocurre después de pulsarlo: lee el
+contenido cargado en la página y abre una página aislada de la extensión para
+revisar y guardar. El icono de la barra también ofrece captura explícita. No se
+captura el historial no cargado ni la memoria privada de un proveedor.
 
-La extensión procesa todo el contenido localmente en el navegador del usuario:
+Las contraseñas y códigos se introducen en la interfaz de la extensión, no en
+formularios insertados en el DOM del sitio del chat. Los campos de credenciales
+se limpian tras las operaciones; cerrar la interfaz elimina su estado en memoria.
+No se garantiza el borrado físico de copias de memoria gestionadas por el navegador.
 
-1. **Lectura de página:** Cuando el usuario hace click en el cerebro flotante (🧠), la extensión lee el texto visible de la pestaña activa usando la API `innerText` del navegador. Este texto nunca sale del dispositivo del usuario.
+WebCrypto genera firmas locales y el verificador comprueba el historial soportado.
+El módulo WASM local autentica, descifra y cifra el contenedor. El formato ALETH002
+permite recuperación local con un código guardado por el usuario; la extensión
+verifica el historial antes de continuar, recuperar o volver a cifrar un archivo.
+No hay recuperación en un servidor. Una firma no certifica la verdad del chat ni
+que el proveedor lo haya firmado.
 
-2. **Cifrado:** El texto se cifra localmente usando la API Web Crypto del navegador (AES-256-GCM) y scrypt (N=32768, r=8, p=1) para derivar la clave de la contraseña del usuario. El cifrado ocurre enteramente en el navegador.
+## Permisos y acceso a páginas
 
-3. **Descarga:** El archivo cifrado (.aleth) se descarga directamente al dispositivo del usuario mediante una descarga del navegador. No se sube a ningún servidor.
+- **activeTab** y **scripting** permiten captura e inserción mediante el icono de
+  la barra después de la activación del usuario, sujetos a las restricciones del navegador.
+- **content_scripts** declara acceso automático para cargar el cerebro en los
+  patrones del manifiesto. No es acceso exclusivamente temporal de `activeTab`.
+  La lista incluye servicios de chat, sitios de desarrollo, rutas de GitHub y
+  `localhost`/`127.0.0.1`; algunas coincidencias abarcan páginas sin chat.
+- No se declaran permisos `storage` ni `host_permissions` globales. Los patrones
+  de `content_scripts` sí autorizan la ejecución del script en esos sitios.
 
-4. **Apertura de archivos:** Cuando el usuario abre un archivo .aleth existente, la extensión lo lee localmente y lo descifra en el navegador. El contenido descifrado nunca se transmite.
+La lista del manifiesto es la referencia exacta y puede cambiar entre versiones.
+Los patrones de URL no representan integraciones verificadas con cada servicio ni
+acceso a aplicaciones nativas de escritorio. Los archivos locales elegidos por el
+usuario se leen en la interfaz de la extensión.
 
-## Permisos de la extensión
+## Compartir contexto
 
-- **activeTab:** Permite a la extensión leer el contenido de la pestaña activa SOLO cuando el usuario hace click explícitamente en el icono de la extensión o en el cerebro flotante. La extensión no lee páginas automáticamente.
+El contexto seleccionado se puede exportar, copiar o insertar como borrador en
+un chat. La extensión no pulsa enviar. Al enviarlo o adjuntarlo, el sitio y su
+proveedor pueden recibir ese contenido conforme a sus propias políticas. No se
+incluyen claves privadas ni credenciales de cifrado en el contexto generado.
 
-- **content_scripts (chat domains only):** El cerebro flotante se inyecta únicamente en estos dominios:
-  - chatgpt.com
-  - chat.openai.com
-  - claude.ai
-  - gemini.google.com
-  - copilot.microsoft.com
-  - poe.com
-  - alethech.alicelabs.site
+Las páginas web visitadas, incluida la página de descargas, pueden realizar sus
+propias solicitudes de red. Descargar o visitar el sitio es distinto de operar
+un archivo con la extensión o con el visor HTML independiente, que incluye su
+código local. No se carga criptografía desde un CDN en estas herramientas.
 
-  No se inyecta en otras páginas (bancos, email, redes sociales, etc.).
+## Código y contacto
 
-## Datos que NO recogemos
+Código público: https://github.com/eddyflores100-lang/alethech
 
-- No recogemos contraseñas ni passphrases
-- No recogemos contenido de chats
-- No recogemos datos de navegación
-- No recogemos direcciones IP
-- No usamos cookies
-- No usamos analytics
-- No usamos telemetría
-- No tenemos servidor backend
-- No tenemos base de datos
-- No usamos servicios de terceros
-
-## Código abierto
-
-Todo el código de la extensión es público y auditable en:
-https://github.com/eddyflores100-lang/alethech
-
-## Contacto
-
-Para preguntas sobre privacidad:
-- GitHub: https://github.com/eddyflores100-lang/alethech/issues
-- Email: eddyflores100-lang@users.noreply.github.com
-
-## Licencia
+Preguntas de privacidad: https://github.com/eddyflores100-lang/alethech/issues
 
 MIT License — © 2026 AliceLabs LLC

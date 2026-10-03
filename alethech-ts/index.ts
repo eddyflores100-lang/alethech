@@ -225,6 +225,10 @@ export async function createCommit(
     content: Record<string, unknown>,
     kp: KeyPair
 ): Promise<MemoryCommit> {
+    // Hashing and signing must use the same caller-approved immutable inputs.
+    parents = [...parents];
+    content = structuredClone(content);
+    const privateKey = kp.privateKey;
     const timestamp = utcNow();
     const signable: Record<string, unknown> = {
         type: "MemoryCommit",
@@ -247,7 +251,7 @@ export async function createCommit(
     const signableWithId = { ...signable, commit_id: commitId };
     const canonicalWithId = canonicalizeJson(signableWithId);
     const signableBytes = new TextEncoder().encode(canonicalWithId);
-    const sig = await sign(kp.privateKey, signableBytes);
+    const sig = await sign(privateKey, signableBytes);
 
     return {
         ...signableWithId as any,
@@ -259,6 +263,8 @@ export async function verifyCommit(
     commit: MemoryCommit,
     publicKeyBytes: Uint8Array
 ): Promise<boolean> {
+    commit = structuredClone(commit);
+    publicKeyBytes = new Uint8Array(publicKeyBytes);
     if (!commit.signature.startsWith("ed25519:")) return false;
 
     const sigB64 = commit.signature.slice(8);

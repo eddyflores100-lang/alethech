@@ -16,8 +16,8 @@ import { acceptWritebackProposal } from "./provider-writeback.ts";
 export type PluginProviderKind = "openai" | "anthropic" | "local";
 
 export interface AlethechPluginSession {
-  payload: PortablePayload;
-  view: VerifiedPortableView;
+  readonly payload: PortablePayload;
+  readonly view: VerifiedPortableView;
 }
 
 export type PreparedProviderRequest =
@@ -25,9 +25,21 @@ export type PreparedProviderRequest =
   | AnthropicCompatibleRequest
   | LocalAgentRequest;
 
+function freezeSession(session: AlethechPluginSession): AlethechPluginSession {
+  function freeze(value: unknown): void {
+    if(!value || typeof value!=="object" || Object.isFrozen(value)) return;
+    for(const child of Object.values(value)) freeze(child);
+    Object.freeze(value);
+  }
+  freeze(session);
+  return session;
+}
+
 export async function createPluginSession(payload: PortablePayload): Promise<AlethechPluginSession> {
+  // The retained payload must be the same snapshot whose history was verified.
+  payload=structuredClone(payload);
   const view = await verifyPortablePayload(payload);
-  return { payload: structuredClone(payload), view };
+  return freezeSession({ payload, view });
 }
 
 export function preparePluginRequest(
@@ -62,5 +74,5 @@ export async function acceptPluginWriteback(
   proposal: AlethechWritebackProposal,
 ): Promise<AlethechPluginSession> {
   const accepted = await acceptWritebackProposal(session.payload, proposal);
-  return { payload: accepted.payload, view: accepted.view };
+  return freezeSession({ payload: accepted.payload, view: accepted.view });
 }

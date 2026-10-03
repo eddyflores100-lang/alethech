@@ -10,6 +10,12 @@ import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 
 const root = resolve(import.meta.dirname, "../..");
+// CI can exercise extracted release bytes with the same real-browser checks.
+// Relative override paths are resolved from the caller's working directory.
+const extensionSource = process.env.ALETHECH_EXTENSION_DIR
+  ? resolve(process.env.ALETHECH_EXTENSION_DIR) : join(root, "extension/dist");
+const standaloneSource = process.env.ALETHECH_STANDALONE_HTML
+  ? resolve(process.env.ALETHECH_STANDALONE_HTML) : join(root, "standalone/dist/alethech.html");
 const temp = await mkdtemp(join(tmpdir(), "alethech-browser-"));
 let context;
 const fixtureRequests = [];
@@ -76,12 +82,20 @@ print(json.dumps(meta))
 }
 try {
   const extension = join(temp, "extension");
-  await cp(join(root, "extension/dist"), extension, { recursive: true });
+  await cp(extensionSource, extension, { recursive: true });
   const manifest = JSON.parse(await readFile(join(extension, "manifest.json"), "utf8"));
   assert.deepEqual([...(manifest.permissions ?? [])].sort(), ["activeTab", "scripting"]);
   assert.equal((manifest.optional_permissions ?? []).length, 0);
   assert.equal((manifest.optional_host_permissions ?? []).length, 0);
   assert.equal((manifest.host_permissions ?? []).length, 0);
+  const productionMatches = manifest.content_scripts.flatMap(script => script.matches);
+  assert.equal(productionMatches.length, 78);
+  assert.equal(new Set(productionMatches).size, 78);
+  assert(productionMatches.every(pattern => /^https?:\/\/[^*/]+(?::\*)?\//.test(pattern)));
+  assert(!productionMatches.includes("<all_urls>"));
+  assert.equal((manifest.web_accessible_resources ?? []).length, 0);
+  // Content scripts run on the local test fixture, never a broad test host grant.
+  for (const script of manifest.content_scripts) script.matches = ["http://127.0.0.1/*"];
   // A tab opened as popup.html does not receive the toolbar's activeTab grant.
   // Grant only the local fixture in the temporary copy, after production assertions.
   manifest.host_permissions = ["http://127.0.0.1/*"];
@@ -124,6 +138,100 @@ try {
     await event.saveAs(path);
     return {path, name: event.suggestedFilename()};
   }
+  // The floating brain captures into an isolated extension tab. It must never
+  // place encryption credentials or a crypto form into the provider's DOM.
+  await sourceChat.bringToFront();
+  await sourceChat.locator("#alethech-brain").waitFor();
+  const tabsBeforeDrag = context.pages().length;
+  const brainBox = await sourceChat.locator("#alethech-brain").boundingBox();
+  assert(brainBox);
+  await sourceChat.mouse.move(brainBox.x + brainBox.width / 2, brainBox.y + brainBox.height / 2);
+  await sourceChat.mouse.down();
+  await sourceChat.mouse.move(brainBox.x - 90, brainBox.y - 90, {steps: 10});
+  await sourceChat.mouse.up();
+  await sourceChat.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  assert.equal(context.pages().length, tabsBeforeDrag);
+  assert.equal(await sourceChat.locator("#alethech-panel,#alethech-pass,#alethech-pass2,#alethech-encrypt").count(), 0);
+  const brainNavigationUrls = [];
+  const recordBrainPage = opened => {
+    brainNavigationUrls.push(opened.url());
+    opened.on("framenavigated", frame => { if (frame === opened.mainFrame()) brainNavigationUrls.push(frame.url()); });
+  };
+  context.on("page", recordBrainPage);
+  const openedFromBrain = context.waitForEvent("page");
+  await sourceChat.locator("#alethech-brain").click();
+  const brainPopup = await openedFromBrain.catch(async error => {
+    const errors = await sourceChat.locator('[role="status"]').allTextContents();
+    throw new Error(`Brain did not open review: ${JSON.stringify(errors)}; ${error.message}`);
+  });
+  brainPopup.on("request", request => { if (/^https?:/.test(request.url())) externalRequests.push(request.url()); });
+  await brainPopup.waitForLoadState("domcontentloaded");
+  assert(brainPopup.url().startsWith(`chrome-extension://${id}/popup.html`));
+  await brainPopup.waitForFunction(() => document.querySelector("#capture-review").value.includes("Remember my favorite"));
+  assert.equal(await brainPopup.locator("#capture-review").inputValue(), reviewed);
+  assert.equal(await brainPopup.locator("#existing-memory").evaluate(element => element.open), false);
+  assert.equal(await brainPopup.locator("#file").isVisible(), false);
+  assert.equal(await sourceChat.locator("#alethech-pass,#alethech-pass2,#alethech-encrypt").count(), 0);
+  await brainPopup.locator("#capture-name").fill("first-memory-from-brain");
+  await brainPopup.locator("#capture-passphrase").fill("brain-popup-pass");
+  await brainPopup.locator("#capture-confirm-passphrase").fill("brain-popup-pass");
+  const firstMemory = await downloadFrom(brainPopup, "#capture-save");
+  assert.equal(firstMemory.name, "first-memory-from-brain.aleth");
+  await brainPopup.locator("#result").waitFor({state: "visible"});
+  const firstCode = await brainPopup.locator("#recovery-code-text").inputValue();
+  assert.equal(await sourceChat.locator("input[type=password]").count(), 2);
+  assert(!await sourceChat.evaluate(({secret, code}) => document.documentElement.outerHTML.includes(secret) || document.documentElement.outerHTML.includes(code), {secret: "brain-popup-pass", code: firstCode}));
+  const firstMeta = inspect(firstMemory.path, "brain-popup-pass", firstCode);
+  assert.equal(firstMeta.entries.length, 1);
+  assert.equal(firstMeta.entries[0].content.text, reviewed);
+  assert.equal(firstMeta.entries[0].content.capture.url, `${fixtureOrigin}/chat`);
+  assert(!JSON.stringify(firstMeta.entries).includes("SECRET"));
+  // Reloading the URL or copying its token cannot replay the already consumed capture.
+  context.off("page", recordBrainPage);
+  const createdCaptureUrl = brainNavigationUrls.find(url => url.startsWith(`chrome-extension://${id}/popup.html#capture=`));
+  // The popup deliberately clears the fragment on consumption. Navigation tracing
+  // normally records its initial URL; a random unknown token also must fail closed.
+  const captureToken = createdCaptureUrl ? new URLSearchParams(new URL(createdCaptureUrl).hash.slice(1)).get("capture") : crypto.randomUUID();
+  assert.match(captureToken, /^[a-f0-9-]{36}$/);
+  assert.equal(new URL(brainPopup.url()).hash, "");
+  const replay = await brainPopup.evaluate(token => chrome.runtime.sendMessage({type: "alethech.take-capture", token}), captureToken);
+  assert.equal(replay.ok, false);
+  assert.equal(replay.capture, undefined);
+  const otherTabTake = await page.evaluate(token => chrome.runtime.sendMessage({type: "alethech.take-capture", token}), captureToken);
+  assert.equal(otherTabTake.ok, false);
+  assert.equal(otherTabTake.capture, undefined);
+  const extensionForgery = await page.evaluate(url => chrome.runtime.sendMessage({
+    type: "alethech.open-capture", capture: {title: "Forged host capture", url, scope: "current-page-dom", captured_at: new Date().toISOString(), messages: [{role: "user", content: "UNTRUSTED_CAPTURE"}]},
+  }), `${fixtureOrigin}/chat`);
+  assert.equal(extensionForgery.ok, false);
+  assert.equal(extensionForgery.capture, undefined);
+  await brainPopup.close();
+
+  async function openFreshPopup() {
+    // Keep the source selected before creating an inactive extension tab: the
+    // popup's initial tabs.query must see the chat, never its own extension page.
+    await sourceChat.bringToFront();
+    const opened = context.waitForEvent("page");
+    await page.evaluate(url => chrome.tabs.create({url, active: false}), `chrome-extension://${id}/popup.html`);
+    const fresh = await opened;
+    fresh.on("request", request => { if (/^https?:/.test(request.url())) externalRequests.push(request.url()); });
+    await fresh.waitForLoadState("domcontentloaded");
+    return fresh;
+  }
+  const firstPopup = await openFreshPopup();
+  await firstPopup.waitForFunction(() => document.querySelector("#capture-review").value.includes("Remember my favorite"));
+  assert.equal(await firstPopup.locator("#existing-memory").evaluate(element => element.open), false);
+  assert.equal(await firstPopup.locator("#file").isVisible(), false);
+  assert.equal(await firstPopup.locator("#capture-review").inputValue(), reviewed);
+  assert.equal(await firstPopup.getByText(/¿Quieres guardar/).isVisible(), true);
+  await firstPopup.close();
+  await sourceChat.evaluate(() => document.querySelector("[data-message-author-role='user'] p").textContent = "The active chat has changed since the last popup.");
+  const refreshedPopup = await openFreshPopup();
+  await refreshedPopup.waitForFunction(() => document.querySelector("#capture-review").value.includes("The active chat has changed"));
+  assert.equal(await refreshedPopup.locator("#existing-memory").evaluate(element => element.open), false);
+  assert(!/Remember my favorite|SECRET/.test(await refreshedPopup.locator("#capture-review").inputValue()));
+  await refreshedPopup.close();
+
   await page.locator("#capture-name").fill("independent-chat");
   await page.locator("#capture-passphrase").fill("capture-pass");
   await page.locator("#capture-confirm-passphrase").fill("capture-pass");
@@ -291,10 +399,12 @@ else:
     if (/^https?:/.test(request.url())) offlineRequests.push(request.url());
   });
   await context.setOffline(true);
-  await offline.goto(pathToFileURL(join(root, "standalone/dist/alethech.html")).href);
+  await offline.goto(pathToFileURL(standaloneSource).href);
   assert.equal(await offline.locator("#capture-chat").isVisible(), false);
   assert.equal(await offline.locator("#insert-context").isVisible(), false);
   const pasted = "user:\nOffline browser memory.\n\nassistant:\nSaved without a server.";
+  assert.equal(await offline.locator("#existing-memory").evaluate(element => element.open), false);
+  assert.equal(await offline.locator("#file").isVisible(), false);
   await offline.locator("#capture-review").fill(pasted);
   await offline.locator("#capture-name").fill("offline-memory");
   await offline.locator("#capture-passphrase").fill("offline-pass");
@@ -318,7 +428,7 @@ else:
   assert.match(offlineContext, /Saved without a server/);
   assert(!/PRIVATE KEY|signing\.key|root\.key|recovery\.key/.test(offlineContext));
   assert.deepEqual(offlineRequests, []);
-  console.log("Browser: actual page capture, independent identity, cross-page draft insertion, guarded editors, capture append, offline HTML create/reopen/export passed");
+  console.log("Browser: isolated brain first-memory capture, token/sender rejection, fresh-popup auto capture, actual page capture, independent identity, cross-page draft insertion, guarded editors, capture append, offline HTML create/reopen/export passed");
   console.log("Browser: upgrade, append, accepted provider writeback, passphrase rotation, recovery rotation, locked recovery preservation/rotation, old-code rejection, sharing and forged-history rejection passed");
 } finally {
   await context?.close();
