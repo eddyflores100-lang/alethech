@@ -579,14 +579,14 @@ jobs:
         run: rm extension/dist/chat-page-bridge-test.js
 
       - name: Upload independent desktop HTML
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alethech-offline-desktop
           path: standalone/dist/alethech.html
           retention-days: 30
 
       - name: Upload extension package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: alethech-browser-extension
           path: extension/dist/
