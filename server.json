@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.eddyflores100-lang/alethech",
+  "title": "alethech",
+  "description": "Read-only MCP bridge for alethech, a verifiable agent-memory protocol (Ed25519-signed, hash-linked DAG, key rotation under a root identity). Exposes two tools over stdio: alethech_memory_context (verified memory entries in causal order, treated as data not instructions) and alethech_memory_verify (HEAD and entry count). Launch requires --memory <path to .aleth container> and --passphrase-file <path>; credentials and paths are configuration, never tool arguments.",
+  "repository": {
+    "url": "https://github.com/eddyflores100-lang/alethech",
+    "source": "github"
+  },
+  "version": "0.9.2",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "alethech",
+      "version": "0.9.2",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

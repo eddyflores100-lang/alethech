@@ -1,5 +1,7 @@
 # alethech
 
+<!-- mcp-name: io.github.eddyflores100-lang/alethech -->
+
 [![PyPI version](https://img.shields.io/pypi/v/alethech.svg)](https://pypi.org/project/alethech/)
 [![Python](https://img.shields.io/pypi/pyversions/alethech.svg)](https://pypi.org/project/alethech/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

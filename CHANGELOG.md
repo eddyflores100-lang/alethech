@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.9.2] — 2026-10-04
+
+### MCP Registry readiness
+
+Patch bump: prepares the package for the official MCP Registry
+(modelcontextprotocol/registry). No protocol or behavior changes;
+the conformance suite is untouched.
+
+- `README.md` now carries the hidden
+  `mcp-name: io.github.eddyflores100-lang/alethech` ownership token
+  checked by the registry's PyPI package verification.
+- New `server.json` with the stdio PyPI package entry for the
+  read-only `alethech-mcp` bridge (`alethech_memory_context`,
+  `alethech_memory_verify`).
+- `pyproject.toml` version bump 0.9.1 → 0.9.2.
+
+## [0.9.1] — 2026-10-03
+
+### Docs sync
+
+- README status section updated to v0.9.1 (CI, releases, MCP bridge
+  surfaces) — fixes the stale-version and "no MCP server" claims
+  flagged during the Awesome-Agent-Memory listing audit.
+- Star CTA and awesome-list social proof added.
+
 ## [0.9.0] — 2026-09-30
 
 ### ALETH002 cross-language + browser extension recovery UI
