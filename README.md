@@ -7,11 +7,16 @@
 [![Mutation paths](https://img.shields.io/badge/mutation%20paths-8-blue)](https://github.com/eddyflores100-lang/alethech)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-yellow)](https://github.com/eddyflores100-lang/alethech)
 [![Type hints](https://img.shields.io/badge/type%20hints-100%25-brightgreen)](https://github.com/eddyflores100-lang/alethech)
+[![GitHub Repo stars](https://img.shields.io/github/stars/eddyflores100-lang/alethech?style=social)](https://github.com/eddyflores100-lang/alethech/stargazers)
 
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
 > The art of un-concealing transmission integrity.
 >
 > Copyright (c) 2026 AliceLabs LLC.
+
+**Listed in [TeleAI-UAGI/Awesome-Agent-Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory)** (Emerging projects) after a maintainer audit of the claims against the code.
+
+**If alethech is useful to you, a ★ [star](https://github.com/eddyflores100-lang/alethech/stargazers) is how other people — and their agents — find it.**
 
 From Greek **ἀλήθεια** (aletheia, "truth as un-concealment") + **τέχνη** (techne, "art, craft").
 The art of revealing that a memory was not modified after being signed.
