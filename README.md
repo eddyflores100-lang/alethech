@@ -18,6 +18,8 @@
 
 **Listed in [TeleAI-UAGI/Awesome-Agent-Memory](https://github.com/TeleAI-UAGI/Awesome-Agent-Memory)** (Emerging projects) after a maintainer audit of the claims against the code.
 
+**Now in the [official MCP Registry](https://registry.modelcontextprotocol.io/): [`io.github.eddyflores100-lang/alethech`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.eddyflores100-lang%2Falethech/versions)** — the read-only `alethech-mcp` bridge, discoverable by any registry-aware MCP client.
+
 **If alethech is useful to you, a ★ [star](https://github.com/eddyflores100-lang/alethech/stargazers) is how other people — and their agents — find it.**
 
 From Greek **ἀλήθεια** (aletheia, "truth as un-concealment") + **τέχνη** (techne, "art, craft").
@@ -33,7 +35,7 @@ This is the reference implementation of the protocol specified in `docs/implemen
 - A cryptographic protocol implementation (Ed25519 + SHA-256 + JCS RFC 8785)
 - An encrypted portable memory container (`.aleth`, scrypt + AES-256-GCM)
 - A neutral verified adapter view for plugins and chat integrations
-- A read-only MCP stdio bridge (`python -m alethech.mcp_memory`) exposing verified memory context and verification tools — credentials and paths stay configuration, never tool arguments
+- A read-only MCP stdio bridge (`python -m alethech.mcp_memory`, or `alethech-mcp` after `pip install alethech`) exposing verified memory context and verification tools — credentials and paths stay configuration, never tool arguments
 - 9 CLI commands (`init`, `commit`, `evidence`, `verify`, `export`, `import`, `migrate`, `key rotate`, `key revoke`)
 - A test suite with mutation-guard paths (each guarantee has a test that fails when the check is defeated)
 - MIT licensed, published on PyPI as `alethech`
