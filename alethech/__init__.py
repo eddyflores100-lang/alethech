@@ -3,7 +3,7 @@
 Reference implementation of the protocol specified in rev 2.
 Local-first, zero-LLM, zero-blockchain.
 """
-__version__ = "0.9.1"
+__version__ = "0.9.2"
 
 
 # Stable embedding API
