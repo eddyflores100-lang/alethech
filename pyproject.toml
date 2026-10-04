@@ -42,6 +42,7 @@ dev = [
 
 [project.scripts]
 alethech = "alethech.cli:cli"
+alethech-mcp = "alethech.mcp_memory:main"
 
 [tool.setuptools.packages.find]
 include = ["alethech*"]

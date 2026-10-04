@@ -14,7 +14,11 @@ from pathlib import Path
 import sys
 from typing import BinaryIO
 
-from .api import Alethech
+try:
+    from .api import Alethech
+except ImportError:  # executed as a plain script (container builders, docker, uvx)
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from alethech.api import Alethech
 
 PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
