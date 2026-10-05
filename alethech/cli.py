@@ -546,13 +546,21 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
 @click.option("--query", required=True, help="Search query")
 @click.option("--top-k", default=5, type=int, help="Maximum results")
 @click.option("--type", "memory_type", default=None, type=click.Choice(["semantic", "episodic", "procedural"]))
-def search(query, top_k, memory_type):
-    """Recall memories by semantic similarity (local TF-IDF, no server)."""
+@click.option("--semantic", is_flag=True, help="Use neural embeddings (requires pip install alethech[semantic])")
+def search(query, top_k, memory_type, semantic):
+    """Recall memories by semantic similarity (local, no server).
+
+    By default uses enhanced TF-IDF with character n-grams (handles
+    abbreviations like k8s, typos, and multilingual matching).
+
+    With --semantic flag, uses neural embeddings (sentence-transformers)
+    for true semantic search. Requires: pip install alethech[semantic]
+    """
     ctx = click.get_current_context()
     store_path = Path(ctx.obj["store"])
     store = Store.open(store_path)
     from .search import recall as do_recall
-    results = do_recall(store, query, top_k=top_k, memory_type=memory_type)
+    results = do_recall(store, query, top_k=top_k, memory_type=memory_type, neural=semantic)
     if not results:
         click.echo("No memories found.")
         return

@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "alethech"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
  "aes-gcm",
  "base64ct",

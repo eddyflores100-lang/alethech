@@ -1,6 +1,6 @@
 [package]
 name = "alethech"
-version = "0.9.3"
+version = "0.9.4"
 edition = "2021"
 description = "Verifiable agent continuity protocol — Ed25519-signed memory, hash-linked DAG, key rotation"
 license = "MIT"

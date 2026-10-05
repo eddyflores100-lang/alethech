@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Alethech Portable Memory",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Guarda y cifra conversaciones de IA como memoria portátil .aleth. Sin cuenta, sin red, sin servidor.",
   "action": {
     "default_title": "🧠 Guardar este chat como memoria",
