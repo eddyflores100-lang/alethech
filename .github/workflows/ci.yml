@@ -591,3 +591,6 @@ jobs:
           name: alethech-browser-extension
           path: extension/dist/
           retention-days: 30
+
+      - name: Package downloads
+        run: python scripts/package_downloads.py
