@@ -540,6 +540,25 @@ def export(output: str, include_artifacts: bool, emit_checkpoint: bool) -> None:
 
 # ---------- 6. import ----------
 
+
+
+@cli.command()
+@click.option("--query", required=True, help="Search query")
+@click.option("--top-k", default=5, type=int, help="Maximum results")
+@click.option("--type", "memory_type", default=None, type=click.Choice(["semantic", "episodic", "procedural"]))
+def search(query, top_k, memory_type):
+    """Recall memories by semantic similarity (local TF-IDF, no server)."""
+    ctx = click.get_current_context()
+    store_path = Path(ctx.obj["store"])
+    store = Store.open(store_path)
+    from .search import recall as do_recall
+    results = do_recall(store, query, top_k=top_k, memory_type=memory_type)
+    if not results:
+        click.echo("No memories found.")
+        return
+    for r in results:
+        click.echo(f"  {r.score:.3f}  {r.commit_id[:16]}  {r.memory_type:10}  {r.snippet[:80]}")
+
 @cli.command(name="import")
 @click.option("--input", "input_path", required=True, type=click.Path(exists=True), help="Path to import from")
 @click.option("--target", "target_path", default=None, help="Target alethech store (default: same as --store)")
