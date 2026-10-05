@@ -568,9 +568,17 @@ jobs:
           python - <<'PY'
           import os, json
           from pathlib import Path
-          from zipfile import ZipFile
+          from zipfile import ZipFile, ZIP_DEFLATED
           version=json.loads(Path("extension/manifest.json").read_text())["version"]
-          with ZipFile(f"downloads/alethech-extension-v{version}.zip") as archive:
+          dist = Path("extension/dist")
+          downloads = Path("downloads")
+          downloads.mkdir(exist_ok=True)
+          zip_path = downloads / f"alethech-extension-v{version}.zip"
+          with ZipFile(zip_path, "w", ZIP_DEFLATED) as archive:
+            for path in sorted(dist.rglob("*")):
+              if path.is_file() and not path.name.endswith("-test.js"):
+                archive.write(path, path.relative_to(dist))
+          with ZipFile(zip_path) as archive:
               archive.extractall(Path(os.environ["RUNNER_TEMP"])/"alethech-release-extension")
           PY
           ALETHECH_EXTENSION_DIR="$RUNNER_TEMP/alethech-release-extension" ALETHECH_STANDALONE_HTML="$GITHUB_WORKSPACE/downloads/alethech.html" node scripts/browser-tests/e2e.mjs
