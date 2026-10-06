@@ -199,9 +199,26 @@ def commit(content: str, memory_type: str, evidence_ids: tuple[str, ...], sessio
         identity.public_key = active["public_key"]
         identity.verify_self = lambda: identity_record.verify_self()
     elif legacy_identities:
-        identity = next(iter(legacy_identities.values()))
-        if not identity.verify_self():
-            raise click.ClickException("identity_mismatch: agent_id does not derive from public_key in store")
+        # FIX local (Task 106, 2026-10-06): prefer the identity whose public key
+        # matches the store signing key; next(iter(...)) is arbitrary when several
+        # identities are registered (post-rotation) and yields signature_invalid.
+        _sign_x = None
+        try:
+            _sign_x = signing.public_jwk().get("x")
+        except Exception:
+            pass
+        identity = None
+        if _sign_x:
+            for _cand in legacy_identities.values():
+                _pk = getattr(_cand, "public_key", None)
+                _x = _pk.get("x") if isinstance(_pk, dict) else None
+                if _x == _sign_x and _cand.verify_self():
+                    identity = _cand
+                    break
+        if identity is None:
+            identity = next(iter(legacy_identities.values()))
+            if not identity.verify_self():
+                raise click.ClickException("identity_mismatch: agent_id does not derive from public_key in store")
     else:
         raise click.ClickException("no identities in store — run `alethech init` first")
 

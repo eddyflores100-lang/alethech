@@ -119,9 +119,27 @@ class Alethech:
             agent_id = identity.agent_id
             key_id = identity.active_keys[0]["key_id"]
         elif legacy:
-            identity = next(iter(legacy.values()))
-            if not identity.verify_self():
-                raise AlethechError("identity_mismatch")
+            # FIX local (Task 106, 2026-10-06): pick the identity whose public key
+            # matches the store signing key; next(iter(...)) is arbitrary when
+            # several identities are registered (post-rotation) and yields
+            # signature_invalid commits.
+            _sign_x = None
+            try:
+                _sign_x = signing.public_jwk().get("x")
+            except Exception:
+                pass
+            identity = None
+            if _sign_x:
+                for _cand in legacy.values():
+                    _pk = getattr(_cand, "public_key", None)
+                    _x = _pk.get("x") if isinstance(_pk, dict) else None
+                    if _x == _sign_x and _cand.verify_self():
+                        identity = _cand
+                        break
+            if identity is None:
+                identity = next(iter(legacy.values()))
+                if not identity.verify_self():
+                    raise AlethechError("identity_mismatch")
             agent_id = identity.agent_id
             key_id = identity.key_id
         else:
