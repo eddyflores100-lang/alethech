@@ -8,7 +8,7 @@ authors:
 repository-code: "https://github.com/eddyflores100-lang/alethech"
 url: "https://alethech.alicelabs.site/"
 license: MIT
-version: "0.9.4"
+version: "0.9.5"
 date-released: "2026-10-04"
 keywords:
   - cryptography

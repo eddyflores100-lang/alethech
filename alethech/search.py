@@ -276,7 +276,7 @@ class LocalSearch:
 
         # If no embedder provided, use TF-IDF
         if self._embedder is None:
-            self._embedder = TFIDFEmbedder(corpus)
+            self._embedder = create_embedder(corpus)
         else:
             # If a custom embedder is provided, we still need to fit it
             # if it's a TFIDFEmbedder. Neural embedders don't need fitting.
@@ -371,7 +371,6 @@ def recall(
     *,
     top_k: int = 5,
     memory_type: str | None = None,
-    neural: bool = False,
 ) -> list[SearchResult]:
     """Search verified memory for entries matching *query*.
 
@@ -385,7 +384,7 @@ def recall(
         for r in results:
             print(f"{r.score:.2f} {r.commit_id[:16]} {r.snippet}")
     """
-    embedder = create_embedder(neural=neural)
+    embedder = create_embedder()
     search = LocalSearch(store, embedder=embedder)
     return search.recall(query, top_k=top_k, memory_type=memory_type)
 
@@ -523,29 +522,38 @@ def create_embedder(
     neural: bool = False,
     enhanced: bool = False,
 ) -> Embedder:
-    """Factory: create the best available embedder.
+    """Factory: create the best available embedder automatically.
 
-    Priority:
-    1. neural=True + sentence-transformers installed → NeuralEmbedder
-       (true semantic search, understands k8s↔kubernetes)
-       Requires: pip install alethech[semantic]
-    2. enhanced=True → EnhancedEmbedder
-       (char n-grams for fuzzy matching, handles typos/abbreviations)
-    3. Default → TFIDFEmbedder
-       (word-level TF-IDF, fast and accurate for exact term matching)
+    Resolution order:
+    1. If sentence-transformers is installed → NeuralEmbedder (auto)
+    2. If not installed but network available → auto-install + NeuralEmbedder
+    3. If no network → TFIDFEmbedder (works offline, zero deps)
 
-    The TFIDFEmbedder is the default because it's the most reliable
-    for exact term matching. EnhancedEmbedder adds fuzzy matching
-    but can produce noisier results. NeuralEmbedder gives true
-    semantic understanding but requires a 90MB model download.
+    The user never has to choose or install anything manually.
+    The first search triggers the download of the 90MB model,
+    cached locally for all future searches.
     """
-    if neural:
+    # Try neural (auto-detected, auto-installed)
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        return NeuralEmbedder(model)
+    except ImportError:
+        # Auto-install sentence-transformers
         try:
+            import subprocess, sys
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--quiet",
+                 "sentence-transformers>=2.0"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=120,
+            )
             from sentence_transformers import SentenceTransformer
             model = SentenceTransformer("all-MiniLM-L6-v2")
             return NeuralEmbedder(model)
-        except ImportError:
-            pass
+        except Exception:
+            pass  # No network or no space — fall back
 
     if enhanced:
         return EnhancedEmbedder(corpus)
