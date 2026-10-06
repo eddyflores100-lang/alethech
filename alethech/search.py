@@ -294,7 +294,7 @@ class LocalSearch:
         *,
         top_k: int = 5,
         memory_type: str | None = None,
-        min_score: float = 0.01,
+        min_score: float = 0.05,
     ) -> list[SearchResult]:
         """Find the top-k memory entries matching *query*.
 
