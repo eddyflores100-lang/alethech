@@ -191,8 +191,9 @@ alethech/                    # this repo — cryptographic protocol only
 ├── tests/                   # Python behavioral, adversarial, mutation and conformance tests
 ├── conformance/             # 15 adversarial conformance vectors
 ├── docs/                    # protocol specification
-├── examples/                # basic_usage.py
+├── examples/                # basic_usage.py + memory_writeback.sh (ops pattern)
 ├── INTEGRATION.md           # how to integrate with memex via MemexAlethechHook
+├── INTEGRATION-VIGIL.md     # fail-closed memory verification for watchdogs
 ├── CHANGELOG.md             # version history
 ├── SECURITY.md              # threat model + vulnerability policy
 ├── CONTRIBUTING.md          # dev setup + PR process
