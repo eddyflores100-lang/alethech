@@ -1,0 +1,16 @@
+{
+  "version": "0.9.5",
+  "source_commit": "781ed8930fdcf4d9b70ee38240de5e3b67e75b68",
+  "integrated_commit": "096f13dfc81c2414b12cda42fd68d8247df460b6",
+  "ci_run": "https://github.com/eddyflores100-lang/alethech/actions/runs/38195488862",
+  "ci_conclusion": "success",
+  "artifacts": {
+    "extension": 11722599147,
+    "offline_viewer": 11722688851
+  },
+  "sha256": {
+    "alethech-extension-v0.9.5.zip": "24397084178b79cc01d2acf9d7a4d978604c58e8fb26da1d7893f2b99228ebfe",
+    "alethech-offline-viewer-v0.9.5.zip": "b6535db98b35d77d543e2a8bfcfb0a032e53e5c3b433027dfde721c404d0452e",
+    "alethech.html": "36d33f30d0a7ad5347da824151584bf5fd339e0900e3a611b41f16d1675ceeaf"
+  }
+}
