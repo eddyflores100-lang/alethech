@@ -7,12 +7,12 @@
     "url": "https://github.com/eddyflores100-lang/alethech",
     "source": "github"
   },
-  "version": "0.9.2",
+  "version": "0.9.5",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "alethech",
-      "version": "0.9.2",
+      "version": "0.9.5",
       "transport": {
         "type": "stdio"
       }
