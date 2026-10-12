@@ -85,6 +85,28 @@ class Alethech:
             raise AlethechError("HEAD missing")
         return head
 
+    @staticmethod
+    def _signing_identity(signing, v2, legacy) -> tuple[str, str]:
+        """Resolve the operational key without falling back to another identity."""
+        public_key = signing.public_jwk()
+        if v2:
+            matches = [
+                (identity.agent_id, key["key_id"])
+                for identity in v2.values() if identity.verify_self()
+                for key in identity.active_keys
+                if isinstance(key, dict) and key.get("public_key") == public_key
+                and isinstance(key.get("key_id"), str) and key["key_id"]
+            ]
+        else:
+            matches = [
+                (identity.agent_id, identity.key_id)
+                for identity in legacy.values()
+                if identity.public_key == public_key and identity.verify_self()
+            ]
+        if len(matches) != 1:
+            raise AlethechError("signing key must match exactly one active identity key")
+        return matches[0]
+
     def commit(self, content: dict, *, memory_type: str = "semantic",
                evidence_refs: Iterable[str] = (), session_id: str | None = None,
                source: str = "agent_observation", confidence: float = 1.0) -> MemoryCommit:
@@ -112,38 +134,7 @@ class Alethech:
         missing = [eid for eid in refs if eid not in evidence]
         if missing:
             raise AlethechError(f"evidence_id not found: {missing[0]}")
-        if v2:
-            identity = next(iter(v2.values()))
-            if not identity.active_keys:
-                raise AlethechError("no active key in v0.2 identity")
-            agent_id = identity.agent_id
-            key_id = identity.active_keys[0]["key_id"]
-        elif legacy:
-            # FIX local (Task 106, 2026-10-06): pick the identity whose public key
-            # matches the store signing key; next(iter(...)) is arbitrary when
-            # several identities are registered (post-rotation) and yields
-            # signature_invalid commits.
-            _sign_x = None
-            try:
-                _sign_x = signing.public_jwk().get("x")
-            except Exception:
-                pass
-            identity = None
-            if _sign_x:
-                for _cand in legacy.values():
-                    _pk = getattr(_cand, "public_key", None)
-                    _x = _pk.get("x") if isinstance(_pk, dict) else None
-                    if _x == _sign_x and _cand.verify_self():
-                        identity = _cand
-                        break
-            if identity is None:
-                identity = next(iter(legacy.values()))
-                if not identity.verify_self():
-                    raise AlethechError("identity_mismatch")
-            agent_id = identity.agent_id
-            key_id = identity.key_id
-        else:
-            raise AlethechError("no identity in store")
+        agent_id, key_id = self._signing_identity(signing, v2, legacy)
         commit = MemoryCommit(
             agent_id=agent_id, key_id=key_id, parents=[head],
             session_id=session_id or str(uuid.uuid4()), memory_type=memory_type,
@@ -179,25 +170,7 @@ class Alethech:
         except StoreError as exc:
             raise AlethechError(str(exc)) from exc
 
-        if v2:
-            identity = next(iter(v2.values()))
-            signing_jwk = signing.public_jwk()
-            matches = [
-                item for item in identity.active_keys
-                if isinstance(item, dict) and item.get("public_key") == signing_jwk
-            ]
-            if not matches:
-                raise AlethechError("signing key does not match an active identity key")
-            agent_id = identity.agent_id
-            key_id = matches[0]["key_id"]
-        elif legacy:
-            identity = next(iter(legacy.values()))
-            if identity.public_key != signing.public_jwk():
-                raise AlethechError("signing key does not match identity")
-            agent_id = identity.agent_id
-            key_id = identity.key_id
-        else:
-            raise AlethechError("no identity in store")
+        agent_id, key_id = self._signing_identity(signing, v2, legacy)
 
         artifact_meta = []
         for name, data in (artifacts or {}).items():
