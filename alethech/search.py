@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -137,6 +138,8 @@ class TFIDFEmbedder:
 
     def _fit(self, corpus: list[str]) -> None:
         """Compute IDF weights from *corpus*."""
+        self._idf.clear()
+        self._vocab.clear()
         n_docs = len(corpus)
         if n_docs == 0:
             return
@@ -261,32 +264,25 @@ class LocalSearch:
         self._entries: list[Any] = []
 
     def _ensure_index(self) -> VerifiedMemoryView:
-        """Build the search index if not already built."""
-        if self._view is not None:
+        """Reverify the live store, reusing vectors only for an unchanged view."""
+        view = build_memory_view(self._store)
+        if self._view == view:
             return self._view
 
-        self._view = build_memory_view(self._store)
-        self._entries = list(self._view.entries)
-
-        if not self._entries:
-            return self._view
-
-        # Build corpus for TF-IDF
-        corpus = [_entry_to_text(e) for e in self._entries]
-
-        # If no embedder provided, use TF-IDF
-        if self._embedder is None:
-            self._embedder = create_embedder(corpus)
-        else:
-            # If a custom embedder is provided, we still need to fit it
-            # if it's a TFIDFEmbedder. Neural embedders don't need fitting.
-            if isinstance(self._embedder, TFIDFEmbedder):
-                self._embedder._fit(corpus)
-
-        # Embed all entries
-        self._entry_vectors = [self._embedder.embed(text) for text in corpus]
-
-        return self._view
+        entries = list(view.entries)
+        corpus = [_entry_to_text(e) for e in entries]
+        embedder = self._embedder
+        if embedder is None:
+            embedder = create_embedder(corpus)
+        elif isinstance(embedder, (TFIDFEmbedder, EnhancedEmbedder)):
+            embedder._fit(corpus)
+        # Publish the cache only after embedding succeeds; failed attempts can retry.
+        vectors = [embedder.embed(text) for text in corpus]
+        self._embedder = embedder
+        self._entries = entries
+        self._entry_vectors = vectors
+        self._view = view
+        return view
 
     def recall(
         self,
@@ -340,7 +336,7 @@ class LocalSearch:
                     commit_id=entry.commit_id,
                     agent_id=entry.agent_id,
                     memory_type=entry.memory_type,
-                    content=entry.content,
+                    content=deepcopy(entry.content),
                     timestamp=entry.timestamp,
                     score=score,
                     snippet=_make_snippet(text),
@@ -476,6 +472,8 @@ class EnhancedEmbedder:
             self._fit(corpus)
 
     def _fit(self, corpus: list[str]) -> None:
+        self._idf.clear()
+        self._vocab.clear()
         n_docs = len(corpus)
         if n_docs == 0:
             return
@@ -522,38 +520,19 @@ def create_embedder(
     neural: bool = False,
     enhanced: bool = False,
 ) -> Embedder:
-    """Factory: create the best available embedder automatically.
+    """Create an offline embedder, or explicitly opt in to a neural model.
 
-    Resolution order:
-    1. If sentence-transformers is installed → NeuralEmbedder (auto)
-    2. If not installed but network available → auto-install + NeuralEmbedder
-    3. If no network → TFIDFEmbedder (works offline, zero deps)
-
-    The user never has to choose or install anything manually.
-    The first search triggers the download of the 90MB model,
-    cached locally for all future searches.
+    Neural search requires a separately installed sentence-transformers package
+    and may download its model on first use. This function never installs packages.
     """
-    # Try neural (auto-detected, auto-installed)
-    try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer("all-MiniLM-L6-v2")
-        return NeuralEmbedder(model)
-    except ImportError:
-        # Auto-install sentence-transformers
+    if neural:
         try:
-            import subprocess, sys
-            subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", "--quiet",
-                 "sentence-transformers>=2.0"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=120,
-            )
             from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer("all-MiniLM-L6-v2")
-            return NeuralEmbedder(model)
-        except Exception:
-            pass  # No network or no space — fall back
+        except ImportError as exc:
+            raise ImportError(
+                "Neural search requires sentence-transformers; install alethech[semantic] explicitly."
+            ) from exc
+        return NeuralEmbedder(SentenceTransformer("all-MiniLM-L6-v2"))
 
     if enhanced:
         return EnhancedEmbedder(corpus)

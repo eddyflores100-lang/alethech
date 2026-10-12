@@ -35,6 +35,7 @@ Changelog = "https://github.com/eddyflores100-lang/alethech/blob/main/CHANGELOG.
 Issues = "https://github.com/eddyflores100-lang/alethech/issues"
 
 [project.optional-dependencies]
+semantic = ["sentence-transformers>=2.0"]
 dev = [
     "pytest>=8.0",
     "pytest-cov",
