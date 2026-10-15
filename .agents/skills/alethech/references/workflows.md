@@ -27,8 +27,10 @@ Each space has its own encrypted file and local unlock credential. The first
 save generates a random credential; no setup question is needed for local use.
 On POSIX, managed state directories require 0700 and credentials use 0600.
 Windows relies on the account's private directory ACL; use a user-owned directory.
-Symlink paths are intentionally rejected, including symlinked parents. Choose a
-physical directory if your system aliases its home or temporary folder.
+Caller-provided symlink paths are intentionally rejected, including symlinked
+parents. Choose a physical directory if your system aliases its home. Internally
+created temporary directories resolve OS aliases such as macOS /var to their
+physical paths before private file operations.
 
 Full signed history verifies before recall. The last local HEAD is kept outside
 the portable file and must be in the presented history's ancestry. Restoring only

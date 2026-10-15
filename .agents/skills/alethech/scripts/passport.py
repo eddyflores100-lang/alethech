@@ -179,7 +179,7 @@ class Passport:
         if before is None and (state or self.key_path.exists()):
             raise ValueError('memory missing; refusing to replace an existing identity')
         with tempfile.TemporaryDirectory(prefix='alethech-passport-') as directory:
-            location = Path(directory) / 'store'
+            location = Path(directory).resolve() / 'store'
             if before is None:
                 if not create:
                     yield None, state, before
@@ -222,7 +222,7 @@ class Passport:
             # Publish the initial credential, ciphertext and checkpoint as one
             # complete directory. Failed staging never installs a partial space.
             with tempfile.TemporaryDirectory(prefix=f'.{self.space}-', dir=self.home / 'spaces') as temp:
-                stage = Path(temp) / 'space'
+                stage = Path(temp).resolve() / 'space'
                 private_directory(stage)
                 atomic_write(stage / self.key_path.name, secret.encode(), exclusive=True)
                 atomic_write(stage / self.path.name, blob, exclusive=True)
@@ -253,7 +253,7 @@ class Passport:
             if digest(destination) != config.get('digest'):
                 return {'status': 'conflict', 'message': 'Cloud revision changed; local memory is saved. Import that revision into a separate space to inspect it.'}
             with tempfile.TemporaryDirectory(prefix='alethech-cloud-') as temp:
-                staged = Path(temp) / 'memory.aleth'
+                staged = Path(temp).resolve() / 'memory.aleth'
                 agent.seal_v2(staged, self._credential(self.cloud_key_path), create_recovery=False)
                 if digest(destination) != config.get('digest'):
                     return {'status': 'conflict', 'message': 'Cloud revision changed; local memory is saved.'}
@@ -341,10 +341,10 @@ class Passport:
             if self.path.exists() or self.key_path.exists() or self.state_path.exists():
                 raise ValueError('memory space already exists; choose a new --space')
             with tempfile.TemporaryDirectory(prefix='alethech-import-') as temp:
-                agent = Alethech.open_aleth(source, Path(temp) / 'store', passphrase)
+                agent = Alethech.open_aleth(source, Path(temp).resolve() / 'store', passphrase)
                 context = agent.context()
                 # Preserve this device's ability to continue using the portable password.
-                self._persist(agent, {}, None, Path(temp), secret=passphrase)
+                self._persist(agent, {}, None, Path(temp).resolve(), secret=passphrase)
                 return {'imported': True, 'head': agent.head, 'entries_total': len(context['entries'])}
 
     def connect_cloud(self, folder: str | Path, passphrase: str) -> dict:

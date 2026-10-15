@@ -262,3 +262,22 @@ def test_export_cannot_hide_recovery_directory_behind_dotdot(memory, tmp_path):
     with pytest.raises(ValueError, match='separate'):
         memory.export_file(output, 'portable password', recovery)
     assert not output.exists()
+
+
+def test_internal_temporary_workflows_support_os_temp_aliases(memory, tmp_path, monkeypatch):
+    if os.name == 'nt':
+        pytest.skip('requires creating an OS-style temporary symlink')
+    import tempfile
+    physical = tmp_path / 'physical-temp'
+    physical.mkdir()
+    alias = tmp_path / 'system-temp-alias'
+    alias.symlink_to(physical, target_is_directory=True)
+    monkeypatch.setattr(tempfile, 'tempdir', str(alias))
+    memory.save({'summary': 'macOS style temporary root'})
+    assert memory.recall()['verified'] is True
+    output = tmp_path / 'transfer' / 'memory.aleth'
+    memory.export_file(output, 'portable password', tmp_path / 'private' / 'recovery')
+    other = passport_module().Passport(tmp_path / 'second-device', memory.space)
+    other.import_file(output, 'portable password')
+    assert other.recall()['verified'] is True
+    assert memory.connect_cloud(tmp_path / 'cloud', 'portable password')['status'] == 'copied'

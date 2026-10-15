@@ -50,7 +50,7 @@ Files: `docs/PORTABLE_SKILL.md`, `docs/COMPETITIVE_MEMORY_REVIEW.md`, README, CI
 
 - [x] Add installation and browser fallback instructions, limitations and primary-source competition comparison.
 - [x] Run the initial full Python suite (392 passed), independent skill forward-test and whole-branch security review; reproduce and fix all four actionable findings. Final regression suite: 398 passed in 35.69s.
-- [ ] Commit and push feature branch, open a reviewable PR; sync the personal skill to its managed git workspace.
+- [x] Publish the feature branch and PR #15 through the GitHub connector; sync the personal skill to its managed git workspace.
 
 ## Execution record
 
@@ -63,3 +63,6 @@ Files: `docs/PORTABLE_SKILL.md`, `docs/COMPETITIVE_MEMORY_REVIEW.md`, README, CI
 - Storage decision: local per-space directory holds ciphertext, credential and checkpoint; a separate local lock protects operations. The journal contains only metadata. Cloud remains best-effort local-folder copying, without distributed CAS.
 
 - Final validation: 398/398 Python tests, skill YAML validation, git diff whitespace check, and standalone copied-skill save/recall/status using only the published 0.9.5 runtime all passed.
+
+- Cross-platform CI exposed macOS /var temporary-directory aliases. Added an OS-alias regression, resolved only internally created temporary paths, and retained symlink rejection for user-selected paths. Final local suite: 399 passed in 34.78s.
+- Publication: PR https://github.com/eddyflores100-lang/alethech/pull/15; managed skill push succeeded. The source Git tree published through GitHub matches the tested local tree byte-for-byte.
