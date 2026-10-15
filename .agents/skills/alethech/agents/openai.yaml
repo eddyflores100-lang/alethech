@@ -1,0 +1,4 @@
+interface:
+  display_name: "Alethech Portable Memory"
+  short_description: "Save encrypted memory and resume across agents"
+  default_prompt: "Use $alethech to save a portable checkpoint of this work and prepare it for another agent."

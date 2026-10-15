@@ -41,7 +41,7 @@ This is the reference implementation of the protocol specified in `docs/implemen
 - MIT licensed, published on PyPI as `alethech`
 
 **What this repo is NOT:**
-- It is NOT a memory store or retrieval system
+- The protocol core is not a hosted retrieval platform; the portable skill adds local encrypted memory workflows and bounded lexical recall
 - It is NOT the legacy `memex` project (Python/ChromaDB memory server)
 - It has no Docker, no auto-update, no LLM calls, no required cloud
 - It depends only on `cryptography` and `click` — no `mem0ai`, no `chromadb`, no `ollama`
@@ -59,6 +59,23 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 ## status
 
 Released version 0.9.1 — portable encrypted memory (`.aleth` v2 with ALETH002 recovery across Python, TypeScript, and Rust) and chat capture into portable memory are live. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
+
+## install the portable memory skill
+
+```bash
+npx skills add eddyflores100-lang/alethech --skill alethech --global
+```
+
+Ask your agent to save a checkpoint, resume a project, or carry memory to another
+AI/device. First save creates encrypted local memory automatically. No API key,
+account, LLM model download, server or MCP configuration is required. Python 3.10+
+and a script-capable Agent Skills host are needed; missing protocol dependencies
+are installed once in a private environment. Later memory operations run offline.
+Optional cloud-folder backup copies ciphertext only and preserves changed remote
+revisions. Browser-only chats use the existing extension/offline viewer.
+
+See [portable skill setup and limits](docs/PORTABLE_SKILL.md) and the
+[primary-source alternatives review](docs/COMPETITIVE_MEMORY_REVIEW.md).
 
 ## install
 

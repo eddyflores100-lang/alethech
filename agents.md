@@ -36,8 +36,14 @@ The verifier does NOT claim to prove WHEN a commit was created — only membersh
 - Not a cloud service
 - Not an LLM
 - Not a truth oracle — it proves signatures, not content truth
-- Not an encryption layer — it provides integrity, not confidentiality
+- The working protocol store is plaintext; portable `.aleth` containers and the passport skill encrypt persisted portable memory
 
 ## License
 
 MIT. Use it, fork it, audit it.
+
+## Portable memory skill
+
+Read `.agents/skills/alethech/SKILL.md` for automatic encrypted save/recall,
+portable export/import and optional encrypted cloud-folder backup. No API key or
+MCP configuration is required for a script-capable Agent Skills host.
