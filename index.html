@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>alethech — verifiable agent continuity protocol</title>
-<meta name="description" content="alethech — verifiable agent continuity protocol. Ed25519 + SHA-256 + JCS RFC 8785 + key rotation with reachability guarantee.">
+<title>alethech — portable encrypted memory for AI agents</title>
+<meta name="description" content="Install the Alethech skill, save encrypted memory and continue across compatible AI agents and devices. No API keys, account or server required.">
 <link rel="canonical" href="https://alethech.alicelabs.site/">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -19,8 +19,8 @@
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="alethech — verifiable agent continuity protocol">
-<meta property="og:description" content="Ed25519-signed memory commits, hash-linked Merkle DAG, key rotation with reachability guarantee. Local verification and portable encrypted files. MIT licensed.">
+<meta property="og:title" content="alethech — portable encrypted memory for AI agents">
+<meta property="og:description" content="Your work, in an encrypted .aleth file. Install the skill, save a checkpoint and resume across compatible agents. Optional encrypted cloud-folder backup. MIT licensed.">
 <meta property="og:url" content="https://alethech.alicelabs.site/">
 <meta property="og:site_name" content="alethech">
 <meta property="og:image" content="https://alethech.alicelabs.site/assets/screenshots/alethech-hero.png">
@@ -31,8 +31,8 @@
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="alethech — verifiable agent continuity protocol">
-<meta name="twitter:description" content="Ed25519-signed memory, Merkle DAG, key rotation with reachability guarantee. Live terminal with real crypto in your browser.">
+<meta name="twitter:title" content="alethech — portable encrypted memory for AI agents">
+<meta name="twitter:description" content="Install the skill. Save encrypted memory. Continue across compatible agents and devices without API keys or a server.">
 <meta name="twitter:image" content="https://alethech.alicelabs.site/assets/screenshots/alethech-hero.png">
 
 <!-- JSON-LD Structured Data -->
@@ -41,7 +41,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "alethech",
-  "description": "Verifiable agent continuity protocol \u2014 Ed25519-signed memory, hash-linked DAG, key rotation with reachability guarantee.",
+  "description": "Portable encrypted memory for AI agents, backed by verified Ed25519-signed history. Agent Skill, browser extension and offline viewer.",
   "url": "https://alethech.alicelabs.site/",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Cross-platform",
@@ -60,6 +60,11 @@
     "priceCurrency": "USD"
   },
   "featureList": [
+    "Installable Agent Skill without API keys or a server",
+    "Automatic encrypted project checkpoints",
+    "Portable .aleth export and import",
+    "Optional encrypted backup to an existing cloud sync folder",
+    "Bounded offline recall with immutable commit references",
     "Ed25519 signatures on every commit",
     "SHA-256 content addressing (JCS RFC 8785)",
     "Key rotation preserving identity",
@@ -1122,6 +1127,26 @@
     border: 1px solid #444;
     border-radius: 4px;
   }
+
+  /* Portable memory skill — use the existing notebook palette. */
+  .skill-passport{margin-top:2rem;padding:clamp(1.25rem,3vw,2.25rem);border:2px solid var(--ink);max-width:940px;}
+  .skill-passport__eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);}
+  .skill-passport h2{font-size:clamp(1.5rem,3.1vw,2.5rem);line-height:1.15;letter-spacing:-.04em;margin:.75rem 0 1rem;}
+  .skill-passport p{font-size:.9rem;line-height:1.65;max-width:78ch;}
+  .skill-command{margin:1.25rem 0 .75rem;padding:1rem;background:var(--ink);color:var(--bg);overflow-x:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem;line-height:1.65;}
+  .skill-copy{font:700 .8rem 'JetBrains Mono',monospace;padding:.75rem 1rem;background:var(--ink);color:var(--bg);border:2px solid var(--ink);cursor:pointer;}
+  .skill-copy:hover{background:var(--bg);color:var(--ink);}
+  .skill-copy:focus-visible,.skill-command:focus-visible{outline:3px solid #7c5cff;outline-offset:4px;}
+  .skill-status{font-size:.75rem;display:inline-block;margin:.5rem 0 .5rem .5rem;}
+  .skill-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:1.5rem 0;list-style:none;}
+  .skill-steps li{padding-top:1rem;border-top:1px dashed var(--thread);font-size:.8rem;line-height:1.65;}
+  .skill-steps strong{display:block;font-size:.9rem;margin-bottom:.4rem;}
+  .skill-passport .skill-note{font-size:.75rem;color:var(--muted);margin-top:1rem;}
+  .skill-passport__links{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;font-size:.8rem;}
+  .browser-install{max-width:940px;margin-top:1.5rem;font-size:.8rem;line-height:1.7;}
+  .browser-install summary{cursor:pointer;font-weight:700;}
+  .browser-install a{color:var(--ink);}
+  @media(max-width:620px){.skill-steps{grid-template-columns:1fr;gap:.75rem;}.skill-status{display:block;margin:.75rem 0;}}
 </style>
 </head>
 <body>
@@ -1140,46 +1165,55 @@
   <div class="page__inner">
     <div class="eyebrow">ἀλήθεια</div>
     <h1 class="mega">alethech</h1>
-    <p class="tagline">verifiable agent continuity protocol</p>
+    <p class="tagline">your memory. your file. your next agent.</p>
 
     <div class="stats">
-      <span>local verification</span><span class="sep">·</span>
-      <span>portable memory</span><span class="sep">·</span>
+      <span>no API keys</span><span class="sep">·</span>
+      <span>encrypted portable memory</span><span class="sep">·</span>
       <span>v0.9.5</span><span class="sep">·</span>
       <span>MIT</span>
     </div>
 
     <div class="links">
+      <a href="#skill-install">instalar skill ↓</a>
+      <a href="capture.html">navegador ↗</a>
       <a href="https://github.com/eddyflores100-lang/alethech" rel="noopener">github ↗</a>
       <a href="https://pypi.org/project/alethech/" rel="noopener">pypi ↗</a>
       <a href="https://www.npmjs.com/package/alethech-ts" rel="noopener">npm ↗</a>
     </div>
 
-    <div style="margin-top:24px;">
-      <a href="downloads/alethech-extension-v0.9.5.zip" download
-         style="display:flex;align-items:center;gap:12px;padding:16px 24px;background:#7c5cff;color:white;border-radius:14px;text-decoration:none;font-weight:700;font-size:15px;width:fit-content;">
-        <img src="downloads/alethech-icon-128.png" width="32" height="32" style="border-radius:8px;">
-        <div>
-          <div>Descargar extensión v0.9.5</div>
-          <div style="font-size:11px;font-weight:400;opacity:0.8;">Paquete disponible v0.9.5 → extrae y carga en modo desarrollador</div>
-        </div>
-      </a>
+    <div class="skill-passport" id="skill-install" lang="es">
+      <div class="skill-passport__eyebrow">Alethech Portable Memory · Agent Skill</div>
+      <h2>Instala la skill.<br>Continúa donde te quedaste.</h2>
+      <p>Guarda las decisiones, avances y próximos pasos de tu proyecto en un archivo cifrado <code>.aleth</code>. Llévalo a otro agente o dispositivo sin configurar APIs, cuentas ni servidores.</p>
+      <pre class="skill-command" tabindex="0"><code id="skill-command">npx skills add eddyflores100-lang/alethech --skill alethech --global</code></pre>
+      <button class="skill-copy" type="button" data-copy-target="skill-command" data-copy-status="skill-copy-status">Copiar comando de instalación</button>
+      <span class="skill-status" id="skill-copy-status" role="status" aria-live="polite"></span>
+      <ol class="skill-steps">
+        <li><strong>01 · Guarda</strong>Pide «Alethech, guarda este proyecto». El primer guardado crea la memoria cifrada automáticamente.</li>
+        <li><strong>02 · Llévala</strong>Exporta tu <code>.aleth</code> o guarda una copia cifrada en una carpeta que tu nube ya sincronice.</li>
+        <li><strong>03 · Continúa</strong>Importa el archivo en otro agente compatible, desbloquéalo localmente y retoma los próximos pasos.</li>
+      </ol>
+      <p>Historial firmado y verificado, memoria separada por proyecto y contexto con límite de tamaño. Si aparece otra revisión en la carpeta de nube, conserva tu trabajo local y señala el conflicto.</p>
+      <div class="skill-passport__links">
+        <a href="https://github.com/eddyflores100-lang/alethech/blob/main/docs/PORTABLE_SKILL.md" rel="noopener">Guía de la skill ↗</a>
+        <a href="capture.html">Capturar y arrastrar memoria en el navegador ↗</a>
+        <a href="downloads/alethech.html" download>Descargar visor offline ↗</a>
+      </div>
+      <p class="skill-note">Requiere Python 3.10+ y un agente con soporte de skills y ejecución de scripts. La primera ejecución descarga las dependencias si hacen falta; después funciona sin red. En chats web sin scripts, usa la extensión o el visor. La contraseña se introduce localmente, nunca en el chat.</p>
     </div>
 
-    <div style="margin-top:12px;font-size:12px;color:#8492a8;line-height:1.7;">
-      <strong style="color:#aeb9ca;">Cómo usar la extensión:</strong><br>
-      1. Click en <strong style="color:#7de2a8;">"Descargar extensión"</strong> — se baja un archivo ZIP<br>
-      2. Descomprime el ZIP (click derecho → Extraer todo)<br>
-      3. Abre <code style="color:#7de2a8;">chrome://extensions</code> en Chrome o <code style="color:#7de2a8;">edge://extensions</code> en Edge<br>
-      4. Activar <strong style="color:#aeb9ca;">Modo desarrollador</strong> (arriba a la derecha)<br>
-      5. Click <strong style="color:#aeb9ca;">Cargar descomprimida</strong> → elegir la carpeta descomprimida<br>
-      6. El icono <img src="downloads/alethech-icon-128.png" width="16" height="16" style="border-radius:3px;vertical-align:middle;"> aparece en la barra del navegador. Fíjalo (click en el pin).<br>
-      7. Abre tu chat de IA; la captura depende del contenido cargado y de la estructura del sitio<br>
-      8. Pulsa el cerebro flotante para abrir la captura en una página aislada de la extensión, o usa la captura del icono de la barra<br>
-      9. En la interfaz de la extensión revisa el texto, pon contraseña y descarga tu <code style="color:#7de2a8;">.aleth</code> cifrado<br>
-      <br>
-      <em style="color:#8492a8;">Sin extensión: <a href="downloads/alethech.html" download style="color:#7de2a8;">descarga el visor HTML independiente</a> para pegar/importar, cifrar y verificar localmente. <a href="capture.html" style="color:#7de2a8;">Ver guía y límites</a>.</em>
-    </div>
+    <details class="browser-install" lang="es">
+      <summary>¿Lo quieres en un chat web? Instala la extensión o usa el visor offline.</summary>
+      <p style="margin-top:1rem;"><a href="downloads/alethech-extension-v0.9.5.zip" download>Descargar extensión v0.9.5</a> · <a href="downloads/alethech.html" download>Descargar visor HTML independiente</a></p>
+      <ol style="padding-left:1.25rem;margin-top:.75rem;">
+        <li>Extrae el ZIP. Abre <code>chrome://extensions</code> o <code>edge://extensions</code>, activa el modo desarrollador y carga la carpeta descomprimida.</li>
+        <li>Abre tu chat y pulsa el icono Alethech o su cerebro flotante para capturar el contenido cargado.</li>
+        <li>Revisa la captura en la interfaz aislada de la extensión, elige una contraseña y descarga tu <code>.aleth</code>. Guarda la recuperación por separado.</li>
+        <li>En el destino, arrastra el archivo a la extensión o al visor, desbloquéalo y comparte solo el contexto que elijas.</li>
+      </ol>
+      <p style="margin-top:.75rem;">No recupera conversaciones no cargadas ni memorias privadas del proveedor. <a href="capture.html">Ver guía y límites ↗</a></p>
+    </details>
   </div>
 </section>
 
@@ -1194,8 +1228,8 @@
 
     <div class="with-margin">
       <div class="content prose-stack">
-        <p class="big">alethech is a Python package that provides cryptographically verifiable memory continuity for AI agents.</p>
-        <p class="body">It lets an agent sign its memory commits with <code>Ed25519</code>, link them in a Merkle DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.</p>
+        <p class="big">alethech gives AI agents portable encrypted memory, backed by a cryptographically verifiable history.</p>
+        <p class="body">It lets an agent sign its memory commits with <code>Ed25519</code>, link them in a hash-linked DAG, rotate keys without losing identity, and prove to a third party that its memory was not tampered with.</p>
         <p class="body" style="color:var(--muted);">The protocol does <b style="color:var(--ink)">NOT</b> prove that the agent's claims are true — only that they were signed by the identity that claims them.</p>
 
         <!-- the giant property sentence, now as a highlighted blockquote -->
@@ -1533,7 +1567,7 @@ result: OK"></pre>
         <ul class="honesty">
           <li><span class="not">NOT</span> <span class="x">·</span> prove truth</li>
           <li><span class="not">NOT</span> <span class="x">·</span> rollback without checkpoint</li>
-          <li><span class="not">NOT</span> <span class="x">·</span> encrypt at rest</li>
+          <li><span class="not">NOT</span> <span class="x">·</span> encrypt the raw protocol working store</li>
           <li><span class="not">NOT</span> <span class="x">·</span> delegate permissions</li>
           <li><span class="not">NOT</span> <span class="x">·</span> call any LLM</li>
           <li><span class="not">NOT</span> <span class="x">·</span> prove physical time</li>
@@ -1557,7 +1591,7 @@ result: OK"></pre>
 
     <aside class="marginalia" style="margin-top:2rem; max-width:100%;">
       <b>by design</b>
-      These non-goals describe the continuity protocol. Portable .aleth containers add local encryption at rest. The repository includes tests; test counts and hosting issue totals are not live release guarantees. Verification establishes signed history and integrity, not the truth of its content.
+      These non-goals describe the continuity protocol. Portable .aleth containers and the memory skill persist encrypted memory. Temporary working stores are plaintext during an operation. The repository includes tests; test counts and hosting issue totals are not live release guarantees. Verification establishes signed history and integrity, not the truth of its content.
     </aside>
   </div>
 </section>
@@ -1569,6 +1603,7 @@ result: OK"></pre>
     <p class="motto">τέχνη ἀληθείας</p>
 
     <nav class="colophon-links">
+      <a href="#skill-install">instalar skill ↑</a>
       <a href="https://github.com/eddyflores100-lang/alethech" rel="noopener">github ↗</a>
       <a href="https://pypi.org/project/alethech/" rel="noopener">pypi ↗</a>
       <a href="https://github.com/eddyflores100-lang/alethech/releases" rel="noopener">releases ↗</a>
@@ -2656,6 +2691,8 @@ result: OK"></pre>
   }
 })();
 </script>
+
+<script src="assets/skill-install.js" defer></script>
 
 <!-- ============ PRESENTATION MODE — keyboard nav + fullscreen ============ -->
 <script>

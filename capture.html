@@ -13,6 +13,12 @@
 <p><a href="index.html">← Alethech</a></p>
 <h1>Tu conversación, en un archivo independiente</h1>
 <p>Un <code>.aleth</code> guarda el contenido que revisas, cifrado con tu contraseña y con un historial firmado que se verifica localmente. Esta página es una guía; no recibe conversaciones ni contraseñas.</p>
+<h2>¿Tu agente admite skills?</h2>
+<p>Instala Alethech Portable Memory para guardar y retomar proyectos sin APIs ni servidor. El primer guardado crea tu memoria cifrada; luego puedes exportarla o copiarla a una carpeta local que tu nube ya sincronice.</p>
+<pre style="white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:#111c2d;line-height:1.7;" tabindex="0"><code id="skill-command">npx skills add eddyflores100-lang/alethech --skill alethech --global</code></pre>
+<button class="download" type="button" style="border:0;font:inherit;cursor:pointer;" data-copy-target="skill-command" data-copy-status="skill-copy-status">Copiar comando de instalación</button>
+<p id="skill-copy-status" role="status" aria-live="polite"></p>
+<p>Necesita Python 3.10+ y permiso para ejecutar scripts. En un chat web sin esa capacidad, usa la extensión o el visor descritos abajo. La contraseña se introduce localmente, nunca en el chat. <a href="https://github.com/eddyflores100-lang/alethech/blob/main/docs/PORTABLE_SKILL.md">Guía completa de la skill</a>.</p>
 <h2>Capturar desde el navegador</h2>
 <p><a class="download" href="downloads/alethech-extension-v0.9.5.zip" download>Descargar extensión v0.9.5</a></p>
 <ol>
@@ -26,5 +32,5 @@
 <p>Guarda <code>alethech.html</code> y ábrelo en un navegador moderno con WebCrypto Ed25519. Pega una conversación o importa texto, revísalo y crea tu archivo. El visor incluye el código y WASM necesarios para cifrar y verificar sin descargar código externo. También permite abrir un <code>.aleth</code>, recuperar su acceso y exportar contexto. No puede leer otras pestañas.</p>
 <p>Compartir contexto con otra IA requiere insertarlo, copiarlo o adjuntarlo desde el visor o la extensión y enviarlo tú. La firma prueba integridad y aceptación por tu identidad local; no prueba que el proveedor firmó el chat ni que el contenido sea verdadero.</p>
 <p><a href="docs/CHAT_CAPTURE_FLOW.md">Flujo completo y límites</a> · <a href="extension/PRIVACY.md">Privacidad y permisos</a></p>
-</main></body>
+</main><script src="assets/skill-install.js" defer></script></body>
 </html>

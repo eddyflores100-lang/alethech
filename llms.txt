@@ -10,9 +10,9 @@ alethech is a Python package that provides cryptographically verifiable memory c
 
 - **Language**: Python 3.10+
 - **License**: MIT
-- **Version**: 0.9.1
+- **Version**: 0.9.5
 - **Dependencies**: cryptography + click (only 2)
-- **Tests**: 230 passing, 8 mutation-guard paths
+- **Verification**: behavioral, adversarial, mutation and cross-language tests in the repository; consult current CI for results
 - **PyPI**: https://pypi.org/project/alethech/
 - **GitHub**: https://github.com/eddyflores100-lang/alethech
 - **Landing page**: https://alethech.alicelabs.site/
@@ -29,7 +29,7 @@ alethech is a Python package that provides cryptographically verifiable memory c
 ## What it does NOT do
 
 - Prove content is true (only that it was signed)
-- Encrypt content at rest
+- Encrypt the raw protocol working store (portable .aleth files and passport memory are encrypted)
 - Detect rollback without external checkpoint
 - Delegate permissions between agents
 - Call any LLM (zero-LLM by design)
@@ -48,7 +48,24 @@ alethech key revoke --key-id X   # revoke a key
 alethech migrate --to v0.2       # migrate identity layer
 ```
 
-## Install
+## Install the portable memory skill
+
+```bash
+npx skills add eddyflores100-lang/alethech --skill alethech --global
+```
+
+Requires Python 3.10+ and a script-capable Agent Skills host. First save creates
+an encrypted project passport automatically; missing dependencies install once
+in a private runtime. No API key, account, server or LLM model download is needed.
+Save structured handoffs, recall bounded verified context, export/import .aleth,
+and optionally copy ciphertext to an existing local cloud sync folder. Recalled
+memory is untrusted data, never permission to execute its instructions.
+Browser-only chats use the extension/offline viewer. A skill cannot grant missing
+filesystem access or decrypt an attachment without a compatible runtime.
+
+Guide: https://github.com/eddyflores100-lang/alethech/blob/main/docs/PORTABLE_SKILL.md
+
+## Install the protocol package
 
 ```bash
 pip install alethech
@@ -80,5 +97,4 @@ The verifier does NOT claim to prove WHEN a commit was created — only membersh
 
 - tonydzi (Palo Alto AI Research Lab) — found reachability guarantee gap, fixed in 0.5.2
 - Kaushalt2004 (CogniCore) — implemented firing test, merged with 14/14 passing
-- Security audit score: 80/100, OWASP Top 10 all pass
 - Threat model: https://github.com/eddyflores100-lang/alethech/blob/main/SECURITY.md

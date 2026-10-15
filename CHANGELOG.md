@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — portable Agent Skill
+
+- Replace inaccurate skill examples with a runnable, self-contained portable memory workflow.
+- Automatically create encrypted project memory on first save; bounded verified lexical recall and idempotent consecutive handoffs.
+- Add password-protected export/import, separate recovery credentials and optional encrypted backup into an existing local cloud-sync folder.
+- Add atomic initial installation, recoverable ciphertext/checkpoint updates, local locks, continuity checks, credential-pattern rejection and conflict-preserving cloud publication.
+- Bootstrap the tested 0.9.5 protocol in a private Python environment only when needed; no API key, server, account or model download required.
+- Document actual host limits and primary-source comparisons; extend portability CI with skill workflow tests.
+
+
 ## [Unreleased]
 
 ### Memory vault integration
