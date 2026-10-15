@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Memory vault integration
+
+- New `examples/memory_vault.py`: portable sectioned encrypted vault (Fernet,
+  AES-128-CBC + HMAC, 0600 on disk) — the pluggable `VAULT_SYNC_CMD` companion
+  for `examples/memory_writeback.sh`. Environment-configurable
+  (`ALETHECH_VAULT_DIR`, `ALETHECH_WORKLOG`, `ALETHECH_STORE`); commands:
+  status / read / set / add / sync / rotate.
+- New `examples/memory_recall.py`: verbatim chain reader with
+  `--last / --type / --search` filters (quote, don't paraphrase).
+- New `INTEGRATION-MEMORY.md`: the two-layer memory pattern (signed chain +
+  encrypted vault) with session-start/session-end rituals, failure semantics,
+  anti-patterns, and production evidence from 3+ full sandbox resets with
+  zero memory loss.
+
 ## [0.9.2] — 2026-10-04
 
 ### MCP Registry readiness
