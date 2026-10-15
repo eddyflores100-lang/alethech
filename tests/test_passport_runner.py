@@ -79,3 +79,21 @@ def test_old_protocol_is_detected_before_attempting_memory_operation(tmp_path):
     assert response.returncode == 1
     assert 'protocol unavailable' in json.loads(response.stdout)['error']
     assert not (tmp_path / 'device').exists()
+
+
+def test_export_requires_a_visible_local_prompt_even_with_inherited_console(monkeypatch):
+    import importlib.util
+    import io
+    from types import SimpleNamespace
+    import pytest
+    spec = importlib.util.spec_from_file_location('alethech_skill_runner', SKILL / 'scripts/memory.py')
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    sys.path.insert(0, str(SKILL / 'scripts'))
+    monkeypatch.setattr(sys, 'stdin', SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(sys, 'stderr', io.StringIO())
+    def invisible_prompt(*args, **kwargs):
+        raise AssertionError('must not prompt in a captured unattended process')
+    monkeypatch.setattr(runner.getpass, 'getpass', invisible_prompt)
+    with pytest.raises(ValueError, match='credential-file'):
+        runner.password(SimpleNamespace(credential_file=None))

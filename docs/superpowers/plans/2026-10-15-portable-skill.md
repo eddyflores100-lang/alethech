@@ -66,3 +66,5 @@ Files: `docs/PORTABLE_SKILL.md`, `docs/COMPETITIVE_MEMORY_REVIEW.md`, README, CI
 
 - Cross-platform CI exposed macOS /var temporary-directory aliases. Added an OS-alias regression, resolved only internally created temporary paths, and retained symlink rejection for user-selected paths. Final local suite: 399 passed in 34.78s.
 - Publication: PR https://github.com/eddyflores100-lang/alethech/pull/15; managed skill push succeeded. The source Git tree published through GitHub matches the tested local tree byte-for-byte.
+
+- Publication follow-up: user explicitly requested main and website deployment. Added skill installation to index/landing/capture, clipboard helper and current agent metadata. Windows CI revealed an inherited-console password wait; require visible stderr before prompting, covered by a RED→GREEN regression. Local suite: 400 passed.

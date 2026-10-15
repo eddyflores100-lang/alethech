@@ -45,7 +45,7 @@ def password(args, *, confirm=False):
             raise ValueError('credential-file must allow only the owner (chmod 600)')
         value = read_file(path, 65536).decode('utf-8').rstrip('\r\n')
     else:
-        if not sys.stdin.isatty():
+        if not (sys.stdin.isatty() and sys.stderr.isatty()):
             raise ValueError('unlock locally in a human terminal or provide a private --credential-file; never send passwords in chat')
         with warnings.catch_warnings():
             warnings.simplefilter('error', getpass.GetPassWarning)
