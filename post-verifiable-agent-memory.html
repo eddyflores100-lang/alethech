@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memoria de agente verificable — bitácora de alethech</title>
+<meta name="description" content="Cómo alethech hace verificable la memoria de un agente LLM: commits firmados con Ed25519, DAG enlazado por hashes, rotación de claves con garantía de reachability y cifrado scrypt + AES-256-GCM.">
+<link rel="canonical" href="https://alethech.alicelabs.site/post-verifiable-agent-memory.html">
+<style>
+  *,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --bg:#fafafa;          /* paper */
+    --ink:#0a0a0a;         /* main text + accent */
+    --paper-edge:#efefef;
+    --thread:#9a9a9a;      /* stitch + marginalia */
+    --muted:#6b6b6b;       /* secondary text */
+    --stitch-x:30px;
+    --gutter:64px;
+  }
+  html{ scroll-behavior:smooth; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'JetBrains Mono','IBM Plex Mono','Courier New',monospace;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    padding-left:var(--gutter);
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    top:0; bottom:0;
+    left:var(--stitch-x);
+    width:0;
+    border-left:2px dashed var(--thread);
+    z-index:5;
+    pointer-events:none;
+  }
+  .page{
+    max-width:760px;
+    padding:4rem 2rem 6rem 0;
+  }
+  header.post{ margin-bottom:2.5rem; }
+  .kicker{
+    color:var(--muted);
+    font-size:.8rem;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    margin-bottom:1rem;
+  }
+  h1{
+    font-size:1.7rem;
+    line-height:1.3;
+    margin-bottom:.9rem;
+    font-weight:700;
+  }
+  .meta{
+    color:var(--muted);
+    font-size:.82rem;
+    margin-bottom:2rem;
+  }
+  .meta a{ color:var(--ink); }
+  h2{
+    font-size:1.12rem;
+    margin:2.6rem 0 1rem;
+    padding-top:1.4rem;
+    border-top:1px solid var(--paper-edge);
+  }
+  h2 .num{ color:var(--thread); margin-right:.5rem; }
+  p{ margin-bottom:1rem; }
+  p.li, li{ margin:0 0 .55rem 1.4rem; }
+  ul{ margin-bottom:1rem; }
+  strong{ font-weight:700; }
+  a{ color:var(--ink); text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--thread); }
+  a:hover{ text-decoration-color:var(--ink); }
+  code{
+    font-family:inherit;
+    background:var(--paper-edge);
+    padding:.08em .35em;
+    border-radius:3px;
+    font-size:.88em;
+  }
+  pre{
+    background:#0a0a0a;
+    color:#fafafa;
+    padding:1.1rem 1.2rem;
+    overflow-x:auto;
+    font-size:.82rem;
+    line-height:1.55;
+    margin:1.2rem 0 1.4rem;
+    border-left:4px solid var(--thread);
+  }
+  pre code{ background:none; padding:0; color:inherit; }
+  .aside{
+    border:1px solid var(--paper-edge);
+    border-left:4px solid var(--ink);
+    padding:.9rem 1.1rem;
+    margin:1.4rem 0;
+    color:var(--muted);
+    font-size:.9rem;
+  }
+  .cta{
+    margin-top:3rem;
+    padding:1.2rem 1.3rem;
+    border:1px solid var(--ink);
+  }
+  .cta p{ margin-bottom:.5rem; }
+  .cta .big{ font-weight:700; }
+  footer{
+    margin-top:3rem;
+    padding-top:1.4rem;
+    border-top:1px solid var(--paper-edge);
+    color:var(--muted);
+    font-size:.82rem;
+  }
+  @media (max-width:640px){
+    body{ padding-left:44px; }
+    :root{ --stitch-x:16px; }
+    .page{ padding:2.5rem 1.2rem 4rem 0; }
+    h1{ font-size:1.35rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="post">
+  <p class="kicker">bitácora · alethech</p>
+  <h1>Memoria de agente verificable: firmas Ed25519, un DAG enlazado por hashes y rotación de claves que no puede borrar el pasado</h1>
+  <p class="meta">2026-10-18 · Edison Flores (AliceLabs) · <a href="/">alethech.alicelabs.site ↩</a></p>
+</header>
+
+<h2><span class="num">01</span>El problema: la memoria de un agente es una caja negra</h2>
+<p>Un agente LLM que trabaja durante semanas acumula memoria: decisiones, credenciales de contexto, hallazgos de una investigación, el estado de un despliegue. Casi todas las soluciones actuales guardan esa memoria como texto o como resúmenes re-escritos por otro LLM. El resultado es que la memoria <strong>no tiene historia auditable</strong>: nadie puede responder tres preguntas básicas. ¿Quién escribió exactamente esta entrada y con qué clave? ¿Se modificó algo después de escribirla? ¿Y si la clave con la que se firmó quedó comprometida, cómo demuestro que lo escrito antes del compromiso sigue siendo auténtico?</p>
+<p>El problema no es teórico. Un agente que opera con acceso a billeteras, despliegues o correos produce memoria que otras personas — y otros agentes — usan para decidir. Una memoria que puede mutar en silencio no es memoria: es un borrador. Y un borrador re-escrito por un LLM hereda todos los problemas de confianza del modelo que lo reescribió.</p>
+
+<h2><span class="num">02</span>Objetivos de diseño</h2>
+<p>alethech nace de cuatro restricciones, en este orden:</p>
+<ul>
+  <li><strong>Local-first</strong>: la memoria vive en un archivo del dueño. Nada sale del proceso salvo lo que el usuario exporta explícitamente.</li>
+  <li><strong>Verificación sin la presencia del autor</strong>: un tercero debe poder validar la cadena completa — firmas, enlaces y vigencia de claves — sin confiar en quien la entrega ni en ningún servidor.</li>
+  <li><strong>Zero-LLM</strong>: ningún paso del protocolo invoca un modelo. La verificación es matemática, no estadística: o la firma cuadra o no cuadra.</li>
+  <li><strong>Zero-blockchain</strong>: no hay consenso distribuido ni token. Un DAG local firmado es suficiente; la cadena de propósito general es innecesaria cuando existe una autoridad clara (el dueño de la clave).</li>
+</ul>
+
+<h2><span class="num">03</span>El modelo: cada entrada es un commit firmado</h2>
+<p>La memoria es un archivo append-only donde cada entrada es un commit: un contenido arbitrario (JSON), metadatos de tipo, el hash del commit anterior, y una firma. Para que dos implementaciones en lenguajes distintos produzcan exactamente los mismos bytes antes de firmar, el objeto se canoniza con <strong>JCS (RFC 8785)</strong>: serialización JSON canónica, sin ambigüedad de orden de claves ni de números. Sobre esos bytes se calcula el digest <code>sha256</code> y se firma con <strong>Ed25519</strong>.</p>
+<p>El resultado es un <strong>DAG enlazado por hashes</strong>: cada commit referencia a su padre, y la cabeza (<code>head</code>) es un resumen de todo el estado. Mutar cualquier entrada rompe todos los hashes posteriores; insertar una entrada falsa exige una firma válida de la clave, y modificar una firma vieja exige la clave vieja. La verificación recorre la cadena completa y devuelve un informe estructurado — no un booleano — con el estado de cada commit.</p>
+
+<pre><code>from alethech import Alethech
+
+store = Alethech.open("memory.aleth")
+
+store.commit(
+    {"decision": "deploy v0.9.5", "env": "production",
+     "approved_by": "release-checklist#12"},
+    memory_type="decision",
+)
+
+report = store.verify()
+print(report.errors)   # [] = cadena íntegra, todas las firmas válidas</code></pre>
+
+<p>Ese <code>verify()</code> comprueba, para cada commit: digest JCS correcto, firma Ed25519 válida respecto de la clave declarada, enlace al padre, y vigencia de la clave según la tabla de identidades del store.</p>
+
+<h2><span class="num">04</span>Rotación de claves sin romper la cadena — la parte difícil</h2>
+<p>Rotar la clave de firma es trivial si puedes re-firmar todo. El problema real es que re-firmar destruye el valor probatorio: si puedes re-firmar el pasado, el pasado no prueba nada. alethech lo resuelve con un <strong>evento de control</strong>: una rotación es un commit especial firmado por la clave saliente que declara la clave entrante y un <code>cutoff_head</code> — el punto exacto donde termina la era de la clave vieja.</p>
+<p>La garantía de <strong>reachability</strong> es la contrapartida: un commit firmado con una clave ya revocada <em>solo</em> es válido si pertenece a la ancestría de <code>cutoff_head</code>. Cualquier commit "oscuro" — firmado con la clave revocada <em>fuera</em> de esa ancestría, por ejemplo algo inyectado después con la clave filtrada — es rechazado por <code>verify()</code> con <code>not_in_proven_pre_rotation_history</code>. Puedes rotar mil veces: cada era sigue verificando con la clave que le corresponde, y nada firmado fuera de su era pasa como histórico.</p>
+<div class="aside">Las dos derrotas clásicas de esta garantía — mover la clave de <code>revoked_keys</code> a <code>active_keys</code>, o mutar <code>cutoff_head</code> para que apunte al propio commit oscuro — están implementadas como <em>mutation guards</em> con tests dedicados: el verificador detecta la inconsistencia entre la tabla de control y el estado declarado, no solo el valor puntual.</div>
+<p>La rotación de la clave de <em>firma</em> es distinta de la rotación de la clave de <em>cifrado</em>. Esta última (<code>rekey_aleth</code>) re-envuelve la clave de datos (DEK) con una nueva KEK derivada por scrypt, sin tocar el contenido: cambiar tu frase no invalida la historia, y la historia sigue probando quién la escribió.</p>
+
+<h2><span class="num">05</span>Cifrado en reposo: scrypt + AES-256-GCM</h2>
+<p>El archivo de memoria se puede sellar (<code>seal_v2</code>) como <code>.aleth</code>: una KEK derivada de la frase con <strong>scrypt</strong> envuelve una DEK aleatoria, y el contenido se cifra con <strong>AES-256-GCM</strong> (autenticado: un byte alterado del contenedor falla la apertura, además de fallar la verificación de firmas). La combinación da dos capas independientes — confidencialidad ante robo del archivo, integridad ante manipulación de quien lo obtenga.</p>
+
+<h2><span class="num">06</span>El puente MCP: memoria verificable para cualquier cliente</h2>
+<p>El paquete incluye <code>alethech-mcp</code>, un puente <strong>solo lectura</strong> sobre stdio que expone el store verificado como servidor MCP. Cualquier cliente consciente del protocolo MCP puede inicializar y consultar dos herramientas: <code>alethech_memory_context</code> (contexto verificado, solo entradas íntegras) y <code>alethech_memory_verify</code> (informe de verificación completo). Sin SDK de MCP — JSON-RPC plano sobre stdio — y atado al archivo: el puente no acepta rutas arbitrarias, solo la memoria con la que se levantó.</p>
+
+<pre><code>{"jsonrpc":"2.0","id":1,"method":"initialize",
+ "params":{"protocolVersion":"2024-11-05","capabilities":{},
+           "clientInfo":{"name":"tu-cliente","version":"1.0"}}}
+
+# → serverInfo: alethech-memory · protocol 2024-11-05
+#   tools: alethech_memory_context, alethech_memory_verify</code></pre>
+
+<p>El bridge está publicado en el <a href="https://registry.modelcontextprotocol.io/" rel="noopener">MCP Registry oficial</a> como <code>io.github.eddyflores100-lang/alethech</code>, y el repo aparece en <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory" rel="noopener">Awesome-Agent-Memory</a> tras una auditoría del mantenedor contra el código — firmas, criptografía y CI incluidas.</p>
+
+<h2><span class="num">07</span>Qué NO resuelve (los límites)</h2>
+<p>Honestidad de protocolo: alethech garantiza <em>integridad y autenticidad</em> de la memoria, y esto es lo que garantiza — y lo que no.</p>
+<ul>
+  <li><strong>No garantiza disponibilidad</strong>: si pierdes el archivo y tu frase, la historia se pierde. La recuperación de <code>.aleth</code> v2 incluye material de recuperación, pero es tuyo guardarlo.</li>
+  <li><strong>No resuelve custodia de claves</strong>: si la clave de firma vive en el mismo disco que la memoria, un atacante con acceso a ambos puede escribir memoria nueva (no reescribir la vieja — eso lo impide la cadena).</li>
+  <li><strong>Es monoproceso/monoautor</strong>: un store, una identidad. La memoria multi-agente con consenso entre pares es otro problema, y este protocolo no pretende resolverlo.</li>
+  <li><strong>La firma acredita autoría, no verdad</strong>: que una entrada la escribió tu clave no la hace correcta — hace <em>atribuible</em> e <em>inmutable</em>. La calidad del contenido sigue siendo cosa tuya y de tu agente.</li>
+</ul>
+
+<h2><span class="num">08</span>Verifícalo tú mismo</h2>
+<p>El núcleo es Python stdlib + <code>cryptography</code>, y todo el pipeline corre local:</p>
+<pre><code>pip install alethech          # núcleo + CLI
+alethech init ./mi-memoria.aleth
+alethech commit ./mi-memoria.aleth --type semantic --stdin
+alethech verify ./mi-memoria.aleth</code></pre>
+<p>Implementaciones hermanas comparten el mismo formato sobre la marcha: TypeScript (<a href="https://www.npmjs.com/package/alethech-ts" rel="noopener"><code>alethech-ts</code></a>), Rust (<code>alethech-rs</code>) y WASM para el navegador — todas canonizan con JCS, así que un commit escrito desde TypeScript verifica byte a byte desde Python.</p>
+
+<div class="cta">
+  <p class="big">Si este protocolo te sirve, el repo es <a href="https://github.com/eddyflores100-lang/alethech" rel="noopener">github.com/eddyflores100-lang/alethech</a>.</p>
+  <p>Una ★ en el repo es como otras personas — y sus agentes — encuentran el proyecto. El listado del que probablemente llegaste: <a href="https://github.com/TeleAI-UAGI/Awesome-Agent-Memory" rel="noopener">Awesome-Agent-Memory</a>.</p>
+</div>
+
+<footer>
+  alethech — del griego ἀλήθεια (aletheia, "verdad como des-ocultamiento") + τέχνη (techne, "arte, oficio").
+  <br>Copyright (c) 2026 AliceLabs LLC · <a href="/">inicio ↩</a>
+</footer>
+
+</div>
+</body>
+</html>
