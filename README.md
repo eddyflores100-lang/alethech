@@ -6,9 +6,6 @@
 [![Python](https://img.shields.io/pypi/pyversions/alethech.svg)](https://pypi.org/project/alethech/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/alethech/actions/workflows/ci.yml)
-[![Mutation paths](https://img.shields.io/badge/mutation%20paths-8-blue)](https://github.com/eddyflores100-lang/alethech)
-[![Coverage](https://img.shields.io/badge/coverage-85%25-yellow)](https://github.com/eddyflores100-lang/alethech)
-[![Type hints](https://img.shields.io/badge/type%20hints-100%25-brightgreen)](https://github.com/eddyflores100-lang/alethech)
 [![GitHub Repo stars](https://img.shields.io/github/stars/eddyflores100-lang/alethech?style=social)](https://github.com/eddyflores100-lang/alethech/stargazers)
 
 > Verifiable agent continuity protocol — local-first, zero-LLM, zero-blockchain.
@@ -58,7 +55,7 @@ The protocol does NOT prove that the agent's claims are true — only that they 
 
 ## status
 
-Released version 0.9.1 — portable encrypted memory (`.aleth` v2 with ALETH002 recovery across Python, TypeScript, and Rust) and chat capture into portable memory are live. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
+Released version 0.9.5 — portable encrypted memory (`.aleth` v2 with ALETH002 recovery across Python, TypeScript, and Rust) and chat capture into portable memory are live. CI runs the Python suite on 3.10–3.13 plus cross-language conformance and `.aleth` interoperability across Python, Rust, and TypeScript. No LLM, no required cloud, no blockchain, no consensus.
 
 ## install the portable memory skill
 
@@ -218,7 +215,7 @@ alethech/                    # this repo — cryptographic protocol only
 ├── CITATION.cff             # academic citation
 ├── LICENSE                  # MIT
 ├── README.md                # this file
-└── pyproject.toml           # alethech 0.9.1, deps: cryptography + click only
+└── pyproject.toml           # package metadata and dependencies: cryptography + click
 ```
 
 ## cross-language validation
