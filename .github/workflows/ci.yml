@@ -41,6 +41,11 @@ jobs:
       - name: Install package + dev deps
         run: pip install -e ".[dev]"
 
+      - name: Audit Python dependencies
+        run: |
+          python -m pip install --upgrade pip-audit
+          pip-audit --strict
+
       - name: Run pytest
         run: python -m pytest tests/ -v
 
