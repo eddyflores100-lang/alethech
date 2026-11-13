@@ -38,8 +38,18 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Upgrade vulnerable build tooling
+        run: python -m pip install --upgrade "setuptools>=84.1.0" wheel
+
       - name: Install package + dev deps
         run: pip install -e ".[dev]"
+
+      - name: Audit project environment without auditing the audit tool
+        run: |
+          python -m venv /tmp/pip-audit-venv
+          /tmp/pip-audit-venv/bin/python -m pip install --upgrade pip-audit
+          SITE_PACKAGES="$(python -c 'import site; print(site.getsitepackages()[0])')"
+          /tmp/pip-audit-venv/bin/pip-audit --path "$SITE_PACKAGES" --strict
 
       - name: Run pytest
         run: python -m pytest tests/ -v
