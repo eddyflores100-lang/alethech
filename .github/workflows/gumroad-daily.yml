@@ -1,0 +1,47 @@
+name: Gumroad daily batch
+
+# Lote diario de Gumroad: publica el inventario preparado en gumroad-ops/packs/
+# hasta llenar la cuota rodante (10/24h). El estado vive en gumroad-ops/state/
+# y se commitea para la siguiente corrida.
+# Fires: 04:00, 10:00, 16:00, 22:00 UTC = 23:00, 05:00, 11:00, 17:00 Ecuador.
+# Auto-regulada: la mayoría de corridas son no-ops cuando la cuota sigue llena.
+
+on:
+  schedule:
+    - cron: '0 4,10,16,22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gumroad-daily
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Publish daily batch
+        env:
+          GUMROAD_TOKEN: ${{ secrets.GUMROAD_TOKEN }}
+        run: python gumroad-ops/publish_daily.py
+
+      - name: Commit state
+        run: |
+          git config user.name "alice-gumroad-bot"
+          git config user.email "bot@alicelabs.dev"
+          git add gumroad-ops/state/
+          if git diff --cached --quiet; then
+            echo "sin cambios de estado"
+          else
+            git commit -m "gumroad daily: state update $(date -u +%FT%TZ)"
+            git push
+          fi
